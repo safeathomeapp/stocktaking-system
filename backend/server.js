@@ -144,6 +144,8 @@ app.get('/api/sessions/:id', async (req, res) => {
 
 // Add this endpoint after the GET /api/sessions/:id endpoint in your server.js
 
+// Replace the PUT /api/sessions/:id endpoint in your server.js with this corrected version
+
 // Update session (complete, add notes, change status)
 app.put('/api/sessions/:id', async (req, res) => {
   try {
@@ -192,10 +194,7 @@ app.put('/api/sessions/:id', async (req, res) => {
       paramCount++;
     }
 
-    // Always update the updated_at timestamp
-    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
-
-    if (updateFields.length === 1) { // Only updated_at was added
+    if (updateFields.length === 0) {
       return res.status(400).json({ error: 'No valid fields provided for update' });
     }
 
@@ -221,7 +220,6 @@ app.put('/api/sessions/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update session' });
   }
 });
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
