@@ -433,6 +433,75 @@ app.post('/api/sessions/:id/entries', async (req, res) => {
   }
 });
 
+// Add this endpoint after the POST /api/sessions/:id/entries endpoint in your server.js
+
+// Get all entries for a session with product details
+app.get('/api/sessions/:id/entries', async (req, res) => {
+  try {
+    const { id: session_id } = req.params;
+    const { category, completed_only } = req.query;
+
+    // Verify session exists
+    const sessionCheck = await pool.query('SELECT id FROM stock_sessions WHERE id = $1', [session_id]);
+    if (sessionCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Build query with optional filters
+    let query = `
+      SELECT 
+        se.*,
+        p.name as product_name,
+        p.brand,
+        p.size,
+        p.category,
+        p.unit_type,
+        p.barcode
+      FROM stock_entries se
+      JOIN products p ON se.product_id = p.id
+      WHERE se.session_id = $1
+    `;
+
+    const queryParams = [session_id];
+    let paramCount = 2;
+
+    if (category) {
+      query += ` AND p.category = $${paramCount}`;
+      queryParams.push(category);
+      paramCount++;
+    }
+
+    if (completed_only === 'true') {
+      query += ` AND se.quantity_level IS NOT NULL`;
+    }
+
+    query += ` ORDER BY p.category, p.name`;
+
+    const result = await pool.query(query, queryParams);
+
+    // Get summary statistics
+    const statsResult = await pool.query(
+      `SELECT 
+         COUNT(*) as total_entries,
+         COUNT(CASE WHEN quantity_level IS NOT NULL THEN 1 END) as completed_entries,
+         COUNT(DISTINCT p.category) as categories_covered
+       FROM stock_entries se
+       JOIN products p ON se.product_id = p.id
+       WHERE se.session_id = $1`,
+      [session_id]
+    );
+
+    res.json({
+      entries: result.rows,
+      summary: statsResult.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error fetching stock entries:', error);
+    res.status(500).json({ error: 'Failed to fetch stock entries' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
