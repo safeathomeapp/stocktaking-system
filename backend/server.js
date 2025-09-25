@@ -68,7 +68,47 @@ app.get('/api/venues/:id/products', async (req, res) => {
   }
 });
 
+// ===== SESSION MANAGEMENT ENDPOINTS =====
+
+// Create new stock-taking session
+app.post('/api/sessions', async (req, res) => {
+  try {
+    const { venue_id, stocktaker_name, notes } = req.body;
+
+    // Validate required fields
+    if (!venue_id || !stocktaker_name) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: venue_id and stocktaker_name are required' 
+      });
+    }
+
+    // Verify venue exists
+    const venueCheck = await pool.query('SELECT id FROM venues WHERE id = $1', [venue_id]);
+    if (venueCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    // Create new session
+    const result = await pool.query(
+      `INSERT INTO stock_sessions (venue_id, stocktaker_name, notes, session_date, status) 
+       VALUES ($1, $2, $3, CURRENT_DATE, 'in_progress') 
+       RETURNING *`,
+      [venue_id, stocktaker_name, notes || null]
+    );
+
+    res.status(201).json({
+      message: 'Stock session created successfully',
+      session: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error creating session:', error);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 // Force redeploy Thu Sep 25 23:10:47 GMTST 2025
