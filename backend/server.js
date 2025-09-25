@@ -326,6 +326,113 @@ app.get('/api/sessions', async (req, res) => {
   }
 });
 
+// Add this endpoint after the GET /api/sessions endpoint in your server.js
+
+// ===== STOCK ENTRY MANAGEMENT ENDPOINTS =====
+
+// Add product stock entry to a session
+app.post('/api/sessions/:id/entries', async (req, res) => {
+  try {
+    const { id: session_id } = req.params;
+    const { 
+      product_id, 
+      quantity_level, 
+      quantity_units = 0, 
+      location_notes, 
+      condition_flags,
+      photo_url 
+    } = req.body;
+
+    // Validate required fields
+    if (!product_id || quantity_level === undefined) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: product_id and quantity_level are required' 
+      });
+    }
+
+    // Validate quantity_level range (0.0 to 1.0)
+    if (quantity_level < 0.0 || quantity_level > 1.0) {
+      return res.status(400).json({ 
+        error: 'quantity_level must be between 0.0 (empty) and 1.0 (full)' 
+      });
+    }
+
+    // Check if session exists and is in progress
+    const sessionCheck = await pool.query(
+      'SELECT id, status, venue_id FROM stock_sessions WHERE id = $1', 
+      [session_id]
+    );
+    
+    if (sessionCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (sessionCheck.rows[0].status !== 'in_progress') {
+      return res.status(400).json({ 
+        error: 'Cannot add entries to a session that is not in progress' 
+      });
+    }
+
+    // Verify product exists and belongs to the same venue as the session
+    const productCheck = await pool.query(
+      'SELECT id, name FROM products WHERE id = $1 AND venue_id = $2', 
+      [product_id, sessionCheck.rows[0].venue_id]
+    );
+    
+    if (productCheck.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Product not found or does not belong to this venue' 
+      });
+    }
+
+    // Check if entry already exists for this product in this session
+    const existingEntry = await pool.query(
+      'SELECT id FROM stock_entries WHERE session_id = $1 AND product_id = $2',
+      [session_id, product_id]
+    );
+
+    if (existingEntry.rows.length > 0) {
+      return res.status(409).json({ 
+        error: 'Stock entry already exists for this product in this session. Use PUT to update.' 
+      });
+    }
+
+    // Create new stock entry
+    const result = await pool.query(
+      `INSERT INTO stock_entries 
+       (session_id, product_id, quantity_level, quantity_units, location_notes, condition_flags, photo_url) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+       RETURNING *`,
+      [session_id, product_id, quantity_level, quantity_units, location_notes, 
+       condition_flags ? JSON.stringify(condition_flags) : null, photo_url]
+    );
+
+    // Get entry with product details for response
+    const entryWithProduct = await pool.query(
+      `SELECT 
+         se.*,
+         p.name as product_name,
+         p.brand,
+         p.size,
+         p.category,
+         p.unit_type
+       FROM stock_entries se
+       JOIN products p ON se.product_id = p.id
+       WHERE se.id = $1`,
+      [result.rows[0].id]
+    );
+
+    res.status(201).json({
+      message: 'Stock entry created successfully',
+      entry: entryWithProduct.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error creating stock entry:', error);
+    res.status(500).json({ error: 'Failed to create stock entry' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
