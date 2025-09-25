@@ -141,6 +141,87 @@ app.get('/api/sessions/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch session' });
   }
 });
+
+// Add this endpoint after the GET /api/sessions/:id endpoint in your server.js
+
+// Update session (complete, add notes, change status)
+app.put('/api/sessions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, notes, stocktaker_name } = req.body;
+
+    // Validate status if provided
+    const validStatuses = ['in_progress', 'completed', 'reviewed'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        error: 'Invalid status. Must be: in_progress, completed, or reviewed' 
+      });
+    }
+
+    // Check if session exists
+    const sessionCheck = await pool.query('SELECT id, status FROM stock_sessions WHERE id = $1', [id]);
+    if (sessionCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Build dynamic update query
+    const updateFields = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (status !== undefined) {
+      updateFields.push(`status = $${paramCount}`);
+      values.push(status);
+      paramCount++;
+      
+      // Set completed_at timestamp when status changes to completed
+      if (status === 'completed') {
+        updateFields.push(`completed_at = CURRENT_TIMESTAMP`);
+      }
+    }
+
+    if (notes !== undefined) {
+      updateFields.push(`notes = $${paramCount}`);
+      values.push(notes);
+      paramCount++;
+    }
+
+    if (stocktaker_name !== undefined) {
+      updateFields.push(`stocktaker_name = $${paramCount}`);
+      values.push(stocktaker_name);
+      paramCount++;
+    }
+
+    // Always update the updated_at timestamp
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    if (updateFields.length === 1) { // Only updated_at was added
+      return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+
+    // Add session ID for WHERE clause
+    values.push(id);
+
+    const query = `
+      UPDATE stock_sessions 
+      SET ${updateFields.join(', ')} 
+      WHERE id = $${paramCount} 
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+
+    res.json({
+      message: 'Session updated successfully',
+      session: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating session:', error);
+    res.status(500).json({ error: 'Failed to update session' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
