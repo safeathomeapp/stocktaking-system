@@ -619,6 +619,47 @@ app.put('/api/entries/:id', async (req, res) => {
   }
 });
 
+// Add this endpoint after the PUT /api/entries/:id endpoint in your server.js
+
+// Delete stock entry
+app.delete('/api/entries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if entry exists and session is in progress
+    const entryCheck = await pool.query(
+      `SELECT se.id, se.session_id, ss.status, p.name as product_name
+       FROM stock_entries se 
+       JOIN stock_sessions ss ON se.session_id = ss.id 
+       JOIN products p ON se.product_id = p.id
+       WHERE se.id = $1`, 
+      [id]
+    );
+
+    if (entryCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Stock entry not found' });
+    }
+
+    if (entryCheck.rows[0].status !== 'in_progress') {
+      return res.status(400).json({ 
+        error: 'Cannot delete entries from a session that is not in progress' 
+      });
+    }
+
+    // Delete the entry
+    await pool.query('DELETE FROM stock_entries WHERE id = $1', [id]);
+
+    res.json({
+      message: 'Stock entry deleted successfully',
+      deleted_product: entryCheck.rows[0].product_name
+    });
+
+  } catch (error) {
+    console.error('Error deleting stock entry:', error);
+    res.status(500).json({ error: 'Failed to delete stock entry' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
