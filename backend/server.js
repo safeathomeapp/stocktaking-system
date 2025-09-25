@@ -293,6 +293,39 @@ app.get('/api/venues/:id/sessions', async (req, res) => {
   }
 });
 
+// Add this endpoint after the GET /api/venues/:id/sessions endpoint in your server.js
+
+// Get all active sessions (useful for dashboard/monitoring)
+app.get('/api/sessions', async (req, res) => {
+  try {
+    const { status = 'in_progress', limit = 20 } = req.query;
+
+    const result = await pool.query(
+      `SELECT 
+         s.*,
+         v.name as venue_name,
+         COUNT(se.id) as entry_count
+       FROM stock_sessions s
+       JOIN venues v ON s.venue_id = v.id
+       LEFT JOIN stock_entries se ON s.id = se.session_id
+       WHERE s.status = $1
+       GROUP BY s.id, v.name
+       ORDER BY s.created_at DESC
+       LIMIT $2`,
+      [status, parseInt(limit)]
+    );
+
+    res.json({
+      sessions: result.rows,
+      filter: { status }
+    });
+
+  } catch (error) {
+    console.error('Error fetching sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
