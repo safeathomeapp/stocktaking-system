@@ -1,0 +1,14 @@
+{
+  "name": "stocktaking-system",
+  "version": "1.0.0",
+  "description": "Modern tablet-optimized stock-taking system",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "cd backend && npm start",
+    "build": "cd backend && npm install",
+    "dev": "cd backend && npm run dev"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
