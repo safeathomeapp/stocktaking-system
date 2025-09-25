@@ -106,7 +106,41 @@ app.post('/api/sessions', async (req, res) => {
     res.status(500).json({ error: 'Failed to create session' });
   }
 });
+// Add this endpoint after the POST /api/sessions endpoint in your server.js
 
+// Get session details with venue info and entry count
+app.get('/api/sessions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get session with venue details and entry count
+    const result = await pool.query(
+      `SELECT 
+         s.*,
+         v.name as venue_name,
+         v.address as venue_address,
+         COUNT(se.id) as entry_count
+       FROM stock_sessions s
+       JOIN venues v ON s.venue_id = v.id
+       LEFT JOIN stock_entries se ON s.id = se.session_id
+       WHERE s.id = $1
+       GROUP BY s.id, v.name, v.address`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    res.json({
+      session: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error fetching session:', error);
+    res.status(500).json({ error: 'Failed to fetch session' });
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
