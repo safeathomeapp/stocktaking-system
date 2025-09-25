@@ -660,6 +660,93 @@ app.delete('/api/entries/:id', async (req, res) => {
   }
 });
 
+// Add this endpoint after the DELETE /api/entries/:id endpoint in your server.js
+
+// Get session progress summary
+app.get('/api/sessions/:id/progress', async (req, res) => {
+  try {
+    const { id: session_id } = req.params;
+
+    // Verify session exists
+    const sessionCheck = await pool.query('SELECT id, status FROM stock_sessions WHERE id = $1', [session_id]);
+    if (sessionCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Get detailed progress information
+    const progressResult = await pool.query(
+      `SELECT 
+         -- Total products available for this venue
+         venue_products.total_products,
+         -- Products with stock entries
+         COALESCE(entries.products_counted, 0) as products_counted,
+         -- Products with completed quantities (not null)
+         COALESCE(entries.products_completed, 0) as products_completed,
+         -- Category breakdown
+         COALESCE(entries.categories_data, '[]'::json) as categories_breakdown
+       FROM (
+         -- Get total products for the venue
+         SELECT 
+           COUNT(*) as total_products
+         FROM products p
+         JOIN stock_sessions ss ON p.venue_id = ss.venue_id
+         WHERE ss.id = $1
+       ) venue_products
+       LEFT JOIN (
+         -- Get entry statistics
+         SELECT 
+           COUNT(DISTINCT se.product_id) as products_counted,
+           COUNT(CASE WHEN se.quantity_level IS NOT NULL THEN 1 END) as products_completed,
+           json_agg(
+             json_build_object(
+               'category', p.category,
+               'total', category_stats.total,
+               'counted', category_stats.counted,
+               'completed', category_stats.completed
+             )
+           ) as categories_data
+         FROM stock_entries se
+         JOIN products p ON se.product_id = p.id
+         JOIN (
+           -- Category-wise breakdown
+           SELECT 
+             p2.category,
+             COUNT(*) as total,
+             COUNT(se2.id) as counted,
+             COUNT(CASE WHEN se2.quantity_level IS NOT NULL THEN 1 END) as completed
+           FROM products p2
+           JOIN stock_sessions ss2 ON p2.venue_id = ss2.venue_id AND ss2.id = $1
+           LEFT JOIN stock_entries se2 ON p2.id = se2.product_id AND se2.session_id = $1
+           GROUP BY p2.category
+         ) category_stats ON p.category = category_stats.category
+         WHERE se.session_id = $1
+       ) entries ON true`,
+      [session_id]
+    );
+
+    const progress = progressResult.rows[0];
+    const completionPercentage = progress.total_products > 0 
+      ? Math.round((progress.products_completed / progress.total_products) * 100) 
+      : 0;
+
+    res.json({
+      session_id,
+      status: sessionCheck.rows[0].status,
+      progress: {
+        total_products: parseInt(progress.total_products),
+        products_counted: parseInt(progress.products_counted),
+        products_completed: parseInt(progress.products_completed),
+        completion_percentage: completionPercentage,
+        categories_breakdown: progress.categories_breakdown || []
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching session progress:', error);
+    res.status(500).json({ error: 'Failed to fetch session progress' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
