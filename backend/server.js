@@ -502,6 +502,123 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
   }
 });
 
+// Add this endpoint after the GET /api/sessions/:id/entries endpoint in your server.js
+
+// Update stock entry (quantity, notes, condition, etc.)
+app.put('/api/entries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      quantity_level, 
+      quantity_units, 
+      location_notes, 
+      condition_flags,
+      photo_url 
+    } = req.body;
+
+    // Check if entry exists
+    const entryCheck = await pool.query(
+      `SELECT se.id, se.session_id, ss.status 
+       FROM stock_entries se 
+       JOIN stock_sessions ss ON se.session_id = ss.id 
+       WHERE se.id = $1`, 
+      [id]
+    );
+
+    if (entryCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Stock entry not found' });
+    }
+
+    if (entryCheck.rows[0].status !== 'in_progress') {
+      return res.status(400).json({ 
+        error: 'Cannot update entries for a session that is not in progress' 
+      });
+    }
+
+    // Validate quantity_level if provided
+    if (quantity_level !== undefined && (quantity_level < 0.0 || quantity_level > 1.0)) {
+      return res.status(400).json({ 
+        error: 'quantity_level must be between 0.0 (empty) and 1.0 (full)' 
+      });
+    }
+
+    // Build dynamic update query
+    const updateFields = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (quantity_level !== undefined) {
+      updateFields.push(`quantity_level = $${paramCount}`);
+      values.push(quantity_level);
+      paramCount++;
+    }
+
+    if (quantity_units !== undefined) {
+      updateFields.push(`quantity_units = $${paramCount}`);
+      values.push(quantity_units);
+      paramCount++;
+    }
+
+    if (location_notes !== undefined) {
+      updateFields.push(`location_notes = $${paramCount}`);
+      values.push(location_notes);
+      paramCount++;
+    }
+
+    if (condition_flags !== undefined) {
+      updateFields.push(`condition_flags = $${paramCount}`);
+      values.push(condition_flags ? JSON.stringify(condition_flags) : null);
+      paramCount++;
+    }
+
+    if (photo_url !== undefined) {
+      updateFields.push(`photo_url = $${paramCount}`);
+      values.push(photo_url);
+      paramCount++;
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+
+    // Add entry ID for WHERE clause
+    values.push(id);
+
+    const query = `
+      UPDATE stock_entries 
+      SET ${updateFields.join(', ')} 
+      WHERE id = $${paramCount} 
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+
+    // Get updated entry with product details
+    const entryWithProduct = await pool.query(
+      `SELECT 
+         se.*,
+         p.name as product_name,
+         p.brand,
+         p.size,
+         p.category,
+         p.unit_type
+       FROM stock_entries se
+       JOIN products p ON se.product_id = p.id
+       WHERE se.id = $1`,
+      [id]
+    );
+
+    res.json({
+      message: 'Stock entry updated successfully',
+      entry: entryWithProduct.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating stock entry:', error);
+    res.status(500).json({ error: 'Failed to update stock entry' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
