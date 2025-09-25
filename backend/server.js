@@ -220,6 +220,80 @@ app.put('/api/sessions/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update session' });
   }
 });
+
+// Add this endpoint after the PUT /api/sessions/:id endpoint in your server.js
+
+// Get session history for a venue (with pagination)
+app.get('/api/venues/:id/sessions', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limit = 10, offset = 0, status } = req.query;
+
+    // Verify venue exists
+    const venueCheck = await pool.query('SELECT id, name FROM venues WHERE id = $1', [id]);
+    if (venueCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    // Build query with optional status filter
+    let query = `
+      SELECT 
+        s.*,
+        COUNT(se.id) as entry_count
+      FROM stock_sessions s
+      LEFT JOIN stock_entries se ON s.id = se.session_id
+      WHERE s.venue_id = $1
+    `;
+    
+    const queryParams = [id];
+    let paramCount = 2;
+
+    if (status) {
+      query += ` AND s.status = $${paramCount}`;
+      queryParams.push(status);
+      paramCount++;
+    }
+
+    query += `
+      GROUP BY s.id
+      ORDER BY s.session_date DESC, s.created_at DESC
+      LIMIT $${paramCount} OFFSET $${paramCount + 1}
+    `;
+    
+    queryParams.push(parseInt(limit), parseInt(offset));
+
+    const result = await pool.query(query, queryParams);
+
+    // Get total count for pagination
+    let countQuery = 'SELECT COUNT(*) FROM stock_sessions WHERE venue_id = $1';
+    const countParams = [id];
+    
+    if (status) {
+      countQuery += ' AND status = $2';
+      countParams.push(status);
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
+    const totalCount = parseInt(countResult.rows[0].count);
+
+    res.json({
+      venue: venueCheck.rows[0],
+      sessions: result.rows,
+      pagination: {
+        total: totalCount,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        has_more: (parseInt(offset) + parseInt(limit)) < totalCount
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching venue sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch venue sessions' });
+  }
+});
+
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
