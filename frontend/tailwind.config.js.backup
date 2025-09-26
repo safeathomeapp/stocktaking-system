@@ -1,0 +1,26 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./src/**/*.{js,jsx,ts,tsx}",
+  ],
+  theme: {
+    extend: {
+      // Tablet-optimized breakpoints
+      screens: {
+        'tablet': '768px',
+        'tablet-lg': '1024px',
+      },
+      // Touch-friendly sizing
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+      },
+      // Large touch targets
+      minHeight: {
+        '12': '3rem',
+        '16': '4rem',
+      }
+    },
+  },
+  plugins: [],
+}
