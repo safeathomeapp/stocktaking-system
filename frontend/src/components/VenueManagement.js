@@ -236,7 +236,11 @@ const VenueManagement = () => {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    address: '',
+    address_line_1: '',
+    address_line_2: '',
+    city: '',
+    postcode: '',
+    country: 'United Kingdom',
     phone: '',
     contact_person: '',
     contact_email: '',
@@ -268,7 +272,11 @@ const VenueManagement = () => {
       // Prepare data for API
       const venueData = {
         name: formData.name.trim(),
-        address: formData.address.trim() || null,
+        address_line_1: formData.address_line_1.trim() || null,
+        address_line_2: formData.address_line_2.trim() || null,
+        city: formData.city.trim() || null,
+        postcode: formData.postcode.trim() || null,
+        country: formData.country || 'United Kingdom',
         phone: formData.phone.trim() || null,
         contact_person: formData.contact_person.trim() || null,
         contact_email: formData.contact_email.trim() || null,
@@ -285,7 +293,11 @@ const VenueManagement = () => {
         // Reset form
         setFormData({
           name: '',
-          address: '',
+          address_line_1: '',
+          address_line_2: '',
+          city: '',
+          postcode: '',
+          country: 'United Kingdom',
           phone: '',
           contact_person: '',
           contact_email: '',
@@ -359,14 +371,71 @@ const VenueManagement = () => {
             </FormGroup>
 
             <FormGroup className="full-width">
-              <Label htmlFor="address">Address</Label>
-              <TextArea
-                id="address"
-                name="address"
-                placeholder="Enter full address"
-                value={formData.address}
+              <Label htmlFor="address_line_1">Address Line 1</Label>
+              <Input
+                id="address_line_1"
+                name="address_line_1"
+                type="text"
+                placeholder="Enter street address"
+                value={formData.address_line_1}
                 onChange={handleInputChange}
               />
+            </FormGroup>
+
+            <FormGroup className="full-width">
+              <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
+              <Input
+                id="address_line_2"
+                name="address_line_2"
+                type="text"
+                placeholder="Apartment, suite, building, etc."
+                value={formData.address_line_2}
+                onChange={handleInputChange}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                name="city"
+                type="text"
+                placeholder="Enter city"
+                value={formData.city}
+                onChange={handleInputChange}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label htmlFor="postcode">Postcode</Label>
+              <Input
+                id="postcode"
+                name="postcode"
+                type="text"
+                placeholder="Enter postcode"
+                value={formData.postcode}
+                onChange={handleInputChange}
+              />
+            </FormGroup>
+
+            <FormGroup className="full-width">
+              <Label htmlFor="country">Country</Label>
+              <Select
+                id="country"
+                name="country"
+                value={formData.country}
+                onChange={handleInputChange}
+              >
+                <option value="United Kingdom">United Kingdom</option>
+                <option value="Ireland">Ireland</option>
+                <option value="France">France</option>
+                <option value="Germany">Germany</option>
+                <option value="Spain">Spain</option>
+                <option value="Italy">Italy</option>
+                <option value="Netherlands">Netherlands</option>
+                <option value="Belgium">Belgium</option>
+                <option value="Other">Other</option>
+              </Select>
             </FormGroup>
 
             <FormGroup>

@@ -59,7 +59,11 @@ app.post('/api/venues', async (req, res) => {
   try {
     const {
       name,
-      address,
+      address_line_1,
+      address_line_2,
+      city,
+      postcode,
+      country = 'United Kingdom',
       phone,
       contact_person,
       contact_email,
@@ -75,10 +79,10 @@ app.post('/api/venues', async (req, res) => {
 
     // Create new venue
     const result = await pool.query(
-      `INSERT INTO venues (name, address, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO venues (name, address_line_1, address_line_2, city, postcode, country, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [name, address, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes]
+      [name, address_line_1, address_line_2, city, postcode, country, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes]
     );
 
     const newVenue = result.rows[0];
@@ -140,7 +144,11 @@ app.put('/api/venues/:id', async (req, res) => {
     const { id } = req.params;
     const {
       name,
-      address,
+      address_line_1,
+      address_line_2,
+      city,
+      postcode,
+      country,
       phone,
       contact_person,
       contact_email,
@@ -166,9 +174,29 @@ app.put('/api/venues/:id', async (req, res) => {
       values.push(name);
       paramCount++;
     }
-    if (address !== undefined) {
-      updateFields.push(`address = $${paramCount}`);
-      values.push(address);
+    if (address_line_1 !== undefined) {
+      updateFields.push(`address_line_1 = $${paramCount}`);
+      values.push(address_line_1);
+      paramCount++;
+    }
+    if (address_line_2 !== undefined) {
+      updateFields.push(`address_line_2 = $${paramCount}`);
+      values.push(address_line_2);
+      paramCount++;
+    }
+    if (city !== undefined) {
+      updateFields.push(`city = $${paramCount}`);
+      values.push(city);
+      paramCount++;
+    }
+    if (postcode !== undefined) {
+      updateFields.push(`postcode = $${paramCount}`);
+      values.push(postcode);
+      paramCount++;
+    }
+    if (country !== undefined) {
+      updateFields.push(`country = $${paramCount}`);
+      values.push(country);
       paramCount++;
     }
     if (phone !== undefined) {

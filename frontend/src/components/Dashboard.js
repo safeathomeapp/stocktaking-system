@@ -367,11 +367,20 @@ const Dashboard = () => {
               required
             >
               <option value="">Choose a venue...</option>
-              {venues.map((venue) => (
-                <option key={venue.id} value={venue.id}>
-                  {venue.name} - {venue.address}
-                </option>
-              ))}
+              {venues.map((venue) => {
+                const addressParts = [
+                  venue.address_line_1,
+                  venue.city,
+                  venue.postcode
+                ].filter(Boolean);
+                const displayAddress = addressParts.length > 0 ? addressParts.join(', ') : (venue.address || 'No address');
+
+                return (
+                  <option key={venue.id} value={venue.id}>
+                    {venue.name} - {displayAddress}
+                  </option>
+                );
+              })}
             </Select>
           </FormGroup>
 
