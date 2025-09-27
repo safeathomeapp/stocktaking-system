@@ -5,6 +5,8 @@ const morgan = require('morgan');
 const pool = require('./src/database');
 require('dotenv').config();
 
+// Updated with county field support
+
 const app = express();
 const PORT = process.env.PORT || 3005;
 
