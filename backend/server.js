@@ -56,7 +56,7 @@ app.get('/api/venues', async (req, res) => {
   }
 });
 
-// Create new venue
+// Create new venue with county field support
 app.post('/api/venues', async (req, res) => {
   try {
     const {
