@@ -7,6 +7,7 @@ import { theme } from './styles/theme';
 import Dashboard from './components/Dashboard';
 import StockTaking from './components/StockTaking';
 import SessionHistory from './components/SessionHistory';
+import VenueManagement from './components/VenueManagement';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/stock-taking/:sessionId" element={<StockTaking />} />
             <Route path="/history" element={<SessionHistory />} />
+            <Route path="/venue/new" element={<VenueManagement />} />
           </Routes>
         </div>
       </Router>

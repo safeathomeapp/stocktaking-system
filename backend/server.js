@@ -54,12 +54,310 @@ app.get('/api/venues', async (req, res) => {
   }
 });
 
+// Create new venue
+app.post('/api/venues', async (req, res) => {
+  try {
+    const {
+      name,
+      address,
+      phone,
+      contact_person,
+      contact_email,
+      billing_rate,
+      billing_currency = 'GBP',
+      billing_notes
+    } = req.body;
+
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json({ error: 'Venue name is required' });
+    }
+
+    // Create new venue
+    const result = await pool.query(
+      `INSERT INTO venues (name, address, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [name, address, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes]
+    );
+
+    const newVenue = result.rows[0];
+
+    // Create default areas for the new venue
+    const defaultAreas = [
+      { name: 'Bar Area', order: 1, description: 'Main bar and serving area' },
+      { name: 'Storage Room', order: 2, description: 'Main storage and inventory area' },
+      { name: 'Kitchen', order: 3, description: 'Kitchen and food preparation area' },
+      { name: 'Wine Cellar', order: 4, description: 'Wine storage and cellar area' },
+      { name: 'Dry Storage', order: 5, description: 'Dry goods and non-refrigerated storage' }
+    ];
+
+    for (const area of defaultAreas) {
+      await pool.query(
+        'INSERT INTO venue_areas (venue_id, name, display_order, description) VALUES ($1, $2, $3, $4)',
+        [newVenue.id, area.name, area.order, area.description]
+      );
+    }
+
+    res.status(201).json({
+      message: 'Venue created successfully',
+      venue: newVenue
+    });
+
+  } catch (error) {
+    console.error('Error creating venue:', error);
+    res.status(500).json({ error: 'Failed to create venue' });
+  }
+});
+
+// Get venue by ID with full details
+app.get('/api/venues/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'SELECT * FROM venues WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    res.json({
+      venue: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error fetching venue:', error);
+    res.status(500).json({ error: 'Failed to fetch venue' });
+  }
+});
+
+// Update venue
+app.put('/api/venues/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      address,
+      phone,
+      contact_person,
+      contact_email,
+      billing_rate,
+      billing_currency,
+      billing_notes,
+      active
+    } = req.body;
+
+    // Check if venue exists
+    const venueCheck = await pool.query('SELECT id FROM venues WHERE id = $1', [id]);
+    if (venueCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    // Build dynamic update query
+    const updateFields = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updateFields.push(`name = $${paramCount}`);
+      values.push(name);
+      paramCount++;
+    }
+    if (address !== undefined) {
+      updateFields.push(`address = $${paramCount}`);
+      values.push(address);
+      paramCount++;
+    }
+    if (phone !== undefined) {
+      updateFields.push(`phone = $${paramCount}`);
+      values.push(phone);
+      paramCount++;
+    }
+    if (contact_person !== undefined) {
+      updateFields.push(`contact_person = $${paramCount}`);
+      values.push(contact_person);
+      paramCount++;
+    }
+    if (contact_email !== undefined) {
+      updateFields.push(`contact_email = $${paramCount}`);
+      values.push(contact_email);
+      paramCount++;
+    }
+    if (billing_rate !== undefined) {
+      updateFields.push(`billing_rate = $${paramCount}`);
+      values.push(billing_rate);
+      paramCount++;
+    }
+    if (billing_currency !== undefined) {
+      updateFields.push(`billing_currency = $${paramCount}`);
+      values.push(billing_currency);
+      paramCount++;
+    }
+    if (billing_notes !== undefined) {
+      updateFields.push(`billing_notes = $${paramCount}`);
+      values.push(billing_notes);
+      paramCount++;
+    }
+    if (active !== undefined) {
+      updateFields.push(`active = $${paramCount}`);
+      values.push(active);
+      paramCount++;
+    }
+
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    if (updateFields.length === 1) { // Only timestamp update
+      return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+
+    // Add venue ID for WHERE clause
+    values.push(id);
+
+    const query = `
+      UPDATE venues
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramCount}
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+
+    res.json({
+      message: 'Venue updated successfully',
+      venue: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating venue:', error);
+    res.status(500).json({ error: 'Failed to update venue' });
+  }
+});
+
+// Get areas for a venue
+app.get('/api/venues/:id/areas', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify venue exists
+    const venueCheck = await pool.query('SELECT id FROM venues WHERE id = $1', [id]);
+    if (venueCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    const result = await pool.query(
+      'SELECT * FROM venue_areas WHERE venue_id = $1 ORDER BY display_order, name',
+      [id]
+    );
+
+    res.json({
+      areas: result.rows
+    });
+
+  } catch (error) {
+    console.error('Error fetching venue areas:', error);
+    res.status(500).json({ error: 'Failed to fetch venue areas' });
+  }
+});
+
+// Add area to venue
+app.post('/api/venues/:id/areas', async (req, res) => {
+  try {
+    const { id: venue_id } = req.params;
+    const { name, display_order, description } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Area name is required' });
+    }
+
+    // Verify venue exists
+    const venueCheck = await pool.query('SELECT id FROM venues WHERE id = $1', [venue_id]);
+    if (venueCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    const result = await pool.query(
+      'INSERT INTO venue_areas (venue_id, name, display_order, description) VALUES ($1, $2, $3, $4) RETURNING *',
+      [venue_id, name, display_order || 0, description]
+    );
+
+    res.status(201).json({
+      message: 'Area added successfully',
+      area: result.rows[0]
+    });
+
+  } catch (error) {
+    if (error.constraint === 'unique_venue_area_name') {
+      return res.status(409).json({ error: 'Area name already exists for this venue' });
+    }
+    console.error('Error adding area:', error);
+    res.status(500).json({ error: 'Failed to add area' });
+  }
+});
+
+// Update area
+app.put('/api/areas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, display_order, description } = req.body;
+
+    const result = await pool.query(
+      'UPDATE venue_areas SET name = $1, display_order = $2, description = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
+      [name, display_order, description, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Area not found' });
+    }
+
+    res.json({
+      message: 'Area updated successfully',
+      area: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating area:', error);
+    res.status(500).json({ error: 'Failed to update area' });
+  }
+});
+
+// Delete area
+app.delete('/api/areas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'DELETE FROM venue_areas WHERE id = $1 RETURNING name',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Area not found' });
+    }
+
+    res.json({
+      message: 'Area deleted successfully',
+      deleted_area: result.rows[0].name
+    });
+
+  } catch (error) {
+    console.error('Error deleting area:', error);
+    res.status(500).json({ error: 'Failed to delete area' });
+  }
+});
+
 // Get products for a venue
 app.get('/api/venues/:id/products', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT * FROM products WHERE venue_id = $1 ORDER BY category, name',
+      `SELECT p.*, va.name as area_name
+       FROM products p
+       LEFT JOIN venue_areas va ON p.area_id = va.id
+       WHERE p.venue_id = $1
+       ORDER BY va.display_order, p.category, p.name`,
       [id]
     );
     res.json(result.rows);

@@ -32,6 +32,69 @@ export const apiService = {
     }
   },
 
+  createVenue: async (venueData) => {
+    try {
+      const response = await api.post(API_ENDPOINTS.venues, venueData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getVenueById: async (venueId) => {
+    try {
+      const response = await api.get(API_ENDPOINTS.venueById(venueId));
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  updateVenue: async (venueId, updateData) => {
+    try {
+      const response = await api.put(API_ENDPOINTS.venueById(venueId), updateData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getVenueAreas: async (venueId) => {
+    try {
+      const response = await api.get(API_ENDPOINTS.venueAreas(venueId));
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  addVenueArea: async (venueId, areaData) => {
+    try {
+      const response = await api.post(API_ENDPOINTS.venueAreas(venueId), areaData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  updateArea: async (areaId, updateData) => {
+    try {
+      const response = await api.put(API_ENDPOINTS.areaById(areaId), updateData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  deleteArea: async (areaId) => {
+    try {
+      const response = await api.delete(API_ENDPOINTS.areaById(areaId));
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
   getVenueProducts: async (venueId) => {
     try {
       const response = await api.get(API_ENDPOINTS.venueProducts(venueId));

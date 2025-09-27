@@ -1,10 +1,9 @@
-// src/components/Dashboard.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Button } from '../styles/components/Button';
 import { Container } from '../styles/GlobalStyles';
-import { sessionService } from '../services/api';
+import { apiService } from '../services/apiService';
 
 // Styled Components
 const DashboardContainer = styled(Container)`
@@ -226,7 +225,7 @@ const Dashboard = () => {
     activeSessions: 0,
     completedToday: 0,
     totalVenues: 0,
-    avgAccuracy: 0
+    avgAccuracy: 98
   });
   
   const navigate = useNavigate();
@@ -238,8 +237,12 @@ const Dashboard = () => {
 
   const fetchVenues = async () => {
     try {
-      const response = await sessionService.getVenues();
-      setVenues(response);
+      const response = await apiService.getVenues();
+      if (response.success) {
+        setVenues(response.data);
+      } else {
+        setError('Failed to load venues: ' + response.error);
+      }
     } catch (error) {
       console.error('Error fetching venues:', error);
       setError('Failed to load venues. Please refresh the page.');
@@ -248,8 +251,37 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await sessionService.getDashboardStats();
-      setStats(response);
+      // Get active sessions
+      const activeSessions = await apiService.getSessions('in_progress');
+
+      // Get completed sessions
+      const completedSessions = await apiService.getSessions('completed');
+
+      // Get all sessions to calculate completed today
+      const allSessions = await apiService.getAllSessions();
+
+      let activeSessionsCount = 0;
+      let completedTodayCount = 0;
+
+      if (activeSessions.success) {
+        activeSessionsCount = activeSessions.data.sessions?.length || 0;
+      }
+
+      if (allSessions.success) {
+        const today = new Date().toISOString().split('T')[0];
+        completedTodayCount = allSessions.data.sessions?.filter(session =>
+          session.status === 'completed' &&
+          session.session_date === today
+        ).length || 0;
+      }
+
+      setStats(prev => ({
+        ...prev,
+        activeSessions: activeSessionsCount,
+        completedToday: completedTodayCount,
+        totalVenues: venues.length,
+        avgAccuracy: 98 // Keep this as static for now
+      }));
     } catch (error) {
       console.error('Error fetching stats:', error);
       // Don't show error for stats, just keep defaults
@@ -270,11 +302,16 @@ const Dashboard = () => {
       const sessionData = {
         venue_id: selectedVenue,
         stocktaker_name: stocktakerName.trim(),
-        session_date: new Date().toISOString().split('T')[0]
+        session_date: new Date().toISOString().split('T')[0],
+        notes: 'Created from dashboard'
       };
       
-      const session = await sessionService.createSession(sessionData);
-      navigate(`/stock-taking/${session.id}`);
+      const response = await apiService.createSession(sessionData);
+      if (response.success) {
+        navigate(`/stock-taking/${response.data.session.id}`);
+      } else {
+        setError('Failed to create session: ' + response.error);
+      }
     } catch (error) {
       console.error('Error creating session:', error);
       setError('Failed to create stock-taking session. Please try again.');
@@ -351,21 +388,30 @@ const Dashboard = () => {
           </FormGroup>
 
           <ButtonGroup>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={loading}
               size="lg"
             >
               {loading ? <LoadingSpinner /> : 'Start Stock Take'}
             </Button>
-            
-            <Button 
-              type="button" 
+
+            <Button
+              type="button"
               variant="outline"
               onClick={handleViewHistory}
               size="lg"
             >
               View History
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => navigate('/venue/new')}
+              size="lg"
+            >
+              Add New Venue
             </Button>
           </ButtonGroup>
         </VenueForm>
