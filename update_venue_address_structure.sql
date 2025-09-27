@@ -6,6 +6,7 @@ ALTER TABLE venues
 ADD COLUMN IF NOT EXISTS address_line_1 VARCHAR(255),
 ADD COLUMN IF NOT EXISTS address_line_2 VARCHAR(255),
 ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+ADD COLUMN IF NOT EXISTS county VARCHAR(100),
 ADD COLUMN IF NOT EXISTS postcode VARCHAR(20),
 ADD COLUMN IF NOT EXISTS country VARCHAR(100) DEFAULT 'United Kingdom';
 
@@ -24,4 +25,4 @@ SELECT 'Address structure updated successfully' as status;
 -- Show sample of how the new structure looks
 SELECT
     'Updated venues table structure:' as info,
-    'address_line_1, address_line_2, city, postcode, country' as new_fields;
+    'address_line_1, address_line_2, city, county, postcode, country' as new_fields;

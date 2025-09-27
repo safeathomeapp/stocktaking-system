@@ -239,6 +239,7 @@ const VenueManagement = () => {
     address_line_1: '',
     address_line_2: '',
     city: '',
+    county: '',
     postcode: '',
     country: 'United Kingdom',
     phone: '',
@@ -275,6 +276,7 @@ const VenueManagement = () => {
         address_line_1: formData.address_line_1.trim() || null,
         address_line_2: formData.address_line_2.trim() || null,
         city: formData.city.trim() || null,
+        county: formData.county.trim() || null,
         postcode: formData.postcode.trim() || null,
         country: formData.country || 'United Kingdom',
         phone: formData.phone.trim() || null,
@@ -296,6 +298,7 @@ const VenueManagement = () => {
           address_line_1: '',
           address_line_2: '',
           city: '',
+          county: '',
           postcode: '',
           country: 'United Kingdom',
           phone: '',
@@ -402,6 +405,18 @@ const VenueManagement = () => {
                 type="text"
                 placeholder="Enter city"
                 value={formData.city}
+                onChange={handleInputChange}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label htmlFor="county">County</Label>
+              <Input
+                id="county"
+                name="county"
+                type="text"
+                placeholder="Enter county"
+                value={formData.county}
                 onChange={handleInputChange}
               />
             </FormGroup>

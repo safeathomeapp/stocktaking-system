@@ -4,7 +4,10 @@
       "Bash(psql:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Add comprehensive venue management system\n\n- Add venue creation with contact details and billing information\n- Implement venue-specific areas with persistence\n- Add complete API endpoints for venue and area management\n- Update database schema for enhanced venue data\n- Remove hardcoded sample data from components\n- Implement real database connectivity for session history\n- Add save/complete functionality for stock-taking sessions\n- Connect all components to live database instead of mock data\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Update venue address structure for mapping support\n\n- Replace single address field with structured address components\n- Add address_line_1, address_line_2, city, postcode, country fields\n- Update venue creation and update APIs to handle new structure\n- Update VenueManagement UI with separate address fields\n- Update Dashboard to display structured addresses properly\n- Add country selection with common European countries\n\nThis enables better mapping integration and geocoding accuracy.\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(curl -s \"https://stocktaking-api-production.up.railway.app/api/health\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://stocktaking-api-production.up.railway.app/api/venues\")"
     ],
     "deny": [],
     "ask": []

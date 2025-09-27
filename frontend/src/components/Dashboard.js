@@ -371,6 +371,7 @@ const Dashboard = () => {
                 const addressParts = [
                   venue.address_line_1,
                   venue.city,
+                  venue.county,
                   venue.postcode
                 ].filter(Boolean);
                 const displayAddress = addressParts.length > 0 ? addressParts.join(', ') : (venue.address || 'No address');

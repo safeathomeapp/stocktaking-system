@@ -62,6 +62,7 @@ app.post('/api/venues', async (req, res) => {
       address_line_1,
       address_line_2,
       city,
+      county,
       postcode,
       country = 'United Kingdom',
       phone,
@@ -79,10 +80,10 @@ app.post('/api/venues', async (req, res) => {
 
     // Create new venue
     const result = await pool.query(
-      `INSERT INTO venues (name, address_line_1, address_line_2, city, postcode, country, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO venues (name, address_line_1, address_line_2, city, county, postcode, country, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [name, address_line_1, address_line_2, city, postcode, country, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes]
+      [name, address_line_1, address_line_2, city, county, postcode, country, phone, contact_person, contact_email, billing_rate, billing_currency, billing_notes]
     );
 
     const newVenue = result.rows[0];
@@ -147,6 +148,7 @@ app.put('/api/venues/:id', async (req, res) => {
       address_line_1,
       address_line_2,
       city,
+      county,
       postcode,
       country,
       phone,
@@ -187,6 +189,11 @@ app.put('/api/venues/:id', async (req, res) => {
     if (city !== undefined) {
       updateFields.push(`city = $${paramCount}`);
       values.push(city);
+      paramCount++;
+    }
+    if (county !== undefined) {
+      updateFields.push(`county = $${paramCount}`);
+      values.push(county);
       paramCount++;
     }
     if (postcode !== undefined) {
