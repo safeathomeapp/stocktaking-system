@@ -30,11 +30,12 @@ app.get('/api/health', async (req, res) => {
   try {
     // Test database connection
     const result = await pool.query('SELECT NOW()');
-    res.json({ 
+    res.json({
       status: 'healthy',
       database: 'connected',
       timestamp: new Date().toISOString(),
-      db_time: result.rows[0].now
+      db_time: result.rows[0].now,
+      version: '1.1.0-county-support'
     });
   } catch (error) {
     res.status(500).json({
@@ -44,6 +45,15 @@ app.get('/api/health', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// Test endpoint to verify deployment
+app.get('/api/test-deployment', (req, res) => {
+  res.json({
+    message: 'Deployment successful with county field support',
+    timestamp: new Date().toISOString(),
+    version: '1.1.0'
+  });
 });
 
 // Get all venues
