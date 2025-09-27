@@ -899,7 +899,9 @@ const StockTaking = () => {
       const entriesResponse = await apiService.getSessionEntries(cleanSessionId);
       if (entriesResponse.success) {
         const counts = {};
-        entriesResponse.data.forEach(entry => {
+        // Fix: The API returns {entries: [...]} not a direct array
+        const entries = entriesResponse.data.entries || [];
+        entries.forEach(entry => {
           counts[entry.product_id] = entry.quantity_level.toString();
         });
         setStockCounts(counts);
