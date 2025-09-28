@@ -118,6 +118,13 @@ If deployment fails:
 - Verify deployment success by checking the health endpoint
 - Voice recognition endpoints require the latest deployment with fuzzy search features
 
+### Workflow Optimization
+
+**IMPORTANT:** Due to Railway's unreliable auto-deployment:
+- User will manually refresh server and redeploy when changes are ready
+- Claude should prompt for manual deployment before self-testing
+- This saves time and bandwidth by avoiding repeated failed deployment attempts
+
 ### Production URLs
 
 - **Health Check:** https://stocktaking-api-production.up.railway.app/api/health

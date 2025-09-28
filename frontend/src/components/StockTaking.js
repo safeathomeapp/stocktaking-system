@@ -62,12 +62,9 @@ const LoadingMessage = styled.div`
 `;
 
 const MainContent = styled.div`
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: ${props => props.theme.spacing.lg};
-
-  @media (min-width: ${props => props.theme.breakpoints.desktop}) {
-    grid-template-columns: 1fr 300px;
-  }
 `;
 
 const StockSection = styled.section`
@@ -227,20 +224,6 @@ const CountInput = styled.input`
     font-size: 1.125rem;
     padding: ${props => props.theme.spacing.md};
   }
-`;
-
-const Sidebar = styled.aside`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.lg};
-`;
-
-const ProgressCard = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border-radius: 16px;
-  padding: ${props => props.theme.spacing.xl};
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  border: 1px solid ${props => props.theme.colors.border};
 `;
 
 const ProgressTitle = styled.h3`
@@ -1187,15 +1170,12 @@ const StockTaking = () => {
       );
 
       if (searchResult.success && searchResult.data?.suggestions?.length > 0) {
-        // Show voice suggestions to user
+        // Show voice suggestions to user for manual selection
         setVoiceSuggestions(searchResult.data.suggestions);
         setShowVoiceSuggestions(true);
 
-        // Auto-select the top suggestion if confidence is high
-        const topSuggestion = searchResult.data.suggestions[0];
-        if (topSuggestion.confidence > 80) {
-          handleVoiceSuggestionSelect(topSuggestion, 0);
-        }
+        // Keep the original transcript in the field as a fallback
+        setNewProductName(cleanedQuery);
       } else {
         // No suggestions found, use original input
         console.log('No master product suggestions found, using original input');
@@ -1236,25 +1216,58 @@ const StockTaking = () => {
   };
 
   // Add new product
-  const handleAddProduct = () => {
+  // Generate UUID for new products
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
+  const handleAddProduct = async () => {
     if (newProductName && newProductCategory) {
-      const newProduct = {
-        id: Date.now(),
-        name: newProductName,
-        category: newProductCategory,
-        unit: newProductUnit,
-        expectedCount: 0,
-        area: currentArea
-      };
+      try {
+        // Get current area object to pass area_id
+        const currentAreaObj = areas.find(a => a.id === currentArea);
 
-      setStockItems(prev => [...prev, newProduct]);
+        // Create product in database first
+        const productData = {
+          name: newProductName,
+          category: newProductCategory,
+          unit: newProductUnit,
+          area_id: currentAreaObj?.id || null
+        };
 
-      // Reset form
-      setNewProductName('');
-      setNewProductCategory('');
-      setNewProductUnit('bottles');
-      setShowAddProduct(false);
-      setShowSuggestions(false);
+        const response = await apiService.createVenueProduct(sessionData.venue_id, productData);
+
+        if (response.success) {
+          // Add the database-created product to local state
+          const newProduct = {
+            id: response.data.product.id, // Use database-generated UUID
+            name: newProductName,
+            category: newProductCategory,
+            unit: newProductUnit,
+            expectedCount: 0,
+            area: currentArea
+          };
+
+          setStockItems(prev => [...prev, newProduct]);
+
+          // Reset form
+          setNewProductName('');
+          setNewProductCategory('');
+          setNewProductUnit('bottles');
+          setShowAddProduct(false);
+          setShowSuggestions(false);
+        } else {
+          console.error('Failed to create product:', response.error);
+          setError('Failed to create product: ' + response.error);
+        }
+      } catch (error) {
+        console.error('Error creating product:', error);
+        setError('Failed to create product. Please try again.');
+      }
     }
   };
 
@@ -1334,18 +1347,20 @@ const StockTaking = () => {
       for (const [productId, quantity] of Object.entries(stockCounts)) {
         if (quantity !== '' && !isNaN(parseFloat(quantity))) {
           // Find the product to get expected count
-          const allProducts = getAllItems();
-          const product = allProducts.find(p => p.id === parseInt(productId));
+          const allProducts = stockItems;
+          const product = allProducts.find(p => p.id === productId);
           const expectedCount = product?.expectedCount || 1;
 
-          // Calculate quantity_level as percentage (0.0 to 1.0)
+          // Simple data capture - store actual quantity as input
           const actualQuantity = parseFloat(quantity);
-          const quantityLevel = expectedCount > 0 ? Math.min(actualQuantity / expectedCount, 1.0) : 0.0;
+
+          // For database compatibility, set quantity_level to 1.0 (not used for calculations)
+          const quantityLevel = 1.0;
 
           const entryData = {
-            product_id: parseInt(productId),
-            quantity_level: quantityLevel,
-            quantity_units: actualQuantity, // Store actual count in quantity_units
+            product_id: productId,
+            quantity_level: quantityLevel, // Fixed at 1.0 for compatibility
+            quantity_units: actualQuantity, // Actual count data (12.5, etc.)
             location_notes: null,
             condition_flags: null,
             photo_url: null
@@ -1364,7 +1379,7 @@ const StockTaking = () => {
                 : entriesResponse.data.entries || [];
 
               console.log('Fetched entries for update:', entries);
-              const existingEntry = entries.find(entry => entry.product_id === parseInt(productId));
+              const existingEntry = entries.find(entry => entry.product_id === productId);
               if (existingEntry) {
                 console.log('Updating existing entry:', existingEntry.id);
                 const updateResponse = await apiService.updateStockEntry(existingEntry.id, {
@@ -1399,49 +1414,110 @@ const StockTaking = () => {
 
     try {
       const sessionId = String(sessionData?.id);
+      console.log('Completing session:', sessionId);
+      console.log('Stock counts to save:', stockCounts);
 
       // First save all current progress
+      let savedCount = 0;
+      let totalCount = Object.entries(stockCounts).filter(([, quantity]) => quantity !== '' && !isNaN(parseFloat(quantity))).length;
+
       for (const [productId, quantity] of Object.entries(stockCounts)) {
         if (quantity !== '' && !isNaN(parseFloat(quantity))) {
+          console.log(`Saving product ${productId} with quantity ${quantity}`);
+
+          // Simple data capture - store actual quantity as input
+          const actualQuantity = parseFloat(quantity);
+
+          // For database compatibility, set quantity_level to 1.0 (not used for calculations)
+          const quantityLevel = 1.0;
+
           const entryData = {
-            product_id: parseInt(productId),
-            quantity_level: parseFloat(quantity),
-            quantity_units: 0,
+            product_id: productId,
+            quantity_level: quantityLevel,
+            quantity_units: actualQuantity,
             location_notes: null,
             condition_flags: null,
             photo_url: null
           };
 
-          const addResponse = await apiService.addStockEntry(sessionId, entryData);
-          if (!addResponse.success) {
-            const entriesResponse = await apiService.getSessionEntries(sessionId);
-            if (entriesResponse.success) {
-              const existingEntry = entriesResponse.data.find(entry => entry.product_id === parseInt(productId));
-              if (existingEntry) {
-                await apiService.updateStockEntry(existingEntry.id, {
-                  quantity_level: parseFloat(quantity)
-                });
+          try {
+            const addResponse = await apiService.addStockEntry(sessionId, entryData);
+            if (addResponse.success) {
+              savedCount++;
+              console.log(`Successfully saved product ${productId}`);
+            } else {
+              console.log(`Failed to add entry for product ${productId}, trying to update existing entry`);
+              const entriesResponse = await apiService.getSessionEntries(sessionId);
+              console.log('Entries response:', entriesResponse);
+
+              if (entriesResponse.success && entriesResponse.data) {
+                // Handle different data structures
+                let entries = entriesResponse.data;
+                if (!Array.isArray(entries)) {
+                  // If data is wrapped in another object, try to extract the array
+                  entries = entries.entries || entries.data || [];
+                }
+
+                console.log('Entries array:', entries);
+
+                if (Array.isArray(entries)) {
+                  const existingEntry = entries.find(entry => entry.product_id === productId);
+                  if (existingEntry) {
+                    const updateResult = await apiService.updateStockEntry(existingEntry.id, {
+                      quantity_level: quantityLevel,
+                      quantity_units: actualQuantity
+                    });
+                    if (updateResult.success) {
+                      savedCount++;
+                      console.log(`Successfully updated product ${productId}`);
+                    } else {
+                      console.error(`Failed to update entry for product ${productId}:`, updateResult.error);
+                    }
+                  } else {
+                    console.log(`No existing entry found for product ${productId}, entry may need to be created differently`);
+                  }
+                } else {
+                  console.error(`Entries data is not an array:`, entries);
+                }
+              } else {
+                console.error(`Failed to get existing entries for product ${productId}:`, entriesResponse.error || 'Invalid response structure');
               }
             }
+          } catch (error) {
+            console.error(`Error processing product ${productId}:`, error);
           }
         }
       }
 
+      console.log(`Saved ${savedCount} out of ${totalCount} entries`);
+
       // Then mark session as completed
+      console.log('Marking session as completed');
+      const notes = totalCount > 0
+        ? `Session completed with ${savedCount}/${totalCount} items saved (${Object.keys(stockCounts).length} items counted)`
+        : `Session completed with ${Object.keys(stockCounts).length} items counted`;
+
       const updateResponse = await apiService.updateSession(sessionId, {
         status: 'completed',
-        notes: `Session completed with ${Object.keys(stockCounts).length} items counted`
+        notes: notes
       });
 
       if (updateResponse.success) {
         console.log('Session completed successfully');
-        navigate('/history');
+        if (savedCount < totalCount) {
+          setError(`Session completed but only ${savedCount}/${totalCount} stock entries were saved successfully.`);
+          // Still navigate after a delay to show the message
+          setTimeout(() => navigate('/history'), 3000);
+        } else {
+          navigate('/history');
+        }
       } else {
+        console.error('Failed to update session status:', updateResponse.error);
         setError('Failed to complete session: ' + updateResponse.error);
       }
     } catch (error) {
       console.error('Error completing session:', error);
-      setError('Failed to complete session. Please try again.');
+      setError('Failed to complete session: ' + error.message);
     } finally {
       setSaving(false);
     }
@@ -1850,30 +1926,28 @@ const StockTaking = () => {
             )}
           </DraggableProductList>
         </StockSection>
-        </DisabledOverlay>
 
-        <Sidebar>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Button
-              variant="secondary"
-              onClick={handleSaveProgress}
-              disabled={saving}
-              size="sm"
-              style={{ flex: 1 }}
-            >
-              {saving ? <LoadingSpinner /> : 'Save'}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleCompleteSession}
-              disabled={saving || completedItems === 0}
-              size="sm"
-              style={{ flex: 1 }}
-            >
-              {saving ? <LoadingSpinner /> : 'Complete'}
-            </Button>
-          </div>
-        </Sidebar>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
+          <Button
+            variant="secondary"
+            onClick={handleSaveProgress}
+            disabled={saving}
+            size="sm"
+            style={{ flex: 1, maxWidth: '120px' }}
+          >
+            {saving ? <LoadingSpinner /> : 'Save'}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleCompleteSession}
+            disabled={saving || completedItems === 0}
+            size="sm"
+            style={{ flex: 1, maxWidth: '120px' }}
+          >
+            {saving ? <LoadingSpinner /> : 'Complete'}
+          </Button>
+        </div>
+        </DisabledOverlay>
       </MainContent>
     </StockTakingContainer>
   );

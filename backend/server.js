@@ -100,21 +100,7 @@ app.post('/api/venues', async (req, res) => {
 
     const newVenue = result.rows[0];
 
-    // Create default areas for the new venue
-    const defaultAreas = [
-      { name: 'Bar Area', order: 1, description: 'Main bar and serving area' },
-      { name: 'Storage Room', order: 2, description: 'Main storage and inventory area' },
-      { name: 'Kitchen', order: 3, description: 'Kitchen and food preparation area' },
-      { name: 'Wine Cellar', order: 4, description: 'Wine storage and cellar area' },
-      { name: 'Dry Storage', order: 5, description: 'Dry goods and non-refrigerated storage' }
-    ];
-
-    for (const area of defaultAreas) {
-      await pool.query(
-        'INSERT INTO venue_areas (venue_id, name, display_order, description) VALUES ($1, $2, $3, $4)',
-        [newVenue.id, area.name, area.order, area.description]
-      );
-    }
+    // No automatic areas - user will manually add areas as needed
 
     res.status(201).json({
       message: 'Venue created successfully',
@@ -410,6 +396,42 @@ app.get('/api/venues/:id/products', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Create venue-specific product
+app.post('/api/venues/:id/products', async (req, res) => {
+  try {
+    const venueId = req.params.id;
+    const { name, category, unit, area_id, brand, size, barcode } = req.body;
+
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json({ error: 'Product name is required' });
+    }
+
+    // Verify venue exists
+    const venueCheck = await pool.query('SELECT id FROM venues WHERE id = $1', [venueId]);
+    if (venueCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    // Create the product
+    const result = await pool.query(
+      `INSERT INTO products (venue_id, area_id, name, category, brand, size, unit_type, barcode, expected_count)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [venueId, area_id || null, name, category || 'General', brand || null, size || null, unit || 'bottles', barcode || null, 0]
+    );
+
+    res.status(201).json({
+      message: 'Product created successfully',
+      product: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error creating venue product:', error);
+    res.status(500).json({ error: 'Failed to create product' });
   }
 });
 

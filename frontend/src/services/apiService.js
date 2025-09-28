@@ -241,7 +241,7 @@ export const apiService = {
                 brand: "Beck's",
                 category: "Beer",
                 size: "275ml",
-                confidence: 95,
+                confidence: 75,
                 logId: 'mock-log-1'
               },
               {
@@ -250,7 +250,7 @@ export const apiService = {
                 brand: "Beck's",
                 category: "Beer",
                 size: "275ml",
-                confidence: 88,
+                confidence: 79,
                 logId: 'mock-log-2'
               }
             ]
@@ -309,6 +309,17 @@ export const apiService = {
     } catch (error) {
       console.error('Add master product error:', error);
       return { success: false, error: error.message };
+    }
+  },
+
+  // Create venue-specific product
+  createVenueProduct: async (venueId, productData) => {
+    try {
+      const response = await api.post(`/api/venues/${venueId}/products`, productData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Create venue product error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
     }
   },
 
