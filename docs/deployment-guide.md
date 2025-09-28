@@ -21,18 +21,26 @@ railway up --detach
 railway up --service stocktaking-api --detach
 ```
 
-**Option 2: Git Push + Manual Trigger (recommended)**
+**Option 2: Git Push + Railway CLI Deployment (REQUIRED for this project)**
 ```bash
 # 1. Commit and push your changes
 git add .
 git commit -m "Your commit message"
 git push
 
-# 2. Wait for automatic deployment (may take 5-10 minutes)
-# 3. If automatic deployment doesn't trigger, use Railway web dashboard to manually redeploy
+# 2. CRITICAL: Railway automatic deployment is NOT working for this project
+#    You MUST manually trigger deployment after every push:
 
-# 4. Monitor deployment at: https://railway.app/project/[project-id]
+# Navigate to project root
+cd /c/users/kevth/desktop/stocktake/stocktaking-system
+
+# Force deployment using Railway CLI
+railway up --service stocktaking-api --detach
+
+# 3. Monitor deployment at: https://railway.app/project/[project-id]
 ```
+
+**⚠️ IMPORTANT:** Railway automatic deployment is NOT working for this project. You MUST run the `railway up --service stocktaking-api --detach` command after every git push to deploy changes to production.
 
 **Option 3: Force Deployment via Railway Dashboard**
 1. Go to https://railway.app/project/[project-id]
