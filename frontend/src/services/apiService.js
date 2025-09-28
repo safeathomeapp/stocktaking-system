@@ -323,6 +323,77 @@ export const apiService = {
     }
   },
 
+  // Master Products API
+  getMasterProducts: async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+
+      const response = await api.get(`/api/master-products?${params}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get master products error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  getMasterProductById: async (id) => {
+    try {
+      const response = await api.get(`/api/master-products/${id}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get master product error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  createMasterProduct: async (productData) => {
+    try {
+      const response = await api.post('/api/master-products', productData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Create master product error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  updateMasterProduct: async (id, updateData) => {
+    try {
+      const response = await api.put(`/api/master-products/${id}`, updateData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Update master product error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getMasterProductCategories: async () => {
+    try {
+      const response = await api.get('/api/master-products/categories/summary');
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get master product categories error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  searchMasterProductsAdvanced: async (searchQuery, options = {}) => {
+    try {
+      const { limit = 20, min_score = 0.1 } = options;
+      const response = await api.post('/api/master-products/search', {
+        query: searchQuery,
+        limit,
+        min_score
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Search master products error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
 }; 
 
 export default apiService;

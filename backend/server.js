@@ -435,6 +435,220 @@ app.post('/api/venues/:id/products', async (req, res) => {
   }
 });
 
+// ===== MASTER PRODUCTS ENDPOINTS =====
+
+// Get all master products with filtering
+app.get('/api/master-products', async (req, res) => {
+  try {
+    const { category, master_category, search, active = 'true' } = req.query;
+
+    let query = 'SELECT * FROM master_products WHERE 1=1';
+    const params = [];
+    let paramCount = 1;
+
+    if (active !== 'all') {
+      query += ` AND active = $${paramCount}`;
+      params.push(active === 'true');
+      paramCount++;
+    }
+
+    if (category) {
+      query += ` AND category ILIKE $${paramCount}`;
+      params.push(`%${category}%`);
+      paramCount++;
+    }
+
+    if (master_category) {
+      query += ` AND master_category = $${paramCount}`;
+      params.push(master_category);
+      paramCount++;
+    }
+
+    if (search) {
+      query += ` AND (name ILIKE $${paramCount} OR brand ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
+      params.push(`%${search}%`);
+      paramCount++;
+    }
+
+    query += ' ORDER BY master_category, category, brand, name';
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching master products:', error);
+    res.status(500).json({ error: 'Failed to fetch master products' });
+  }
+});
+
+// Get master product by ID
+app.get('/api/master-products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM master_products WHERE id = $1', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Master product not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching master product:', error);
+    res.status(500).json({ error: 'Failed to fetch master product' });
+  }
+});
+
+// Create new master product
+app.post('/api/master-products', async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      category,
+      master_category,
+      container_type,
+      container_size,
+      case_size,
+      unit_size,
+      brand,
+      alcohol_percentage,
+      barcode,
+      sku,
+      suggested_retail_price,
+      currency = 'GBP'
+    } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Product name is required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO master_products
+       (name, description, category, master_category, container_type, container_size, case_size, unit_size,
+        brand, alcohol_percentage, barcode, sku, suggested_retail_price, currency)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       RETURNING *`,
+      [name, description, category, master_category, container_type, container_size, case_size, unit_size,
+       brand, alcohol_percentage, barcode, sku, suggested_retail_price, currency]
+    );
+
+    res.status(201).json({
+      message: 'Master product created successfully',
+      product: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error creating master product:', error);
+    res.status(500).json({ error: 'Failed to create master product' });
+  }
+});
+
+// Update master product
+app.put('/api/master-products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      description,
+      category,
+      master_category,
+      container_type,
+      container_size,
+      case_size,
+      unit_size,
+      brand,
+      alcohol_percentage,
+      barcode,
+      sku,
+      suggested_retail_price,
+      currency,
+      active
+    } = req.body;
+
+    // Build dynamic update query
+    const updateFields = [];
+    const values = [];
+    let paramCount = 1;
+
+    const fields = {
+      name, description, category, master_category, container_type, container_size,
+      case_size, unit_size, brand, alcohol_percentage, barcode, sku, suggested_retail_price,
+      currency, active
+    };
+
+    Object.entries(fields).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateFields.push(`${key} = $${paramCount}`);
+        values.push(value);
+        paramCount++;
+      }
+    });
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(id);
+    const query = `UPDATE master_products SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Master product not found' });
+    }
+
+    res.json({
+      message: 'Master product updated successfully',
+      product: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating master product:', error);
+    res.status(500).json({ error: 'Failed to update master product' });
+  }
+});
+
+// Get master product categories summary
+app.get('/api/master-products/categories/summary', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM master_products_summary ORDER BY master_category, category');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching categories summary:', error);
+    res.status(500).json({ error: 'Failed to fetch categories summary' });
+  }
+});
+
+// Search master products (for voice recognition, etc.)
+app.post('/api/master-products/search', async (req, res) => {
+  try {
+    const { query: searchQuery, limit = 20, min_score = 0.1 } = req.body;
+
+    if (!searchQuery || searchQuery.trim() === '') {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    // Use PostgreSQL full-text search
+    const result = await pool.query(
+      `SELECT *,
+              ts_rank(search_vector, plainto_tsquery('english', $1)) as relevance_score
+       FROM master_products
+       WHERE search_vector @@ plainto_tsquery('english', $1)
+          AND active = true
+          AND ts_rank(search_vector, plainto_tsquery('english', $1)) > $2
+       ORDER BY relevance_score DESC, name
+       LIMIT $3`,
+      [searchQuery.trim(), min_score, limit]
+    );
+
+    res.json({
+      query: searchQuery,
+      results: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error searching master products:', error);
+    res.status(500).json({ error: 'Failed to search master products' });
+  }
+});
+
 // ===== SESSION MANAGEMENT ENDPOINTS =====
 
 // Create new stock-taking session

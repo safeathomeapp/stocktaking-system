@@ -1225,49 +1225,27 @@ const StockTaking = () => {
     });
   };
 
-  const handleAddProduct = async () => {
+  const handleAddProduct = () => {
     if (newProductName && newProductCategory) {
-      try {
-        // Get current area object to pass area_id
-        const currentAreaObj = areas.find(a => a.id === currentArea);
+      // TEMPORARY: Create local products until database schema is fixed
+      const newProduct = {
+        id: generateUUID(), // Use UUID for frontend consistency
+        name: newProductName,
+        category: newProductCategory,
+        unit: newProductUnit,
+        expectedCount: 0,
+        area: currentArea,
+        isLocal: true // Flag to indicate this is a local-only product
+      };
 
-        // Create product in database first
-        const productData = {
-          name: newProductName,
-          category: newProductCategory,
-          unit: newProductUnit,
-          area_id: currentAreaObj?.id || null
-        };
+      setStockItems(prev => [...prev, newProduct]);
 
-        const response = await apiService.createVenueProduct(sessionData.venue_id, productData);
-
-        if (response.success) {
-          // Add the database-created product to local state
-          const newProduct = {
-            id: response.data.product.id, // Use database-generated UUID
-            name: newProductName,
-            category: newProductCategory,
-            unit: newProductUnit,
-            expectedCount: 0,
-            area: currentArea
-          };
-
-          setStockItems(prev => [...prev, newProduct]);
-
-          // Reset form
-          setNewProductName('');
-          setNewProductCategory('');
-          setNewProductUnit('bottles');
-          setShowAddProduct(false);
-          setShowSuggestions(false);
-        } else {
-          console.error('Failed to create product:', response.error);
-          setError('Failed to create product: ' + response.error);
-        }
-      } catch (error) {
-        console.error('Error creating product:', error);
-        setError('Failed to create product. Please try again.');
-      }
+      // Reset form
+      setNewProductName('');
+      setNewProductCategory('');
+      setNewProductUnit('bottles');
+      setShowAddProduct(false);
+      setShowSuggestions(false);
     }
   };
 

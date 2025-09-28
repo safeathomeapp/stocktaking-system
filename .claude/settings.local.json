@@ -17,7 +17,9 @@
       "Bash(npm install:*)",
       "Bash(npm start)",
       "Bash(timeout:*)",
-      "Read(//c/users/kevth/desktop/stocktake/stocktaking-system/**)"
+      "Read(//c/users/kevth/desktop/stocktake/stocktaking-system/**)",
+      "Bash(export DATABASE_URL=\"postgresql://postgres:tMpkSRqsDdrbECsTJYEAfgDNBchJjCdi@junction.proxy.rlwy.net:26900/railway\")",
+      "Bash(export DATABASE_URL=\"postgresql://postgres:tMpkSRqsDdrbECsTJYEAfgDNBchJjCdi@caboose.proxy.rlwy.net:35214/railway\")"
     ],
     "deny": [],
     "ask": []
