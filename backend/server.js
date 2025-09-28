@@ -1093,8 +1093,259 @@ app.get('/api/sessions/:id/progress', async (req, res) => {
 });
 
 
+// ===== VOICE RECOGNITION & MASTER PRODUCTS ENDPOINTS =====
+
+// Import voice recognition service when needed to prevent startup errors
+
+// Search master products with fuzzy matching
+app.post('/api/master-products/search', async (req, res) => {
+  try {
+    const { query, sessionId, venueId, maxResults, minConfidence } = req.body;
+
+    if (!query || query.trim() === '') {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const options = {
+      maxResults: maxResults || 20,
+      minConfidence: minConfidence || 40,
+      sessionId: sessionId || null,
+      venueId: venueId || null,
+      includeAliases: true
+    };
+
+    const fuzzyMatchingService = require('./services/fuzzyMatchingService');
+    const searchResults = await fuzzyMatchingService.searchMasterProducts(query.trim(), options);
+
+    res.json(searchResults);
+
+  } catch (error) {
+    console.error('Error searching master products:', error);
+    res.status(500).json({
+      error: 'Search service unavailable',
+      details: error.message
+    });
+  }
+});
+
+// Record product selection for learning
+app.post('/api/voice-recognition/select', async (req, res) => {
+  try {
+    const { productId, logId, selectionRank } = req.body;
+
+    if (!productId || !logId) {
+      return res.status(400).json({ error: 'Product ID and log ID are required' });
+    }
+
+    const fuzzyMatchingService = require('./services/fuzzyMatchingService');
+    await fuzzyMatchingService.recordProductSelection(
+      productId,
+      logId,
+      selectionRank || 1
+    );
+
+    res.json({ message: 'Selection recorded successfully' });
+
+  } catch (error) {
+    console.error('Error recording product selection:', error);
+    res.status(500).json({ error: 'Failed to record selection' });
+  }
+});
+
+// Add new master product
+app.post('/api/master-products', async (req, res) => {
+  try {
+    const {
+      name,
+      brand,
+      category,
+      subcategory,
+      size,
+      unit_type,
+      alcohol_percentage,
+      barcode,
+      venue_id
+    } = req.body;
+
+    if (!name || name.trim() === '') {
+      return res.status(400).json({ error: 'Product name is required' });
+    }
+
+    const productData = {
+      name: name.trim(),
+      brand: brand?.trim() || null,
+      category: category?.trim() || null,
+      subcategory: subcategory?.trim() || null,
+      size: size?.trim() || null,
+      unit_type: unit_type || 'other',
+      alcohol_percentage: alcohol_percentage || null,
+      barcode: barcode?.trim() || null,
+      venue_id: venue_id || null
+    };
+
+    const fuzzyMatchingService = require('./services/fuzzyMatchingService');
+    const newProduct = await fuzzyMatchingService.addMasterProduct(productData);
+
+    res.status(201).json({
+      message: 'Master product created successfully',
+      product: newProduct
+    });
+
+  } catch (error) {
+    console.error('Error creating master product:', error);
+    res.status(500).json({ error: 'Failed to create master product' });
+  }
+});
+
+// Get master product by ID
+app.get('/api/master-products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'SELECT * FROM master_products WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Master product not found' });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (error) {
+    console.error('Error fetching master product:', error);
+    res.status(500).json({ error: 'Failed to fetch master product' });
+  }
+});
+
+// Get voice recognition analytics
+app.get('/api/voice-recognition/analytics', async (req, res) => {
+  try {
+    const { venueId, days = 30 } = req.query;
+
+    // Basic analytics query
+    const analyticsQuery = `
+      SELECT
+        COUNT(*) as total_requests,
+        COUNT(selected_product_id) as successful_selections,
+        AVG(confidence_score) as avg_confidence,
+        AVG(processing_time_ms) as avg_processing_time,
+        COUNT(CASE WHEN selection_rank = 1 THEN 1 END) as first_choice_selections,
+        COUNT(CASE WHEN manual_entry = true THEN 1 END) as manual_entries
+      FROM voice_recognition_log
+      WHERE created_at >= NOW() - INTERVAL '${parseInt(days)} days'
+      ${venueId ? 'AND venue_id = $1' : ''}
+    `;
+
+    const params = venueId ? [venueId] : [];
+    const result = await pool.query(analyticsQuery, params);
+
+    const analytics = result.rows[0];
+
+    // Calculate success rate
+    const successRate = analytics.total_requests > 0
+      ? (analytics.successful_selections / analytics.total_requests * 100).toFixed(2)
+      : 0;
+
+    // Calculate first choice accuracy
+    const firstChoiceAccuracy = analytics.successful_selections > 0
+      ? (analytics.first_choice_selections / analytics.successful_selections * 100).toFixed(2)
+      : 0;
+
+    res.json({
+      totalRequests: parseInt(analytics.total_requests),
+      successfulSelections: parseInt(analytics.successful_selections),
+      successRate: parseFloat(successRate),
+      firstChoiceAccuracy: parseFloat(firstChoiceAccuracy),
+      avgConfidence: parseFloat(analytics.avg_confidence || 0).toFixed(2),
+      avgProcessingTime: parseFloat(analytics.avg_processing_time || 0).toFixed(0),
+      manualEntries: parseInt(analytics.manual_entries),
+      periodDays: parseInt(days)
+    });
+
+  } catch (error) {
+    console.error('Error fetching voice recognition analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// Get popular products from master database
+app.get('/api/master-products/popular', async (req, res) => {
+  try {
+    const { category, limit = 50 } = req.query;
+
+    let sql = `
+      SELECT
+        mp.*,
+        array_length(mp.venues_seen, 1) as venue_count
+      FROM master_products mp
+      WHERE mp.usage_count > 0
+    `;
+
+    const params = [];
+    if (category) {
+      sql += ' AND LOWER(mp.category) = LOWER($1)';
+      params.push(category);
+    }
+
+    sql += `
+      ORDER BY mp.usage_count DESC, mp.success_rate DESC
+      LIMIT $${params.length + 1}
+    `;
+
+    params.push(parseInt(limit));
+
+    const result = await pool.query(sql, params);
+
+    res.json({
+      products: result.rows,
+      totalCount: result.rows.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching popular products:', error);
+    res.status(500).json({ error: 'Failed to fetch popular products' });
+  }
+});
+
+// Link venue product to master product
+app.post('/api/venues/:venueId/products/:productId/link-master', async (req, res) => {
+  try {
+    const { venueId, productId } = req.params;
+    const { masterProductId } = req.body;
+
+    if (!masterProductId) {
+      return res.status(400).json({ error: 'Master product ID is required' });
+    }
+
+    // Update the venue product to link to master product
+    const result = await pool.query(
+      `UPDATE products
+       SET master_product_id = $1, auto_matched = false
+       WHERE id = $2 AND venue_id = $3
+       RETURNING *`,
+      [masterProductId, productId, venueId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    res.json({
+      message: 'Product linked to master database successfully',
+      product: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error linking product to master:', error);
+    res.status(500).json({ error: 'Failed to link product' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Voice Recognition API ready at /api/master-products/search`);
 });
 
 // Force redeploy $(date)// Force redeploy Fri Sep 26 00:02:49 GMTST 2025

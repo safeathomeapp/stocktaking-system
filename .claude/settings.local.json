@@ -13,7 +13,10 @@
       "Bash(node:*)",
       "Bash(npm run build:*)",
       "Bash(export PGPASSWORD=tMpkSRqsDdrbECsTJYEAfgDNBchJjCdi)",
-      "Bash(railway:*)"
+      "Bash(railway:*)",
+      "Bash(npm install:*)",
+      "Bash(npm start)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

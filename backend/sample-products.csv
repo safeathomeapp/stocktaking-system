@@ -1,0 +1,31 @@
+name,brand,category,subcategory,size,unit_type,alcohol_percentage,barcode,ean_code
+Beck's Lager,Beck's,Beer,Lager,275ml,bottle,4.8,5000169080382,5000169080382
+Stella Artois,Stella Artois,Beer,Lager,330ml,bottle,5.0,5410228142027,5410228142027
+Guinness Draught,Guinness,Beer,Stout,440ml,can,4.2,5000169047422,5000169047422
+Budweiser Lager,Budweiser,Beer,Lager,330ml,bottle,5.0,5000169017777,5000169017777
+Corona Extra,Corona,Beer,Lager,330ml,bottle,4.5,7501056312220,7501056312220
+Heineken Lager,Heineken,Beer,Lager,330ml,bottle,5.0,8710103010399,8710103010399
+Carlsberg Lager,Carlsberg,Beer,Lager,440ml,can,3.8,5000169001974,5000169001974
+Smirnoff Red Vodka,Smirnoff,Spirits,Vodka,700ml,bottle,37.5,5000175020008,5000175020008
+Jack Daniel's Old No. 7,Jack Daniel's,Spirits,Whiskey,700ml,bottle,40.0,5099873089354,5099873089354
+Captain Morgan Spiced Rum,Captain Morgan,Spirits,Rum,700ml,bottle,35.0,5000281016658,5000281016658
+Gordon's London Dry Gin,Gordon's,Spirits,Gin,700ml,bottle,37.5,5000169008065,5000169008065
+Baileys Original Irish Cream,Baileys,Spirits,Liqueur,700ml,bottle,17.0,5000169052167,5000169052167
+Jameson Irish Whiskey,Jameson,Spirits,Whiskey,700ml,bottle,40.0,5011007003357,5011007003357
+Grey Goose Vodka,Grey Goose,Spirits,Vodka,700ml,bottle,40.0,3166472000013,3166472000013
+Tanqueray London Dry Gin,Tanqueray,Spirits,Gin,700ml,bottle,43.3,5000291020157,5000291020157
+Chardonnay House White,House Wine,Wine,White Wine,750ml,bottle,12.5,,
+Merlot House Red,House Wine,Wine,Red Wine,750ml,bottle,13.0,,
+Sauvignon Blanc,Oyster Bay,Wine,White Wine,750ml,bottle,12.5,9421001180104,9421001180104
+Cabernet Sauvignon,Jacob's Creek,Wine,Red Wine,750ml,bottle,13.5,9300727341041,9300727341041
+Pinot Grigio,Bolla,Wine,White Wine,750ml,bottle,12.0,8007430001525,8007430001525
+Prosecco DOCG,Villa Sandi,Wine,Sparkling,750ml,bottle,11.0,8032375012133,8032375012133
+Champagne Brut,Moët & Chandon,Wine,Champagne,750ml,bottle,12.0,3185370001356,3185370001356
+Coca-Cola,Coca-Cola,Soft Drinks,Cola,330ml,bottle,0.0,5449000214911,5449000214911
+Pepsi Cola,Pepsi,Soft Drinks,Cola,330ml,bottle,0.0,5449000009159,5449000009159
+Orange Juice,Tropicana,Soft Drinks,Juice,1L,other,0.0,5000169150047,5000169150047
+Apple Juice,Copella,Soft Drinks,Juice,750ml,bottle,0.0,5000169133323,5000169133323
+Mineral Water,Evian,Soft Drinks,Water,500ml,bottle,0.0,3068320000016,3068320000016
+Tonic Water,Schweppes,Soft Drinks,Mixer,200ml,bottle,0.0,5000169062197,5000169062197
+Ginger Beer,Fever-Tree,Soft Drinks,Mixer,200ml,bottle,0.0,5055491002004,5055491002004
+Energy Drink,Red Bull,Soft Drinks,Energy,250ml,can,0.0,9002490100004,9002490100004
