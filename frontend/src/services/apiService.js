@@ -214,7 +214,48 @@ export const apiService = {
       return { success: false, error: error.message };
     }
   },
-  
+
+  // Voice Recognition & Master Products
+  searchMasterProducts: async (query, sessionId = null, venueId = null, maxResults = 20, minConfidence = 40) => {
+    try {
+      const response = await api.post('/api/master-products/search', {
+        query: query.trim(),
+        sessionId,
+        venueId,
+        maxResults,
+        minConfidence
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Voice search error:', error);
+      return { success: false, error: error.message, suggestions: [] };
+    }
+  },
+
+  recordProductSelection: async (productId, logId, selectionRank = 1) => {
+    try {
+      const response = await api.post('/api/voice-recognition/select', {
+        productId,
+        logId,
+        selectionRank
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Selection recording error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  addMasterProduct: async (productData) => {
+    try {
+      const response = await api.post('/api/master-products', productData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Add master product error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
 }; 
 
 export default apiService;

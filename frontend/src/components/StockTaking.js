@@ -800,6 +800,9 @@ const StockTaking = () => {
   // Voice recognition
   const [isListening, setIsListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceSuggestions, setVoiceSuggestions] = useState([]);
+  const [showVoiceSuggestions, setShowVoiceSuggestions] = useState(false);
+  const [voiceSearchLoading, setVoiceSearchLoading] = useState(false);
   const recognition = useRef(null);
 
   // Drag and drop
@@ -1166,22 +1169,70 @@ const StockTaking = () => {
     setIsListening(false);
   };
 
-  const handleVoiceResultForProduct = (transcript) => {
+  const handleVoiceResultForProduct = async (transcript) => {
     console.log('Processing voice for product input:', transcript);
+    setVoiceSearchLoading(true);
 
-    // Parse voice input for "Add [product name]" or just product names
-    const addMatch = transcript.match(/add\s+(.+)/i);
-    if (addMatch) {
-      const productName = addMatch[1].trim();
-      setNewProductName(productName);
-      handleSuggestionSelect(productName);
-    } else {
-      // If no "add" keyword, just treat the whole transcript as a product name
-      const productName = transcript.trim();
-      setNewProductName(productName);
-      handleSuggestionSelect(productName);
+    // Clean up the transcript
+    const cleanedQuery = transcript.replace(/^(add|create|new)\s+/i, '').trim();
+
+    try {
+      // Search master products database with fuzzy matching
+      const searchResult = await apiService.searchMasterProducts(
+        cleanedQuery,
+        sessionId,
+        venueData?.id,
+        10, // maxResults
+        30  // minConfidence (lower for more suggestions)
+      );
+
+      if (searchResult.success && searchResult.data?.suggestions?.length > 0) {
+        // Show voice suggestions to user
+        setVoiceSuggestions(searchResult.data.suggestions);
+        setShowVoiceSuggestions(true);
+
+        // Auto-select the top suggestion if confidence is high
+        const topSuggestion = searchResult.data.suggestions[0];
+        if (topSuggestion.confidence > 80) {
+          handleVoiceSuggestionSelect(topSuggestion, 0);
+        }
+      } else {
+        // No suggestions found, use original input
+        console.log('No master product suggestions found, using original input');
+        setNewProductName(cleanedQuery);
+        setShowVoiceSuggestions(false);
+      }
+    } catch (error) {
+      console.error('Voice search error:', error);
+      // Fallback to original behavior
+      setNewProductName(cleanedQuery);
+      setShowVoiceSuggestions(false);
+    } finally {
+      setVoiceSearchLoading(false);
+      setIsListening(false);
     }
-    setIsListening(false);
+  };
+
+  // Handle voice suggestion selection
+  const handleVoiceSuggestionSelect = async (suggestion, rank) => {
+    console.log('Selected voice suggestion:', suggestion);
+
+    // Fill in the product form with suggestion data
+    setNewProductName(suggestion.name);
+    setNewProductCategory(suggestion.category || '');
+
+    // Record the selection for learning
+    if (suggestion.logId) {
+      try {
+        await apiService.recordProductSelection(suggestion.id, suggestion.logId, rank + 1);
+      } catch (error) {
+        console.error('Failed to record selection:', error);
+      }
+    }
+
+    // Hide suggestions
+    setShowVoiceSuggestions(false);
+    setVoiceSuggestions([]);
   };
 
   // Add new product
@@ -1674,7 +1725,48 @@ const StockTaking = () => {
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     autoFocus
                   />
-                  {showSuggestions && productSuggestions.length > 0 && (
+                  {/* Voice search loading indicator */}
+                  {voiceSearchLoading && (
+                    <SuggestionsList>
+                      <SuggestionItem style={{ color: '#666', fontStyle: 'italic' }}>
+                        🎤 Searching products...
+                      </SuggestionItem>
+                    </SuggestionsList>
+                  )}
+
+                  {/* Voice suggestions from master database */}
+                  {showVoiceSuggestions && voiceSuggestions.length > 0 && (
+                    <SuggestionsList>
+                      <SuggestionItem style={{
+                        backgroundColor: '#E3F2FD',
+                        color: '#1976D2',
+                        fontWeight: 'bold',
+                        fontSize: '0.8rem',
+                        padding: '4px 8px'
+                      }}>
+                        🎤 Voice Suggestions:
+                      </SuggestionItem>
+                      {voiceSuggestions.map((suggestion, index) => (
+                        <SuggestionItem
+                          key={`voice-${index}`}
+                          onMouseDown={() => handleVoiceSuggestionSelect(suggestion, index)}
+                          style={{ borderLeft: '3px solid #2196F3' }}
+                        >
+                          <div>
+                            <strong>{suggestion.name}</strong>
+                            {suggestion.brand && <span> ({suggestion.brand})</span>}
+                            {suggestion.size && <span> - {suggestion.size}</span>}
+                            <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                              {suggestion.category} • {suggestion.confidence}% match
+                            </div>
+                          </div>
+                        </SuggestionItem>
+                      ))}
+                    </SuggestionsList>
+                  )}
+
+                  {/* Regular typed suggestions */}
+                  {showSuggestions && productSuggestions.length > 0 && !showVoiceSuggestions && (
                     <SuggestionsList>
                       {productSuggestions.map((suggestion, index) => (
                         <SuggestionItem
