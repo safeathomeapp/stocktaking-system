@@ -1333,10 +1333,19 @@ const StockTaking = () => {
       // Save or update each stock count
       for (const [productId, quantity] of Object.entries(stockCounts)) {
         if (quantity !== '' && !isNaN(parseFloat(quantity))) {
+          // Find the product to get expected count
+          const allProducts = getAllItems();
+          const product = allProducts.find(p => p.id === parseInt(productId));
+          const expectedCount = product?.expectedCount || 1;
+
+          // Calculate quantity_level as percentage (0.0 to 1.0)
+          const actualQuantity = parseFloat(quantity);
+          const quantityLevel = expectedCount > 0 ? Math.min(actualQuantity / expectedCount, 1.0) : 0.0;
+
           const entryData = {
             product_id: parseInt(productId),
-            quantity_level: parseFloat(quantity),
-            quantity_units: 0, // Default value
+            quantity_level: quantityLevel,
+            quantity_units: actualQuantity, // Store actual count in quantity_units
             location_notes: null,
             condition_flags: null,
             photo_url: null
@@ -1345,18 +1354,31 @@ const StockTaking = () => {
           // Try to add entry (will fail if exists, then we'll update)
           const addResponse = await apiService.addStockEntry(sessionId, entryData);
           if (!addResponse.success) {
+            console.log('Add failed, trying to update existing entry:', addResponse.error);
             // If add failed, try to find and update existing entry
             const entriesResponse = await apiService.getSessionEntries(sessionId);
             if (entriesResponse.success) {
-              const existingEntry = entriesResponse.data.find(entry => entry.product_id === parseInt(productId));
+              // Handle different response formats
+              const entries = Array.isArray(entriesResponse.data)
+                ? entriesResponse.data
+                : entriesResponse.data.entries || [];
+
+              console.log('Fetched entries for update:', entries);
+              const existingEntry = entries.find(entry => entry.product_id === parseInt(productId));
               if (existingEntry) {
+                console.log('Updating existing entry:', existingEntry.id);
                 const updateResponse = await apiService.updateStockEntry(existingEntry.id, {
-                  quantity_level: parseFloat(quantity)
+                  quantity_level: quantityLevel,
+                  quantity_units: actualQuantity
                 });
                 if (!updateResponse.success) {
                   console.error('Failed to update entry:', updateResponse.error);
                 }
+              } else {
+                console.log('No existing entry found for product_id:', productId);
               }
+            } else {
+              console.error('Failed to fetch entries:', entriesResponse.error);
             }
           }
         }
