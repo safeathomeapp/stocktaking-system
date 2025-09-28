@@ -40,7 +40,29 @@ railway up --service stocktaking-api --detach
 # 3. Monitor deployment at: https://railway.app/project/[project-id]
 ```
 
-**⚠️ IMPORTANT:** Railway automatic deployment is NOT working for this project. You MUST run the `railway up --service stocktaking-api --detach` command after every git push to deploy changes to production.
+**⚠️ CRITICAL:** Railway automatic deployment is NOT working for this project. You MUST manually deploy after every git push using one of these methods:
+
+**Method 1: Railway CLI (if properly linked)**
+```bash
+railway up --service stocktaking-api --detach
+```
+
+**Method 2: Railway Dashboard (if CLI not linked)**
+1. Go to Railway project dashboard
+2. Select the stocktaking-api service
+3. Go to "Deployments" tab
+4. Click "Deploy" on the latest commit
+5. Wait for deployment to complete
+
+**Method 3: Force deployment with environment linking**
+```bash
+# First-time setup (if not done)
+railway login
+railway link [project-id]
+
+# Then deploy
+railway up --service stocktaking-api --detach
+```
 
 **Option 3: Force Deployment via Railway Dashboard**
 1. Go to https://railway.app/project/[project-id]

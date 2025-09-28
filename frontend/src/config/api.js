@@ -1,5 +1,5 @@
 // API Configuration for Stock Taking System
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
+const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://stocktaking-api-production.up.railway.app'
   : 'https://stocktaking-api-production.up.railway.app'; // Use production for development too since local DB has issues
 

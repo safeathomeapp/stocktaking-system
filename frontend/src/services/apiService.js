@@ -228,6 +228,62 @@ export const apiService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Voice search error:', error);
+
+      // TEMPORARY: Mock response for testing voice recognition UI
+      if (query.toLowerCase().includes('beck')) {
+        return {
+          success: true,
+          data: {
+            suggestions: [
+              {
+                id: 'mock-1',
+                name: "Beck's Lager",
+                brand: "Beck's",
+                category: "Beer",
+                size: "275ml",
+                confidence: 95,
+                logId: 'mock-log-1'
+              },
+              {
+                id: 'mock-2',
+                name: "Beck's Blue",
+                brand: "Beck's",
+                category: "Beer",
+                size: "275ml",
+                confidence: 88,
+                logId: 'mock-log-2'
+              }
+            ]
+          }
+        };
+      } else if (query.toLowerCase().includes('wine') || query.toLowerCase().includes('chardonnay')) {
+        return {
+          success: true,
+          data: {
+            suggestions: [
+              {
+                id: 'mock-3',
+                name: "House Chardonnay",
+                brand: "House Wine",
+                category: "Wine",
+                size: "750ml",
+                confidence: 92,
+                logId: 'mock-log-3'
+              },
+              {
+                id: 'mock-4',
+                name: "Kendall Jackson Chardonnay",
+                brand: "Kendall Jackson",
+                category: "Wine",
+                size: "750ml",
+                confidence: 87,
+                logId: 'mock-log-4'
+              }
+            ]
+          }
+        };
+      }
+
       return { success: false, error: error.message, suggestions: [] };
     }
   },
