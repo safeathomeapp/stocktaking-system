@@ -1009,7 +1009,7 @@ const StockTaking = () => {
     }
   };
 
-  const handleAreaDrop = (e, dropAreaId) => {
+  const handleAreaDrop = async (e, dropAreaId) => {
     e.preventDefault();
 
     if (editAreasMode && draggedArea && dropAreaId && draggedArea !== dropAreaId) {
@@ -1020,7 +1020,36 @@ const StockTaking = () => {
         const newAreas = [...areas];
         const [draggedAreaData] = newAreas.splice(draggedIndex, 1);
         newAreas.splice(dropIndex, 0, draggedAreaData);
+
+        // Update local state immediately for responsive UI
         setAreas(newAreas);
+
+        // Save new display order to database
+        try {
+          const updatePromises = newAreas.map((area, index) => {
+            if (typeof area.id === 'number') { // Only update database areas, not temporary ones
+              return apiService.updateArea(area.id, {
+                name: area.name,
+                display_order: index,
+                description: area.description || ''
+              });
+            }
+            return Promise.resolve({ success: true });
+          });
+
+          const results = await Promise.all(updatePromises);
+          const failedUpdates = results.filter(r => !r.success);
+
+          if (failedUpdates.length > 0) {
+            console.error('Some area order updates failed:', failedUpdates);
+            setError('Failed to save area order. Changes will be lost on refresh.');
+          } else {
+            console.log('Area order saved successfully');
+          }
+        } catch (error) {
+          console.error('Error updating area order:', error);
+          setError('Failed to save area order. Changes will be lost on refresh.');
+        }
       }
     }
 
@@ -1031,19 +1060,42 @@ const StockTaking = () => {
     setDraggedArea(null);
   };
 
-  // Add new area
-  const handleAddArea = () => {
-    if (newAreaName.trim()) {
-      const newArea = {
-        id: `area-${Date.now()}`,
-        name: newAreaName.trim(),
-        completedItems: 0,
-        totalItems: 0
-      };
-      setAreas(prev => [...prev, newArea]);
-      setCurrentArea(`area-${Date.now()}`);
-      setNewAreaName('');
-      setShowAddArea(false);
+  // Add new area - immediately save to database
+  const handleAddArea = async () => {
+    if (newAreaName.trim() && venueData?.id) {
+      try {
+        // Save area to database immediately
+        const areaData = {
+          name: newAreaName.trim(),
+          display_order: areas.length,
+          description: ''
+        };
+
+        const response = await apiService.addVenueArea(venueData.id, areaData);
+
+        if (response.success) {
+          // Add the database area to local state
+          const newArea = {
+            id: response.data.area.id,
+            name: response.data.area.name,
+            display_order: response.data.area.display_order,
+            completedItems: 0,
+            totalItems: 0
+          };
+
+          setAreas(prev => [...prev, newArea]);
+          setCurrentArea(newArea.id);
+          setNewAreaName('');
+          setShowAddArea(false);
+          console.log('Area saved to database:', response.data.area);
+        } else {
+          console.error('Failed to save area:', response.error);
+          setError('Failed to save area. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error saving area:', error);
+        setError('Failed to save area. Please try again.');
+      }
     }
   };
 
