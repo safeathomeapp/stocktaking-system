@@ -197,7 +197,6 @@ const Settings = () => {
     // Personal Information
     first_name: '',
     last_name: '',
-    preferred_name: '',
     company_name: '',
     job_title: '',
 
@@ -223,8 +222,6 @@ const Settings = () => {
     instagram_handle: '',
     twitter_handle: '',
     linkedin_handle: '',
-    tiktok_handle: '',
-    snapchat_handle: '',
 
     // Preferences
     preferred_language: 'en',
@@ -373,15 +370,6 @@ const Settings = () => {
                   value={profile.last_name}
                   onChange={(e) => handleInputChange('last_name', e.target.value)}
                   required
-                />
-              </FormGroup>
-              <FormGroup>
-                <Label>Preferred Name</Label>
-                <Input
-                  type="text"
-                  value={profile.preferred_name}
-                  onChange={(e) => handleInputChange('preferred_name', e.target.value)}
-                  placeholder="What you like to be called"
                 />
               </FormGroup>
               <FormGroup>

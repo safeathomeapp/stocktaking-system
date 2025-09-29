@@ -1796,17 +1796,16 @@ app.get('/api/user/profile', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
-        id, first_name, last_name, preferred_name,
+        id, first_name, last_name,
         address_line_1, address_line_2, city, county, postcode, country,
         mobile_phone, home_phone, work_phone, whatsapp_number,
         primary_email, work_email, personal_email,
         facebook_handle, instagram_handle, twitter_handle, linkedin_handle,
-        tiktok_handle, snapchat_handle,
         company_name, job_title,
         preferred_language, timezone, date_format, currency,
         profile_complete, active,
         share_phone, share_email, share_social_media,
-        notes, profile_picture_url,
+        notes,
         created_at, updated_at, last_login
       FROM user_profiles
       WHERE active = true
@@ -1845,16 +1844,15 @@ app.put('/api/user/profile', async (req, res) => {
 
     // Build dynamic update query based on provided fields
     const allowedFields = [
-      'first_name', 'last_name', 'preferred_name',
+      'first_name', 'last_name',
       'address_line_1', 'address_line_2', 'city', 'county', 'postcode', 'country',
       'mobile_phone', 'home_phone', 'work_phone', 'whatsapp_number',
       'primary_email', 'work_email', 'personal_email',
       'facebook_handle', 'instagram_handle', 'twitter_handle', 'linkedin_handle',
-      'tiktok_handle', 'snapchat_handle',
       'company_name', 'job_title',
       'preferred_language', 'timezone', 'date_format', 'currency',
       'share_phone', 'share_email', 'share_social_media',
-      'notes', 'profile_picture_url'
+      'notes'
     ];
 
     const updateFields = [];
