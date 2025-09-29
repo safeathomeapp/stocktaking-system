@@ -888,7 +888,7 @@ const StockTaking = () => {
         // Fix: The API returns {entries: [...]} not a direct array
         const entries = entriesResponse.data.entries || [];
         entries.forEach(entry => {
-          counts[entry.product_id] = entry.quantity_level.toString();
+          counts[entry.product_id] = entry.quantity_units.toString();
         });
         setStockCounts(counts);
       }
@@ -1426,16 +1426,10 @@ const StockTaking = () => {
           // Simple data capture - store actual quantity as input
           const actualQuantity = parseFloat(quantity);
 
-          // For database compatibility, set quantity_level to 1.0 (not used for calculations)
-          const quantityLevel = 1.0;
-
           const entryData = {
             product_id: productId,
-            quantity_level: quantityLevel, // Fixed at 1.0 for compatibility
-            quantity_units: actualQuantity, // Actual count data (12.5, etc.)
-            location_notes: null,
-            condition_flags: null,
-            photo_url: null
+            quantity_units: actualQuantity,
+            venue_area_id: null
           };
 
           // Try to add entry (will fail if exists, then we'll update)
@@ -1455,7 +1449,6 @@ const StockTaking = () => {
               if (existingEntry) {
                 console.log('Updating existing entry:', existingEntry.id);
                 const updateResponse = await apiService.updateStockEntry(existingEntry.id, {
-                  quantity_level: quantityLevel,
                   quantity_units: actualQuantity
                 });
                 if (!updateResponse.success) {
@@ -1500,16 +1493,10 @@ const StockTaking = () => {
           // Simple data capture - store actual quantity as input
           const actualQuantity = parseFloat(quantity);
 
-          // For database compatibility, set quantity_level to 1.0 (not used for calculations)
-          const quantityLevel = 1.0;
-
           const entryData = {
             product_id: productId,
-            quantity_level: quantityLevel,
             quantity_units: actualQuantity,
-            location_notes: null,
-            condition_flags: null,
-            photo_url: null
+            venue_area_id: null
           };
 
           try {
@@ -1536,7 +1523,6 @@ const StockTaking = () => {
                   const existingEntry = entries.find(entry => entry.product_id === productId);
                   if (existingEntry) {
                     const updateResult = await apiService.updateStockEntry(existingEntry.id, {
-                      quantity_level: quantityLevel,
                       quantity_units: actualQuantity
                     });
                     if (updateResult.success) {

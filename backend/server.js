@@ -912,29 +912,32 @@ app.get('/api/sessions', async (req, res) => {
 // ===== STOCK ENTRY MANAGEMENT ENDPOINTS =====
 
 // Add product stock entry to a session
+// Helper function to round to 2 decimal places
+function roundToTwoDecimals(num) {
+  return Math.round((parseFloat(num) || 0) * 100) / 100;
+}
+
 app.post('/api/sessions/:id/entries', async (req, res) => {
   try {
     const { id: session_id } = req.params;
-    const { 
-      product_id, 
-      quantity_level, 
-      quantity_units = 0, 
-      location_notes, 
-      condition_flags,
-      photo_url 
+    const {
+      product_id,
+      quantity_units = 0,
+      venue_area_id
     } = req.body;
 
     // Validate required fields
-    if (!product_id || quantity_level === undefined) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: product_id and quantity_level are required' 
+    if (!product_id || quantity_units === undefined) {
+      return res.status(400).json({
+        error: 'Missing required fields: product_id and quantity_units are required'
       });
     }
 
-    // Validate quantity_level range (0.0 to 1.0)
-    if (quantity_level < 0.0 || quantity_level > 1.0) {
-      return res.status(400).json({ 
-        error: 'quantity_level must be between 0.0 (empty) and 1.0 (full)' 
+    // Round quantity_units to 2 decimal places and ensure non-negative
+    const roundedQuantity = roundToTwoDecimals(quantity_units);
+    if (roundedQuantity < 0) {
+      return res.status(400).json({
+        error: 'quantity_units must be non-negative'
       });
     }
 
@@ -980,25 +983,26 @@ app.post('/api/sessions/:id/entries', async (req, res) => {
 
     // Create new stock entry
     const result = await pool.query(
-      `INSERT INTO stock_entries 
-       (session_id, product_id, quantity_level, quantity_units, location_notes, condition_flags, photo_url) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+      `INSERT INTO stock_entries
+       (session_id, product_id, quantity_units, venue_area_id)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [session_id, product_id, quantity_level, parseInt(quantity_units) || 0, location_notes,
-       condition_flags ? JSON.stringify(condition_flags) : null, photo_url]
+      [session_id, product_id, roundedQuantity, venue_area_id || null]
     );
 
-    // Get entry with product details for response
+    // Get entry with product and venue area details for response
     const entryWithProduct = await pool.query(
-      `SELECT 
+      `SELECT
          se.*,
          p.name as product_name,
          p.brand,
          p.size,
          p.category,
-         p.unit_type
+         p.unit_type,
+         va.name as venue_area_name
        FROM stock_entries se
        JOIN products p ON se.product_id = p.id
+       LEFT JOIN venue_areas va ON se.venue_area_id = va.id
        WHERE se.id = $1`,
       [result.rows[0].id]
     );
@@ -1030,16 +1034,18 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
 
     // Build query with optional filters
     let query = `
-      SELECT 
+      SELECT
         se.*,
         p.name as product_name,
         p.brand,
         p.size,
         p.category,
         p.unit_type,
-        p.barcode
+        p.barcode,
+        va.name as venue_area_name
       FROM stock_entries se
       JOIN products p ON se.product_id = p.id
+      LEFT JOIN venue_areas va ON se.venue_area_id = va.id
       WHERE se.session_id = $1
     `;
 

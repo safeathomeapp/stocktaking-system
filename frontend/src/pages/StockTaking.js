@@ -97,15 +97,14 @@ const StockTaking = () => {
     }
   };
 
-  const handleStockEntry = async (product, quantityLevel, quantityUnits = 0, locationNotes = '') => {
+  const handleStockEntry = async (product, quantityUnits = 0, venueAreaId = null) => {
     try {
       // Check if entry already exists
       const existingEntry = entries.find(entry => entry.product_id === product.id);
-      
+
       const entryData = {
-        quantity_level: quantityLevel,
         quantity_units: quantityUnits,
-        location_notes: locationNotes
+        venue_area_id: venueAreaId
       };
 
       let result;
@@ -325,13 +324,12 @@ const StockTaking = () => {
 
 // Product Card Component
 const ProductCard = ({ product, entry, onStockEntry, isActive }) => {
-  const [quantityLevel, setQuantityLevel] = useState(entry?.quantity_level || 0);
   const [quantityUnits, setQuantityUnits] = useState(entry?.quantity_units || 0);
-  const [locationNotes, setLocationNotes] = useState(entry?.location_notes || '');
+  const [venueAreaId, setVenueAreaId] = useState(entry?.venue_area_id || null);
   const [isEditing, setIsEditing] = useState(!entry && isActive);
 
   const handleSave = () => {
-    onStockEntry(product, quantityLevel, quantityUnits, locationNotes);
+    onStockEntry(product, quantityUnits, venueAreaId);
     setIsEditing(false);
   };
 
@@ -370,14 +368,11 @@ const ProductCard = ({ product, entry, onStockEntry, isActive }) => {
           border: '1px solid #c3e6cb'
         }}>
           <div style={{ fontWeight: 'bold', color: '#155724' }}>
-            Level: {formatQuantityLevel(entry.quantity_level)} ({getQuantityDescription(entry.quantity_level)})
+            Quantity: {entry.quantity_units || 0}
           </div>
-          {entry.quantity_units > 0 && (
-            <div style={{ color: '#155724' }}>Units: {entry.quantity_units}</div>
-          )}
-          {entry.location_notes && (
+          {entry.venue_area_name && (
             <div style={{ color: '#155724', fontSize: '0.875rem' }}>
-              Location: {entry.location_notes}
+              Area: {entry.venue_area_name}
             </div>
           )}
         </div>
