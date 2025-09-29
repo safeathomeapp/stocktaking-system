@@ -1277,27 +1277,69 @@ const StockTaking = () => {
     });
   };
 
-  const handleAddProduct = () => {
-    if (newProductName && newProductCategory) {
-      // TEMPORARY: Create local products until database schema is fixed
-      const newProduct = {
-        id: generateUUID(), // Use UUID for frontend consistency
-        name: newProductName,
-        category: newProductCategory,
-        unit: newProductUnit,
-        expectedCount: 0,
-        area: currentArea,
-        isLocal: true // Flag to indicate this is a local-only product
-      };
+  const handleAddProduct = async () => {
+    if (newProductName && newProductCategory && venueData?.id && currentArea) {
+      try {
+        // Find the current area object to get its database ID
+        const currentAreaObj = areas.find(area => area.id === currentArea);
 
-      setStockItems(prev => [...prev, newProduct]);
+        if (!currentAreaObj) {
+          setError('Please select a valid area before adding products.');
+          return;
+        }
 
-      // Reset form
-      setNewProductName('');
-      setNewProductCategory('');
-      setNewProductUnit('bottles');
-      setShowAddProduct(false);
-      setShowSuggestions(false);
+        // Prepare product data for database
+        const productData = {
+          name: newProductName,
+          category: newProductCategory,
+          unit: newProductUnit,
+          area_id: typeof currentAreaObj.id === 'number' ? currentAreaObj.id : null, // Only use database area IDs
+          brand: '',
+          size: '',
+          barcode: ''
+        };
+
+        // Save product to database immediately
+        const response = await apiService.createVenueProduct(venueData.id, productData);
+
+        if (response.success) {
+          // Add the database product to local state
+          const newProduct = {
+            id: response.data.product.id,
+            name: response.data.product.name,
+            category: response.data.product.category,
+            unit_type: response.data.product.unit_type,
+            area_id: response.data.product.area_id,
+            area: currentArea, // Keep area reference for UI
+            expectedCount: 0,
+            brand: response.data.product.brand,
+            size: response.data.product.size,
+            barcode: response.data.product.barcode
+          };
+
+          setStockItems(prev => [...prev, newProduct]);
+
+          // Reset form
+          setNewProductName('');
+          setNewProductCategory('');
+          setNewProductUnit('bottles');
+          setShowAddProduct(false);
+          setShowSuggestions(false);
+          console.log('Product saved to database:', response.data.product);
+        } else {
+          console.error('Failed to save product:', response.error);
+          setError('Failed to save product. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error saving product:', error);
+        setError('Failed to save product. Please try again.');
+      }
+    } else {
+      if (!currentArea) {
+        setError('Please select an area before adding products.');
+      } else if (!newProductName || !newProductCategory) {
+        setError('Please fill in product name and category.');
+      }
     }
   };
 

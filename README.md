@@ -124,6 +124,38 @@ node migrate-db.js # Run database migrations
 node check-db.js   # Verify database structure
 ```
 
+## 🚀 Railway Deployment
+
+### Manual Deployment Process
+
+After pushing changes to GitHub, use these commands to force a redeploy:
+
+```bash
+# Step 1: Navigate to project directory
+cd /c/users/kevth/desktop/stocktake/stocktaking-system
+
+# Step 2: Login to Railway (if not already logged in)
+railway login
+
+# Step 3: Link to your stocktaking-api project
+railway link
+# When prompted, select: stocktaking-api
+
+# Step 4: Verify connection is working
+railway status
+
+# Step 5: Deploy the updated backend
+railway up --service stocktaking-api --detach
+
+# Step 6: Wait for deployment (approx 50 seconds)
+sleep 60
+
+# Step 7: Verify deployment shows new version
+curl -s "https://stocktaking-api-production.up.railway.app/api/health"
+```
+
+**Note**: After step 5, always wait 60 seconds as redeployment takes approximately 50 seconds to complete.
+
 ### Database Management
 ```bash
 # Schema migration
