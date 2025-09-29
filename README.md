@@ -156,6 +156,40 @@ curl -s "https://stocktaking-api-production.up.railway.app/api/health"
 
 **Note**: After step 5, always wait 60 seconds as redeployment takes approximately 50 seconds to complete.
 
+### Development Server Management
+
+**Background Servers**: During development, keep both frontend and backend running in background:
+
+```bash
+# Frontend (port 3000) - run in background terminal
+cd frontend && npm start
+
+# Backend (port 3005) - run in background terminal
+cd backend && npm start
+```
+
+**Deployment Workflow**: When committing and deploying changes:
+
+```bash
+# Step 1: Commit and push changes
+git add . && git commit -m "your message" && git push
+
+# Step 2: Kill existing frontend server (if running on port 3000)
+# Find process: netstat -ano | findstr :3000
+# Kill process: taskkill /PID <process_id> /F
+
+# Step 3: Deploy to Railway
+railway up --service stocktaking-api --detach
+
+# Step 4: Wait for deployment
+sleep 60
+
+# Step 5: Restart local frontend (optional)
+cd frontend && npm start
+```
+
+**Important**: Always kill and restart the frontend server after deployment to ensure you're testing the latest backend changes.
+
 ### Database Management
 ```bash
 # Schema migration

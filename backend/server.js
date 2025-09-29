@@ -984,7 +984,7 @@ app.post('/api/sessions/:id/entries', async (req, res) => {
        (session_id, product_id, quantity_level, quantity_units, location_notes, condition_flags, photo_url) 
        VALUES ($1, $2, $3, $4, $5, $6, $7) 
        RETURNING *`,
-      [session_id, product_id, quantity_level, quantity_units, location_notes, 
+      [session_id, product_id, quantity_level, parseInt(quantity_units) || 0, location_notes,
        condition_flags ? JSON.stringify(condition_flags) : null, photo_url]
     );
 
