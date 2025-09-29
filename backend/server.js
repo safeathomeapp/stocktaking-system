@@ -35,7 +35,7 @@ app.get('/api/health', async (req, res) => {
       database: 'connected',
       timestamp: new Date().toISOString(),
       db_time: result.rows[0].now,
-      version: '1.1.0-county-support'
+      version: '1.2.0-e2e-tested'
     });
   } catch (error) {
     res.status(500).json({
@@ -1576,6 +1576,213 @@ app.post('/api/venues/:venueId/products/:productId/link-master', async (req, res
   } catch (error) {
     console.error('Error linking product to master:', error);
     res.status(500).json({ error: 'Failed to link product' });
+  }
+});
+
+// Supplier Mapping Service
+const SupplierMappingService = require('./supplier-mapping-service');
+const supplierMappingService = new SupplierMappingService(pool);
+
+// ==================== SUPPLIER MAPPING ENDPOINTS ====================
+
+// Get all suppliers
+app.get('/api/suppliers', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.*, COUNT(spm.id) as mapped_products_count
+      FROM suppliers s
+      LEFT JOIN supplier_product_mappings spm ON s.id = spm.supplier_id
+      WHERE s.active = true
+      GROUP BY s.id
+      ORDER BY s.name
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching suppliers:', error);
+    res.status(500).json({ error: 'Failed to fetch suppliers' });
+  }
+});
+
+// Get supplier by ID with mappings
+app.get('/api/suppliers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const supplierResult = await pool.query('SELECT * FROM suppliers WHERE id = $1', [id]);
+    if (supplierResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    const mappingsResult = await pool.query(`
+      SELECT spm.*, mp.name as master_product_name, mp.unit_size
+      FROM supplier_product_mappings spm
+      JOIN master_products mp ON spm.master_product_id = mp.id
+      WHERE spm.supplier_id = $1
+      ORDER BY spm.created_at DESC
+    `, [id]);
+
+    const supplier = supplierResult.rows[0];
+    supplier.mappings = mappingsResult.rows;
+
+    res.json(supplier);
+  } catch (error) {
+    console.error('Error fetching supplier:', error);
+    res.status(500).json({ error: 'Failed to fetch supplier' });
+  }
+});
+
+// Process Bookers invoice data
+app.post('/api/suppliers/bookers/process', async (req, res) => {
+  try {
+    const { invoiceData } = req.body; // Array of Bookers invoice items
+
+    if (!Array.isArray(invoiceData)) {
+      return res.status(400).json({ error: 'Invoice data must be an array' });
+    }
+
+    // Get Bookers supplier ID
+    const supplierResult = await pool.query("SELECT id FROM suppliers WHERE name = 'Bookers'");
+    if (supplierResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Bookers supplier not found. Run migration first.' });
+    }
+
+    const supplierId = supplierResult.rows[0].id;
+    const results = [];
+
+    for (const item of invoiceData) {
+      try {
+        const masterProduct = await supplierMappingService.findOrCreateMasterProduct(item, supplierId);
+        results.push({
+          success: true,
+          supplier_data: item,
+          master_product: masterProduct
+        });
+      } catch (error) {
+        console.error('Error processing item:', item, error);
+        results.push({
+          success: false,
+          supplier_data: item,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      processed: results.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results
+    });
+
+  } catch (error) {
+    console.error('Error processing Bookers data:', error);
+    res.status(500).json({ error: 'Failed to process invoice data' });
+  }
+});
+
+// Process CSV data with custom field mapping
+app.post('/api/suppliers/:id/process-csv', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { csvData, fieldMapping } = req.body;
+
+    if (!Array.isArray(csvData)) {
+      return res.status(400).json({ error: 'CSV data must be an array' });
+    }
+
+    const results = await supplierMappingService.processCSVData(csvData, id, fieldMapping);
+
+    res.json({
+      processed: results.length,
+      successful: results.filter(r => !r.error).length,
+      failed: results.filter(r => r.error).length,
+      results
+    });
+
+  } catch (error) {
+    console.error('Error processing CSV data:', error);
+    res.status(500).json({ error: 'Failed to process CSV data' });
+  }
+});
+
+// Get supplier product mappings with search
+app.get('/api/suppliers/:id/mappings', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { search, limit = 50 } = req.query;
+
+    let query = `
+      SELECT spm.*, mp.name as master_product_name, mp.unit_size, mp.master_category
+      FROM supplier_product_mappings spm
+      JOIN master_products mp ON spm.master_product_id = mp.id
+      WHERE spm.supplier_id = $1
+    `;
+    const params = [id];
+
+    if (search) {
+      query += ` AND (spm.supplier_description ILIKE $${params.length + 1} OR mp.name ILIKE $${params.length + 1})`;
+      params.push(`%${search}%`);
+    }
+
+    query += ` ORDER BY spm.updated_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+
+  } catch (error) {
+    console.error('Error fetching mappings:', error);
+    res.status(500).json({ error: 'Failed to fetch mappings' });
+  }
+});
+
+// Update supplier mapping (verify/correct mapping)
+app.put('/api/supplier-mappings/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { master_product_id, verified, mapping_confidence } = req.body;
+
+    const result = await pool.query(`
+      UPDATE supplier_product_mappings
+      SET master_product_id = $1, verified = $2, mapping_confidence = $3, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+      RETURNING *
+    `, [master_product_id, verified, mapping_confidence, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mapping not found' });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (error) {
+    console.error('Error updating mapping:', error);
+    res.status(500).json({ error: 'Failed to update mapping' });
+  }
+});
+
+// Get supplier mapping statistics
+app.get('/api/suppliers/:id/stats', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) as total_mappings,
+        COUNT(CASE WHEN verified = true THEN 1 END) as verified_mappings,
+        COUNT(CASE WHEN auto_mapped = true THEN 1 END) as auto_mapped,
+        AVG(mapping_confidence) as avg_confidence,
+        COUNT(DISTINCT master_product_id) as unique_products
+      FROM supplier_product_mappings
+      WHERE supplier_id = $1
+    `, [id]);
+
+    res.json(result.rows[0]);
+
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
 

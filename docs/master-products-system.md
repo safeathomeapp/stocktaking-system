@@ -90,13 +90,15 @@ CREATE TABLE master_products (
 - `spirits` - Bottled spirits and liqueurs
 - `wine` - All wine products
 - `beer` - Bottled/canned beers
-- `misc` - Soft drinks, mixers, food, etc.
+- `soft_drinks` - Soft drinks, minerals, juices, water, etc.
+- `misc` - Food items, cleaning supplies, etc.
 
 **Category Examples:**
 - Wine: chardonnay, sauvignon blanc, merlot, prosecco
 - Spirits: vodka, gin, whiskey, rum
 - Beer: lager, stout, IPA, bitter
-- Misc: cola, juice, water, mixer
+- Soft Drinks: cola, juice, water, mineral, tonic, lemonade
+- Misc: food items, cleaning supplies, paper products
 
 ## API Endpoints
 
@@ -300,10 +302,209 @@ The system includes sample products with proper unit sizing:
 6. **Consistency**: Eliminates duplicate products across venues
 7. **Scalability**: Easy to add new products and categories
 
+## Supplier Mapping Bridge System
+
+The system includes a powerful bridge table system to handle different supplier formats and automatically map them to your standardized master products structure.
+
+### Bridge Tables
+
+#### suppliers
+```sql
+CREATE TABLE suppliers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL, -- e.g., "Bookers", "Tesco", "CSV_Import_2024"
+    type VARCHAR(50) NOT NULL, -- e.g., "invoice", "csv", "ocr", "manual"
+    description TEXT,
+    field_mappings JSONB, -- Maps supplier fields to our fields
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### supplier_product_mappings (Bridge Table)
+```sql
+CREATE TABLE supplier_product_mappings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    supplier_id UUID REFERENCES suppliers(id),
+    master_product_id UUID REFERENCES master_products(id),
+
+    -- Original supplier data (raw format)
+    supplier_product_code VARCHAR(100), -- Their internal code
+    supplier_description TEXT NOT NULL, -- Raw description from supplier
+    supplier_category VARCHAR(100), -- Their category name
+    supplier_pack_size VARCHAR(50), -- Their pack size format
+    supplier_unit_size VARCHAR(50), -- Their unit size format
+    supplier_brand VARCHAR(100), -- Their brand name
+    supplier_data JSONB, -- Store any extra fields like price, VAT, etc.
+
+    -- Mapping confidence and validation
+    mapping_confidence DECIMAL(5,2) DEFAULT 1.0,
+    auto_mapped BOOLEAN DEFAULT false,
+    verified BOOLEAN DEFAULT false,
+
+    -- Usage tracking
+    usage_count INTEGER DEFAULT 0,
+    last_used TIMESTAMP,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(supplier_id, supplier_product_code)
+);
+```
+
+### Supplier Mapping API Endpoints
+
+#### Process Bookers Invoice Data
+```bash
+POST /api/suppliers/bookers/process
+```
+
+**Example Request Body:**
+```json
+{
+  "invoiceData": [
+    {
+      "internal_code": "BK123456",
+      "description": "Coca Cola Can",
+      "pack": "24",
+      "size": "330ml",
+      "qty": "2",
+      "price": "18.50",
+      "value": "37.00",
+      "VAT": "7.40",
+      "STD_RRP": "1.20",
+      "POR": "12345"
+    }
+  ]
+}
+```
+
+The system will automatically:
+1. Parse "Coca Cola Can" → Extract product name "Coca Cola", container type "can"
+2. Parse "24" pack → case_size = 24
+3. Parse "330ml" size → container_size = "330ml"
+4. Generate unit_size → "24 cans per case"
+5. Determine master_category → "soft_drinks"
+6. Create or link to master product
+7. Store supplier mapping for future reference
+
+#### Process CSV Data
+```bash
+POST /api/suppliers/:id/process-csv
+```
+
+**Example Request Body:**
+```json
+{
+  "csvData": [
+    {
+      "product_name": "Beck's Lager",
+      "category": "Beer",
+      "size": "275ml",
+      "pack_size": "24"
+    }
+  ],
+  "fieldMapping": {
+    "name": "product_name",
+    "category": "category",
+    "container_size": "size",
+    "case_size": "pack_size"
+  }
+}
+```
+
+#### Get Supplier Mappings
+```bash
+GET /api/suppliers/:id/mappings?search=coca&limit=20
+```
+
+#### Update Mapping (Verify/Correct)
+```bash
+PUT /api/supplier-mappings/:id
+```
+
+```json
+{
+  "master_product_id": "uuid-here",
+  "verified": true,
+  "mapping_confidence": 0.95
+}
+```
+
+### Auto-Mapping Logic
+
+The system includes intelligent parsing rules that automatically extract:
+
+- **Product Name**: Removes container words, capitalizes properly
+- **Container Type**: Detects bottle, can, keg, box, bag from description
+- **Container Size**: Normalizes ml, cl, L, gallons formats
+- **Case Size**: Extracts pack quantity numbers
+- **Unit Size**: Generates descriptive text like "24 bottles per case"
+- **Master Category**: Uses keyword matching for wine, beer, spirits, draught
+- **Brand**: Recognizes common brands or extracts from description
+
+### Parsing Rules Examples
+
+For Bookers supplier:
+- Extract container type: `\b(bottle|can|keg|box|bag)\b` → container_type
+- Extract size: `(\d+(?:\.\d+)?)\s*(ml|cl|l|gallons?)` → container_size
+- Determine wine: `wine|chardonnay|merlot|sauvignon` → master_category = 'wine'
+- Determine beer: `beer|lager|ale|stout|bitter` → master_category = 'beer'
+
+### Usage Examples
+
+**Processing Bookers Invoice:**
+```javascript
+// Your Bookers OCR data
+const bookersData = {
+  internal_code: "BK789123",
+  description: "Stella Artois Lager Can",
+  pack: "24",
+  size: "440ml",
+  qty: "3",
+  price: "22.50"
+};
+
+// System automatically creates:
+// - Product name: "Stella Artois Lager"
+// - Container type: "can"
+// - Container size: "440ml"
+// - Case size: 24
+// - Unit size: "24 cans per case"
+// - Master category: "beer"
+// - Category: "lager"
+// - Brand: "Stella Artois"
+```
+
+**Benefits:**
+- **Unified Data**: All supplier formats convert to standard master products
+- **Auto-Mapping**: Intelligent parsing reduces manual work
+- **Audit Trail**: Track confidence scores and verify mappings
+- **Flexible**: Support any supplier format via configurable field mappings
+- **Scalable**: Easy to add new suppliers and parsing rules
+
+### Setup Instructions
+
+1. **Run Supplier Mapping Migration**
+```bash
+cd backend
+node migrate-supplier-mappings.js
+```
+
+2. **Verify Installation**
+```bash
+curl "https://your-api-url/api/suppliers"
+```
+
+This will show the pre-configured suppliers: Bookers, CSV_Import, Manual_Entry.
+
 ## Future Enhancements
 
 - Product images and photos
-- Supplier information and pricing
+- Advanced OCR integration
+- Machine learning for mapping confidence
 - Inventory thresholds and reorder points
 - Product lifecycle management
 - Integration with POS systems
