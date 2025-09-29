@@ -55,7 +55,9 @@ const buttonSizes = {
   `
 };
 
-export const Button = styled.button`
+export const Button = styled.button.withConfig({
+  shouldForwardProp: (prop) => !['variant', 'size'].includes(prop),
+})`
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -64,19 +66,19 @@ export const Button = styled.button`
   transition: all 0.2s ease;
   position: relative;
   min-width: ${props => props.theme.tablet.minTouchTarget};
-  
+
   ${props => buttonVariants[props.variant || 'primary']}
   ${props => buttonSizes[props.size || 'md']}
-  
+
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
-  
+
   &:active {
     transform: translateY(1px);
   }
-  
+
   @media (min-width: ${props => props.theme.breakpoints.tablet}) {
     min-height: ${props => props.theme.tablet.minTouchTarget};
     font-size: ${props => props.size === 'lg' ? '20px' : '18px'};
