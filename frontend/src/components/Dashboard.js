@@ -300,7 +300,6 @@ const Dashboard = () => {
         setUserProfile({
           first_name: 'Stock',
           last_name: 'Taker',
-          preferred_name: 'Stock Taker',
           profile_complete: false
         });
       }
@@ -310,7 +309,6 @@ const Dashboard = () => {
       setUserProfile({
         first_name: 'Stock',
         last_name: 'Taker',
-        preferred_name: 'Stock Taker',
         profile_complete: false
       });
     }
@@ -332,9 +330,8 @@ const Dashboard = () => {
     setError(null);
     
     try {
-      // Use preferred name if available, otherwise first + last name
-      const stocktakerName = userProfile.preferred_name ||
-                           `${userProfile.first_name} ${userProfile.last_name}`.trim();
+      // Use first + last name
+      const stocktakerName = `${userProfile.first_name} ${userProfile.last_name}`.trim();
 
       const sessionData = {
         venue_id: selectedVenue,
@@ -437,7 +434,7 @@ const Dashboard = () => {
                 <span style={{ fontSize: '16px' }}>👤</span>
                 <div>
                   <div style={{ fontWeight: '600', color: '#495057' }}>
-                    {userProfile.preferred_name || `${userProfile.first_name} ${userProfile.last_name}`.trim()}
+                    {`${userProfile.first_name} ${userProfile.last_name}`.trim()}
                   </div>
                   {!userProfile.profile_complete && (
                     <div style={{ fontSize: '12px', color: '#6c757d' }}>

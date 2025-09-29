@@ -1916,12 +1916,12 @@ app.post('/api/user/profile/reset', async (req, res) => {
     // Create new default profile
     const result = await pool.query(`
       INSERT INTO user_profiles (
-        first_name, last_name, preferred_name,
+        first_name, last_name,
         country, currency, timezone,
         active, profile_complete,
         notes
       ) VALUES (
-        'Stock', 'Taker', 'Stock Taker',
+        'Stock', 'Taker',
         'United Kingdom', 'GBP', 'Europe/London',
         true, false,
         'Reset user profile - please update through Settings'
@@ -1946,7 +1946,7 @@ app.get('/api/user/summary', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
-        id, first_name, last_name, preferred_name,
+        id, first_name, last_name,
         primary_email, mobile_phone,
         city, county,
         profile_complete, active,
