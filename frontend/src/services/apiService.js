@@ -394,6 +394,47 @@ export const apiService = {
     }
   },
 
+  // User Profile Management (Single-user system)
+  getUserProfile: async () => {
+    try {
+      const response = await api.get('/api/user/profile');
+      return { success: true, profile: response.data.profile };
+    } catch (error) {
+      console.error('Get user profile error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getUserSummary: async () => {
+    try {
+      const response = await api.get('/api/user/summary');
+      return { success: true, summary: response.data.summary };
+    } catch (error) {
+      console.error('Get user summary error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  updateUserProfile: async (profileData) => {
+    try {
+      const response = await api.put('/api/user/profile', profileData);
+      return { success: true, profile: response.data.profile, message: response.data.message };
+    } catch (error) {
+      console.error('Update user profile error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  resetUserProfile: async () => {
+    try {
+      const response = await api.post('/api/user/profile/reset');
+      return { success: true, profile: response.data.profile, message: response.data.message };
+    } catch (error) {
+      console.error('Reset user profile error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
 }; 
 
 export default apiService;

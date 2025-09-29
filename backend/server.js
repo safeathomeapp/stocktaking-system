@@ -35,7 +35,7 @@ app.get('/api/health', async (req, res) => {
       database: 'connected',
       timestamp: new Date().toISOString(),
       db_time: result.rows[0].now,
-      version: '1.3.0-user-profile'
+      version: '1.4.0-single-user-complete'
     });
   } catch (error) {
     res.status(500).json({

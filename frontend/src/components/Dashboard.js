@@ -218,7 +218,7 @@ const ErrorMessage = styled.div`
 const Dashboard = () => {
   const [venues, setVenues] = useState([]);
   const [selectedVenue, setSelectedVenue] = useState('');
-  const [stocktakerName, setStocktakerName] = useState('');
+  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
@@ -227,12 +227,13 @@ const Dashboard = () => {
     totalVenues: 0,
     avgAccuracy: 98
   });
-  
+
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchVenues();
     fetchStats();
+    fetchUserProfile();
   }, []);
 
   const fetchVenues = async () => {
@@ -288,10 +289,42 @@ const Dashboard = () => {
     }
   };
 
+  const fetchUserProfile = async () => {
+    try {
+      const response = await apiService.getUserSummary();
+      if (response.success) {
+        setUserProfile(response.summary);
+      } else {
+        console.error('Failed to load user profile:', response.error);
+        // Set a default profile if load fails
+        setUserProfile({
+          first_name: 'Stock',
+          last_name: 'Taker',
+          preferred_name: 'Stock Taker',
+          profile_complete: false
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      // Set a default profile if error occurs
+      setUserProfile({
+        first_name: 'Stock',
+        last_name: 'Taker',
+        preferred_name: 'Stock Taker',
+        profile_complete: false
+      });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedVenue || !stocktakerName.trim()) {
-      setError('Please select a venue and enter your name.');
+    if (!selectedVenue) {
+      setError('Please select a venue.');
+      return;
+    }
+
+    if (!userProfile) {
+      setError('User profile not loaded. Please refresh the page or update your settings.');
       return;
     }
 
@@ -299,11 +332,15 @@ const Dashboard = () => {
     setError(null);
     
     try {
+      // Use preferred name if available, otherwise first + last name
+      const stocktakerName = userProfile.preferred_name ||
+                           `${userProfile.first_name} ${userProfile.last_name}`.trim();
+
       const sessionData = {
         venue_id: selectedVenue,
-        stocktaker_name: stocktakerName.trim(),
+        stocktaker_name: stocktakerName,
         session_date: new Date().toISOString().split('T')[0],
-        notes: 'Created from dashboard'
+        notes: 'Created from dashboard - Single user system'
       };
       
       const response = await apiService.createSession(sessionData);
@@ -386,15 +423,54 @@ const Dashboard = () => {
           </FormGroup>
 
           <FormGroup>
-            <Label htmlFor="stocktaker">Stocktaker Name</Label>
-            <Input
-              id="stocktaker"
-              type="text"
-              placeholder="Enter your name"
-              value={stocktakerName}
-              onChange={(e) => setStocktakerName(e.target.value)}
-              required
-            />
+            <Label>Current User</Label>
+            {userProfile ? (
+              <div style={{
+                padding: '12px',
+                background: '#f8f9fa',
+                border: '1px solid #e9ecef',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '16px' }}>👤</span>
+                <div>
+                  <div style={{ fontWeight: '600', color: '#495057' }}>
+                    {userProfile.preferred_name || `${userProfile.first_name} ${userProfile.last_name}`.trim()}
+                  </div>
+                  {!userProfile.profile_complete && (
+                    <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                      ⚠️ Profile incomplete - <button
+                        type="button"
+                        onClick={() => navigate('/settings')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#007bff',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          fontSize: '12px',
+                          padding: 0
+                        }}
+                      >
+                        Update in Settings
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                padding: '12px',
+                background: '#fff3cd',
+                border: '1px solid #ffeaa7',
+                borderRadius: '6px',
+                color: '#856404'
+              }}>
+                Loading user profile...
+              </div>
+            )}
           </FormGroup>
 
           <ButtonGroup>
@@ -422,6 +498,15 @@ const Dashboard = () => {
               size="lg"
             >
               Add New Venue
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/settings')}
+              size="lg"
+              style={{ borderColor: '#6B7280', color: '#6B7280' }}
+            >
+              ⚙️ Settings
             </Button>
           </ButtonGroup>
         </VenueForm>

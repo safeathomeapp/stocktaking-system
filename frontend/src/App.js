@@ -8,6 +8,7 @@ import Dashboard from './components/Dashboard';
 import StockTaking from './components/StockTaking';
 import SessionHistory from './components/SessionHistory';
 import VenueManagement from './components/VenueManagement';
+import Settings from './components/Settings';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
             <Route path="/stock-taking/:sessionId" element={<StockTaking />} />
             <Route path="/history" element={<SessionHistory />} />
             <Route path="/venue/new" element={<VenueManagement />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </div>
       </Router>
