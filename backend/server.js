@@ -421,7 +421,7 @@ app.post('/api/venues/:id/products', async (req, res) => {
       `INSERT INTO products (venue_id, area_id, name, category, brand, size, unit_type, barcode, expected_count)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [venueId, area_id || null, name, category || 'General', brand || null, size || null, unit || 'bottles', barcode || null, 0]
+      [venueId, area_id || null, name, category || 'General', brand || null, size || null, unit || 'bottle', barcode || null, 0]
     );
 
     res.status(201).json({

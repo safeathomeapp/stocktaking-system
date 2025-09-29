@@ -776,7 +776,7 @@ const StockTaking = () => {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [newProductCategory, setNewProductCategory] = useState('');
-  const [newProductUnit, setNewProductUnit] = useState('bottles');
+  const [newProductUnit, setNewProductUnit] = useState('bottle');
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -1322,7 +1322,7 @@ const StockTaking = () => {
           // Reset form
           setNewProductName('');
           setNewProductCategory('');
-          setNewProductUnit('bottles');
+          setNewProductUnit('bottle');
           setShowAddProduct(false);
           setShowSuggestions(false);
           console.log('Product saved to database:', response.data.product);
@@ -1961,7 +1961,7 @@ const StockTaking = () => {
                   value={newProductUnit}
                   onChange={(e) => setNewProductUnit(e.target.value)}
                 >
-                  <option value="bottles">Bottles</option>
+                  <option value="bottle">Bottles</option>
                   <option value="cans">Cans</option>
                   <option value="kegs">Kegs</option>
                   <option value="units">Units</option>
