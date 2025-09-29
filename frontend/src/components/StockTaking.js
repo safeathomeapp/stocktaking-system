@@ -1426,10 +1426,14 @@ const StockTaking = () => {
           // Simple data capture - store actual quantity as input
           const actualQuantity = parseFloat(quantity);
 
+          // Get current area's database ID
+          const currentAreaObj = areas.find(area => area.id === currentArea);
+          const venueAreaId = currentAreaObj && typeof currentAreaObj.id === 'number' ? currentAreaObj.id : null;
+
           const entryData = {
             product_id: productId,
             quantity_units: actualQuantity,
-            venue_area_id: null
+            venue_area_id: venueAreaId
           };
 
           // Try to add entry (will fail if exists, then we'll update)
@@ -1449,7 +1453,8 @@ const StockTaking = () => {
               if (existingEntry) {
                 console.log('Updating existing entry:', existingEntry.id);
                 const updateResponse = await apiService.updateStockEntry(existingEntry.id, {
-                  quantity_units: actualQuantity
+                  quantity_units: actualQuantity,
+                  venue_area_id: venueAreaId
                 });
                 if (!updateResponse.success) {
                   console.error('Failed to update entry:', updateResponse.error);
@@ -1493,10 +1498,14 @@ const StockTaking = () => {
           // Simple data capture - store actual quantity as input
           const actualQuantity = parseFloat(quantity);
 
+          // Get current area's database ID
+          const currentAreaObj = areas.find(area => area.id === currentArea);
+          const venueAreaId = currentAreaObj && typeof currentAreaObj.id === 'number' ? currentAreaObj.id : null;
+
           const entryData = {
             product_id: productId,
             quantity_units: actualQuantity,
-            venue_area_id: null
+            venue_area_id: venueAreaId
           };
 
           try {
@@ -1523,7 +1532,8 @@ const StockTaking = () => {
                   const existingEntry = entries.find(entry => entry.product_id === productId);
                   if (existingEntry) {
                     const updateResult = await apiService.updateStockEntry(existingEntry.id, {
-                      quantity_units: actualQuantity
+                      quantity_units: actualQuantity,
+                      venue_area_id: venueAreaId
                     });
                     if (updateResult.success) {
                       savedCount++;

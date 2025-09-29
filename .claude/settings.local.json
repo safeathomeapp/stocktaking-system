@@ -24,7 +24,10 @@
       "Bash(git reset:*)",
       "Bash(git checkout:*)",
       "Bash(echo \"   curl -s \"\"https://stocktaking-api-production.up.railway.app/api/health\"\"\")",
-      "Bash(echo \"   # Should show: \"\"version\"\": \"\"1.2.0-e2e-tested\"\"\")"
+      "Bash(echo \"   # Should show: \"\"version\"\": \"\"1.2.0-e2e-tested\"\"\")",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []
