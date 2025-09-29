@@ -190,6 +190,7 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
+  const [countdown, setCountdown] = useState(null);
 
   // Form state
   const [profile, setProfile] = useState({
@@ -197,7 +198,8 @@ const Settings = () => {
     first_name: '',
     last_name: '',
     preferred_name: '',
-    date_of_birth: '',
+    company_name: '',
+    job_title: '',
 
     // Address Information
     address_line_1: '',
@@ -224,16 +226,6 @@ const Settings = () => {
     tiktok_handle: '',
     snapchat_handle: '',
 
-    // Professional Information
-    company_name: '',
-    job_title: '',
-    industry: '',
-
-    // Emergency Contact
-    emergency_contact_name: '',
-    emergency_contact_phone: '',
-    emergency_contact_relationship: '',
-
     // Preferences
     preferred_language: 'en',
     timezone: 'Europe/London',
@@ -253,6 +245,19 @@ const Settings = () => {
     loadUserProfile();
   }, []);
 
+  // Auto-redirect countdown effect
+  useEffect(() => {
+    let timer;
+    if (countdown !== null && countdown > 0) {
+      timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      navigate('/');
+    }
+    return () => clearTimeout(timer);
+  }, [countdown, navigate]);
+
   const loadUserProfile = async () => {
     setLoading(true);
     try {
@@ -260,10 +265,7 @@ const Settings = () => {
       if (response.success) {
         const userData = response.profile;
 
-        // Format date_of_birth for input field
-        if (userData.date_of_birth) {
-          userData.date_of_birth = new Date(userData.date_of_birth).toISOString().split('T')[0];
-        }
+        // Remove date_of_birth formatting (field removed)
 
         setProfile(prev => ({
           ...prev,
@@ -298,10 +300,8 @@ const Settings = () => {
       const response = await apiService.updateUserProfile(profile);
       if (response.success) {
         setSuccess('Profile updated successfully!');
-        // Update the profile with returned data
-        if (response.profile.date_of_birth) {
-          response.profile.date_of_birth = new Date(response.profile.date_of_birth).toISOString().split('T')[0];
-        }
+        setCountdown(10);
+        // Update the profile with returned data (date_of_birth removed)
         setProfile(prev => ({
           ...prev,
           ...response.profile
@@ -340,7 +340,16 @@ const Settings = () => {
       </Header>
 
       <FormContainer>
-        {success && <SuccessMessage>{success}</SuccessMessage>}
+        {success && (
+          <SuccessMessage>
+            {success}
+            {countdown !== null && countdown > 0 && (
+              <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
+                Redirecting to dashboard in {countdown} seconds...
+              </div>
+            )}
+          </SuccessMessage>
+        )}
         {error && <ErrorMessage>{error}</ErrorMessage>}
 
         <form onSubmit={handleSubmit}>
@@ -376,11 +385,21 @@ const Settings = () => {
                 />
               </FormGroup>
               <FormGroup>
-                <Label>Date of Birth</Label>
+                <Label>Company Name</Label>
                 <Input
-                  type="date"
-                  value={profile.date_of_birth}
-                  onChange={(e) => handleInputChange('date_of_birth', e.target.value)}
+                  type="text"
+                  value={profile.company_name}
+                  onChange={(e) => handleInputChange('company_name', e.target.value)}
+                  placeholder="Your company or organization"
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>Job Title</Label>
+                <Input
+                  type="text"
+                  value={profile.job_title}
+                  onChange={(e) => handleInputChange('job_title', e.target.value)}
+                  placeholder="Your role or position"
                 />
               </FormGroup>
             </FormGrid>
@@ -559,83 +578,6 @@ const Settings = () => {
             </FormGrid>
           </Section>
 
-          {/* Professional Information */}
-          <Section>
-            <SectionTitle>💼 Professional Information</SectionTitle>
-            <FormGrid>
-              <FormGroup>
-                <Label>Company Name</Label>
-                <Input
-                  type="text"
-                  value={profile.company_name}
-                  onChange={(e) => handleInputChange('company_name', e.target.value)}
-                />
-              </FormGroup>
-              <FormGroup>
-                <Label>Job Title</Label>
-                <Input
-                  type="text"
-                  value={profile.job_title}
-                  onChange={(e) => handleInputChange('job_title', e.target.value)}
-                />
-              </FormGroup>
-              <FormGroup>
-                <Label>Industry</Label>
-                <Select
-                  value={profile.industry}
-                  onChange={(e) => handleInputChange('industry', e.target.value)}
-                >
-                  <option value="">Select Industry</option>
-                  <option value="Hospitality">Hospitality</option>
-                  <option value="Food & Beverage">Food & Beverage</option>
-                  <option value="Retail">Retail</option>
-                  <option value="Healthcare">Healthcare</option>
-                  <option value="Education">Education</option>
-                  <option value="Manufacturing">Manufacturing</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Other">Other</option>
-                </Select>
-              </FormGroup>
-            </FormGrid>
-          </Section>
-
-          {/* Emergency Contact */}
-          <Section>
-            <SectionTitle>🚨 Emergency Contact</SectionTitle>
-            <FormGrid>
-              <FormGroup>
-                <Label>Emergency Contact Name</Label>
-                <Input
-                  type="text"
-                  value={profile.emergency_contact_name}
-                  onChange={(e) => handleInputChange('emergency_contact_name', e.target.value)}
-                />
-              </FormGroup>
-              <FormGroup>
-                <Label>Emergency Contact Phone</Label>
-                <Input
-                  type="tel"
-                  value={profile.emergency_contact_phone}
-                  onChange={(e) => handleInputChange('emergency_contact_phone', e.target.value)}
-                />
-              </FormGroup>
-              <FormGroup>
-                <Label>Relationship</Label>
-                <Select
-                  value={profile.emergency_contact_relationship}
-                  onChange={(e) => handleInputChange('emergency_contact_relationship', e.target.value)}
-                >
-                  <option value="">Select Relationship</option>
-                  <option value="Spouse">Spouse</option>
-                  <option value="Parent">Parent</option>
-                  <option value="Child">Child</option>
-                  <option value="Sibling">Sibling</option>
-                  <option value="Friend">Friend</option>
-                  <option value="Other">Other</option>
-                </Select>
-              </FormGroup>
-            </FormGrid>
-          </Section>
 
           {/* System Preferences */}
           <Section>
