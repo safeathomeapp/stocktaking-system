@@ -1059,7 +1059,7 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
     }
 
     if (completed_only === 'true') {
-      query += ` AND se.quantity_level IS NOT NULL`;
+      query += ` AND se.quantity_units > 0`;
     }
 
     query += ` ORDER BY p.category, p.name`;
