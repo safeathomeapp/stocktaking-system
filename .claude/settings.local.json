@@ -19,7 +19,12 @@
       "Bash(timeout:*)",
       "Read(//c/users/kevth/desktop/stocktake/stocktaking-system/**)",
       "Bash(export DATABASE_URL=\"postgresql://postgres:tMpkSRqsDdrbECsTJYEAfgDNBchJjCdi@junction.proxy.rlwy.net:26900/railway\")",
-      "Bash(export DATABASE_URL=\"postgresql://postgres:tMpkSRqsDdrbECsTJYEAfgDNBchJjCdi@caboose.proxy.rlwy.net:35214/railway\")"
+      "Bash(export DATABASE_URL=\"postgresql://postgres:tMpkSRqsDdrbECsTJYEAfgDNBchJjCdi@caboose.proxy.rlwy.net:35214/railway\")",
+      "Bash(cat:*)",
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)",
+      "Bash(echo \"   curl -s \"\"https://stocktaking-api-production.up.railway.app/api/health\"\"\")",
+      "Bash(echo \"   # Should show: \"\"version\"\": \"\"1.2.0-e2e-tested\"\"\")"
     ],
     "deny": [],
     "ask": []

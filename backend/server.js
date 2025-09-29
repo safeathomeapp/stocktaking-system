@@ -35,7 +35,7 @@ app.get('/api/health', async (req, res) => {
       database: 'connected',
       timestamp: new Date().toISOString(),
       db_time: result.rows[0].now,
-      version: '1.2.0-e2e-tested'
+      version: '1.3.0-user-profile'
     });
   } catch (error) {
     res.status(500).json({
@@ -1786,9 +1786,199 @@ app.get('/api/suppliers/:id/stats', async (req, res) => {
   }
 });
 
+// =============================================
+// USER PROFILE MANAGEMENT ENDPOINTS
+// Single-user system - manages the active user profile
+// =============================================
+
+// Get current user profile
+app.get('/api/user/profile', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id, first_name, last_name, preferred_name, date_of_birth,
+        address_line_1, address_line_2, city, county, postcode, country,
+        mobile_phone, home_phone, work_phone, whatsapp_number,
+        primary_email, work_email, personal_email,
+        facebook_handle, instagram_handle, twitter_handle, linkedin_handle,
+        tiktok_handle, snapchat_handle,
+        company_name, job_title, industry,
+        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+        preferred_language, timezone, date_format, currency,
+        profile_complete, active,
+        share_phone, share_email, share_social_media,
+        notes, profile_picture_url,
+        created_at, updated_at, last_login
+      FROM user_profiles
+      WHERE active = true
+      LIMIT 1
+    `);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User profile not found' });
+    }
+
+    const userProfile = result.rows[0];
+    res.json({
+      success: true,
+      profile: userProfile
+    });
+
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
+// Update user profile (PUT for updating existing profile)
+app.put('/api/user/profile', async (req, res) => {
+  try {
+    const profileData = req.body;
+
+    // Get the current active user ID
+    const currentUser = await pool.query('SELECT id FROM user_profiles WHERE active = true LIMIT 1');
+
+    if (currentUser.rows.length === 0) {
+      return res.status(404).json({ error: 'No active user profile found' });
+    }
+
+    const userId = currentUser.rows[0].id;
+
+    // Build dynamic update query based on provided fields
+    const allowedFields = [
+      'first_name', 'last_name', 'preferred_name', 'date_of_birth',
+      'address_line_1', 'address_line_2', 'city', 'county', 'postcode', 'country',
+      'mobile_phone', 'home_phone', 'work_phone', 'whatsapp_number',
+      'primary_email', 'work_email', 'personal_email',
+      'facebook_handle', 'instagram_handle', 'twitter_handle', 'linkedin_handle',
+      'tiktok_handle', 'snapchat_handle',
+      'company_name', 'job_title', 'industry',
+      'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
+      'preferred_language', 'timezone', 'date_format', 'currency',
+      'share_phone', 'share_email', 'share_social_media',
+      'notes', 'profile_picture_url'
+    ];
+
+    const updateFields = [];
+    const updateValues = [];
+    let paramCount = 1;
+
+    for (const [key, value] of Object.entries(profileData)) {
+      if (allowedFields.includes(key) && value !== undefined) {
+        updateFields.push(`${key} = $${paramCount}`);
+        updateValues.push(value);
+        paramCount++;
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+
+    // Check if profile should be marked as complete
+    const essentialFields = ['first_name', 'last_name', 'primary_email', 'mobile_phone'];
+    const hasEssentialFields = essentialFields.every(field =>
+      profileData[field] || updateFields.some(f => f.startsWith(field))
+    );
+
+    if (hasEssentialFields) {
+      updateFields.push(`profile_complete = true`);
+    }
+
+    // Add updated timestamp
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    const updateQuery = `
+      UPDATE user_profiles
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramCount}
+      RETURNING *
+    `;
+
+    updateValues.push(userId);
+
+    const result = await pool.query(updateQuery, updateValues);
+
+    res.json({
+      success: true,
+      message: 'User profile updated successfully',
+      profile: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    res.status(500).json({ error: 'Failed to update user profile' });
+  }
+});
+
+// Create or reset user profile (POST for creating new or resetting)
+app.post('/api/user/profile/reset', async (req, res) => {
+  try {
+    // Deactivate any existing profiles
+    await pool.query('UPDATE user_profiles SET active = false WHERE active = true');
+
+    // Create new default profile
+    const result = await pool.query(`
+      INSERT INTO user_profiles (
+        first_name, last_name, preferred_name,
+        country, currency, timezone,
+        active, profile_complete,
+        notes
+      ) VALUES (
+        'Stock', 'Taker', 'Stock Taker',
+        'United Kingdom', 'GBP', 'Europe/London',
+        true, false,
+        'Reset user profile - please update through Settings'
+      )
+      RETURNING *
+    `);
+
+    res.json({
+      success: true,
+      message: 'User profile reset successfully',
+      profile: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error resetting user profile:', error);
+    res.status(500).json({ error: 'Failed to reset user profile' });
+  }
+});
+
+// Get user profile summary (lightweight endpoint for quick checks)
+app.get('/api/user/summary', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id, first_name, last_name, preferred_name,
+        primary_email, mobile_phone,
+        city, county,
+        profile_complete, active,
+        created_at
+      FROM user_profiles
+      WHERE active = true
+      LIMIT 1
+    `);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User profile not found' });
+    }
+
+    res.json({
+      success: true,
+      summary: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error fetching user summary:', error);
+    res.status(500).json({ error: 'Failed to fetch user summary' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Voice Recognition API ready at /api/master-products/search`);
+  console.log(`User Profile API ready at /api/user/profile`);
 });
 
 // Force redeploy $(date)// Force redeploy Fri Sep 26 00:02:49 GMTST 2025
