@@ -879,26 +879,37 @@ app.get('/api/venues/:id/sessions', async (req, res) => {
 // Get all active sessions (useful for dashboard/monitoring)
 app.get('/api/sessions', async (req, res) => {
   try {
-    const { status = 'in_progress', limit = 20 } = req.query;
+    const { status, limit = 20, offset = 0 } = req.query;
 
-    const result = await pool.query(
-      `SELECT 
+    let query = `SELECT
          s.*,
          v.name as venue_name,
          COUNT(se.id) as entry_count
        FROM stock_sessions s
        JOIN venues v ON s.venue_id = v.id
-       LEFT JOIN stock_entries se ON s.id = se.session_id
-       WHERE s.status = $1
-       GROUP BY s.id, v.name
+       LEFT JOIN stock_entries se ON s.id = se.session_id`;
+
+    let params = [];
+    let paramCount = 0;
+
+    // Only add WHERE clause if status is specified
+    if (status) {
+      query += ` WHERE s.status = $${++paramCount}`;
+      params.push(status);
+    }
+
+    query += ` GROUP BY s.id, v.name
        ORDER BY s.created_at DESC
-       LIMIT $2`,
-      [status, parseInt(limit)]
-    );
+       LIMIT $${++paramCount} OFFSET $${++paramCount}`;
+
+    params.push(parseInt(limit), parseInt(offset));
+
+    const result = await pool.query(query, params);
 
     res.json({
       sessions: result.rows,
-      filter: { status }
+      filter: { status: status || 'all' },
+      total: result.rows.length
     });
 
   } catch (error) {
