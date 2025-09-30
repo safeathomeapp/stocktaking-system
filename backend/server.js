@@ -1183,6 +1183,13 @@ app.put('/api/entries/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Error updating stock entry:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+      stack: error.stack
+    });
     res.status(500).json({ error: 'Failed to update stock entry' });
   }
 });
