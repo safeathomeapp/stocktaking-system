@@ -1264,7 +1264,7 @@ app.get('/api/sessions/:id/progress', async (req, res) => {
          -- Get entry statistics
          SELECT 
            COUNT(DISTINCT se.product_id) as products_counted,
-           COUNT(CASE WHEN se.quantity_level IS NOT NULL THEN 1 END) as products_completed,
+           COUNT(CASE WHEN se.quantity_units > 0 THEN 1 END) as products_completed,
            json_agg(
              json_build_object(
                'category', p.category,
@@ -1281,7 +1281,7 @@ app.get('/api/sessions/:id/progress', async (req, res) => {
              p2.category,
              COUNT(*) as total,
              COUNT(se2.id) as counted,
-             COUNT(CASE WHEN se2.quantity_level IS NOT NULL THEN 1 END) as completed
+             COUNT(CASE WHEN se2.quantity_units > 0 THEN 1 END) as completed
            FROM products p2
            JOIN stock_sessions ss2 ON p2.venue_id = ss2.venue_id AND ss2.id = $1
            LEFT JOIN stock_entries se2 ON p2.id = se2.product_id AND se2.session_id = $1
