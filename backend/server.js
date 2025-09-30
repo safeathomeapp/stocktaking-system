@@ -1068,9 +1068,9 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
 
     // Get summary statistics
     const statsResult = await pool.query(
-      `SELECT 
+      `SELECT
          COUNT(*) as total_entries,
-         COUNT(CASE WHEN quantity_level IS NOT NULL THEN 1 END) as completed_entries,
+         COUNT(CASE WHEN quantity_units > 0 THEN 1 END) as completed_entries,
          COUNT(DISTINCT p.category) as categories_covered
        FROM stock_entries se
        JOIN products p ON se.product_id = p.id
