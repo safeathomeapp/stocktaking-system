@@ -35,7 +35,7 @@ app.get('/api/health', async (req, res) => {
       database: 'connected',
       timestamp: new Date().toISOString(),
       db_time: result.rows[0].now,
-      version: '1.5.2-product-persistence-complete'
+      version: '1.6.0-schema-modernized'
     });
   } catch (error) {
     res.status(500).json({
