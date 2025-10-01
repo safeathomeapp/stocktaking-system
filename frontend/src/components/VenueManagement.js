@@ -537,23 +537,6 @@ const VenueManagement = () => {
           </ButtonGroup>
         </form>
       </FormSection>
-
-      <FormSection>
-        <FormTitle>What happens next?</FormTitle>
-        <div style={{
-          color: '#6B7280',
-          fontSize: '0.875rem',
-          lineHeight: 1.6,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}>
-          <p>✅ Your venue will be created with the information provided</p>
-          <p>✅ Default areas will be automatically created: Bar Area, Storage Room, Kitchen, Wine Cellar, Dry Storage</p>
-          <p>✅ You can customize areas later when creating stock-taking sessions</p>
-          <p>✅ The venue will appear in your dashboard for stock-taking sessions</p>
-        </div>
-      </FormSection>
     </VenueContainer>
   );
 };

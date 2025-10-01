@@ -387,10 +387,10 @@ app.get('/api/venues/:id/products', async (req, res) => {
     const { id } = req.params;
     const result = await pool.query(
       `SELECT p.*, va.name as area_name
-       FROM products p
-       LEFT JOIN venue_areas va ON p.area_id = va.id
+       FROM venue_item_list p
+       LEFT JOIN venue_areas va ON p.ven_location_area = va.id
        WHERE p.venue_id = $1
-       ORDER BY va.display_order, p.category, p.name`,
+       ORDER BY va.display_order, p.ven_category, p.ven_name`,
       [id]
     );
     res.json(result.rows);
@@ -442,35 +442,35 @@ app.get('/api/master-products', async (req, res) => {
   try {
     const { category, master_category, search, active = 'true' } = req.query;
 
-    let query = 'SELECT * FROM master_products WHERE 1=1';
+    let query = 'SELECT * FROM master_item_list WHERE 1=1';
     const params = [];
     let paramCount = 1;
 
     if (active !== 'all') {
-      query += ` AND active = $${paramCount}`;
+      query += ` AND mas_active = $${paramCount}`;
       params.push(active === 'true');
       paramCount++;
     }
 
     if (category) {
-      query += ` AND category ILIKE $${paramCount}`;
+      query += ` AND mas_category ILIKE $${paramCount}`;
       params.push(`%${category}%`);
       paramCount++;
     }
 
     if (master_category) {
-      query += ` AND master_category = $${paramCount}`;
+      query += ` AND mas_category = $${paramCount}`;
       params.push(master_category);
       paramCount++;
     }
 
     if (search) {
-      query += ` AND (name ILIKE $${paramCount} OR brand ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
+      query += ` AND (mas_name ILIKE $${paramCount} OR mas_brand ILIKE $${paramCount} OR mas_description ILIKE $${paramCount})`;
       params.push(`%${search}%`);
       paramCount++;
     }
 
-    query += ' ORDER BY master_category, category, brand, name';
+    query += ' ORDER BY mas_category, mas_brand, mas_name';
 
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -484,7 +484,7 @@ app.get('/api/master-products', async (req, res) => {
 app.get('/api/master-products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('SELECT * FROM master_products WHERE id = $1', [id]);
+    const result = await pool.query('SELECT * FROM master_item_list WHERE mas_item_id = $1', [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Master product not found' });
