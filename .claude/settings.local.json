@@ -29,7 +29,8 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(tasklist)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
