@@ -336,13 +336,44 @@ app.put('/api/areas/:id', async (req, res) => {
     const { id } = req.params;
     const { name, display_order, description, photo } = req.body;
 
-    const result = await pool.query(
-      'UPDATE venue_areas SET name = $1, display_order = $2, description = $3, photo = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *',
-      [name, display_order, description, photo, id]
-    );
+    // Build dynamic update query for partial updates
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount}`);
+      values.push(name);
+      paramCount++;
+    }
+    if (display_order !== undefined) {
+      updates.push(`display_order = $${paramCount}`);
+      values.push(display_order);
+      paramCount++;
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramCount}`);
+      values.push(description);
+      paramCount++;
+    }
+    if (photo !== undefined) {
+      updates.push(`photo = $${paramCount}`);
+      values.push(photo);
+      paramCount++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const query = `UPDATE venue_areas SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    const result = await pool.query(query, values);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Area not found' });
+      return res.status(404).json({ success: false, error: 'Area not found' });
     }
 
     res.json({
@@ -353,7 +384,7 @@ app.put('/api/areas/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Error updating area:', error);
-    res.status(500).json({ success: false, error: 'Failed to update area' });
+    res.status(500).json({ success: false, error: 'Failed to update area', details: error.message });
   }
 });
 
