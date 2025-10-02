@@ -157,3 +157,6 @@ backend/update-api-to-new-tables.js
 frontend/src/components/AreaSetup.js
 frontend/src/components/EposCsvInput.js
 frontend/src/components/InvoiceInput.js
+
+# SQL migration and manipulation scripts (one-time use only)
+*.sql
