@@ -9,6 +9,9 @@ import StockTaking from './components/StockTaking';
 import SessionHistory from './components/SessionHistory';
 import VenueManagement from './components/VenueManagement';
 import Settings from './components/Settings';
+import InvoiceInput from './components/InvoiceInput';
+import EposCsvInput from './components/EposCsvInput';
+import AreaSetup from './components/AreaSetup';
 
 function App() {
   return (
@@ -22,6 +25,9 @@ function App() {
             <Route path="/history" element={<SessionHistory />} />
             <Route path="/venue/new" element={<VenueManagement />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/invoice-input" element={<InvoiceInput />} />
+            <Route path="/epos-csv-input" element={<EposCsvInput />} />
+            <Route path="/area-setup/:venueId" element={<AreaSetup />} />
           </Routes>
         </div>
       </Router>

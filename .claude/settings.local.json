@@ -27,7 +27,9 @@
       "Bash(echo \"   # Should show: \"\"version\"\": \"\"1.2.0-e2e-tested\"\"\")",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(tasklist)",
+      "Bash(git rebase:*)"
     ],
     "deny": [],
     "ask": []

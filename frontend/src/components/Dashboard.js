@@ -7,188 +7,217 @@ import { apiService } from '../services/apiService';
 
 // Styled Components
 const DashboardContainer = styled(Container)`
-  padding-top: ${props => props.theme.spacing.xl};
+  padding-top: ${props => props.theme.spacing.lg};
   padding-bottom: ${props => props.theme.spacing.xl};
   min-height: 100vh;
   background: linear-gradient(135deg, ${props => props.theme.colors.background} 0%, #E0E7FF 100%);
 `;
 
-const Header = styled.header`
-  text-align: center;
-  margin-bottom: ${props => props.theme.spacing.xxl};
-`;
-
-const Title = styled.h1`
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: ${props => props.theme.colors.text};
-  margin-bottom: ${props => props.theme.spacing.md};
-  
-  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    font-size: 3rem;
-  }
-`;
-
-const Subtitle = styled.p`
-  font-size: 1.125rem;
-  color: ${props => props.theme.colors.textSecondary};
-  max-width: 600px;
-  margin: 0 auto;
-  
-  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    font-size: 1.25rem;
-  }
-`;
-
-const StatsGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
+const TopBar = styled.div`
+  display: flex;
+  flex-direction: column;
   gap: ${props => props.theme.spacing.md};
-  margin-bottom: ${props => props.theme.spacing.xxl};
-  
-  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: ${props => props.theme.spacing.lg};
-  }
-`;
-
-const StatCard = styled.div`
+  margin-bottom: ${props => props.theme.spacing.xl};
+  padding: ${props => props.theme.spacing.lg};
   background: ${props => props.theme.colors.surface};
   border-radius: 12px;
-  padding: ${props => props.theme.spacing.lg};
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   border: 1px solid ${props => props.theme.colors.border};
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
-  }
-`;
 
-const StatNumber = styled.div`
-  font-size: 2rem;
-  font-weight: 700;
-  color: ${props => props.theme.colors.primary};
-  margin-bottom: ${props => props.theme.spacing.xs};
-  
   @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    font-size: 2.5rem;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
 `;
 
-const StatLabel = styled.div`
-  font-size: 0.875rem;
-  color: ${props => props.theme.colors.textSecondary};
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  
+const VenueSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${props => props.theme.spacing.sm};
+
   @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    font-size: 1rem;
+    flex-direction: row;
+    align-items: center;
+    gap: ${props => props.theme.spacing.md};
   }
 `;
 
-const ActionSection = styled.section`
+const VenueSelect = styled.select`
+  padding: ${props => props.theme.spacing.md};
+  border: 2px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
   background: ${props => props.theme.colors.surface};
-  border-radius: 16px;
+  color: ${props => props.theme.colors.text};
+  font-size: 1rem;
+  min-height: ${props => props.theme.tablet.minTouchTarget};
+  min-width: 250px;
+
+  &:focus {
+    border-color: ${props => props.theme.colors.primary};
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
+    font-size: 1.125rem;
+    padding: ${props => props.theme.spacing.lg};
+  }
+`;
+
+const SessionsSection = styled.div`
+  background: ${props => props.theme.colors.surface};
+  border-radius: 12px;
   padding: ${props => props.theme.spacing.xl};
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   border: 1px solid ${props => props.theme.colors.border};
-  margin-bottom: ${props => props.theme.spacing.xxl};
+  margin-bottom: ${props => props.theme.spacing.xl};
 `;
 
-const ActionTitle = styled.h2`
+const SectionTitle = styled.h2`
   font-size: 1.5rem;
   font-weight: 600;
   color: ${props => props.theme.colors.text};
   margin-bottom: ${props => props.theme.spacing.lg};
-  text-align: center;
-  
+
   @media (min-width: ${props => props.theme.breakpoints.tablet}) {
     font-size: 1.75rem;
   }
 `;
 
-const VenueForm = styled.form`
+const FilterTabs = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.md};
-  max-width: 500px;
-  margin: 0 auto;
-  
-  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    gap: ${props => props.theme.spacing.lg};
-  }
-`;
-
-const FormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
   gap: ${props => props.theme.spacing.sm};
+  margin-bottom: ${props => props.theme.spacing.lg};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
 `;
 
-const Label = styled.label`
-  font-weight: 600;
-  color: ${props => props.theme.colors.text};
-  font-size: 0.875rem;
-  
-  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    font-size: 1rem;
-  }
-`;
+const FilterTab = styled.button`
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  border: none;
+  background: none;
+  color: ${props => props.active ? props.theme.colors.primary : props.theme.colors.textSecondary};
+  font-weight: ${props => props.active ? 600 : 400};
+  border-bottom: 2px solid ${props => props.active ? props.theme.colors.primary : 'transparent'};
+  cursor: pointer;
+  transition: all 0.2s ease;
 
-const Select = styled.select`
-  padding: ${props => props.theme.spacing.md};
-  border: 2px solid ${props => props.theme.colors.border};
-  border-radius: 8px;
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-  font-size: 1rem;
-  min-height: ${props => props.theme.tablet.minTouchTarget};
-  
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-  
-  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    font-size: 1.125rem;
-    padding: ${props => props.theme.spacing.lg};
+  &:hover {
+    color: ${props => props.theme.colors.primary};
   }
 `;
 
-const Input = styled.input`
-  padding: ${props => props.theme.spacing.md};
-  border: 2px solid ${props => props.theme.colors.border};
-  border-radius: 8px;
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-  font-size: 1rem;
-  min-height: ${props => props.theme.tablet.minTouchTarget};
-  
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-  
-  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    font-size: 1.125rem;
-    padding: ${props => props.theme.spacing.lg};
-  }
-`;
-
-const ButtonGroup = styled.div`
+const SessionsList = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${props => props.theme.spacing.md};
-  margin-top: ${props => props.theme.spacing.lg};
-  
+  max-height: 400px;
+  overflow-y: auto;
+`;
+
+const SessionCard = styled.div`
+  padding: ${props => props.theme.spacing.lg};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  background: ${props => props.theme.colors.background};
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: ${props => props.isClickable ? 'pointer' : 'default'};
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.1);
+    ${props => props.isClickable && `
+      border-color: ${props.theme.colors.primary};
+    `}
+  }
+`;
+
+const SessionHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: ${props => props.theme.spacing.sm};
+`;
+
+const SessionActions = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${props => props.theme.spacing.xs};
+  align-items: flex-end;
+
   @media (min-width: ${props => props.theme.breakpoints.tablet}) {
     flex-direction: row;
-    justify-content: center;
+    gap: ${props => props.theme.spacing.sm};
+    align-items: center;
+  }
+`;
+
+const SessionInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${props => props.theme.spacing.xs};
+`;
+
+const SessionVenue = styled.h3`
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+  margin: 0;
+`;
+
+const SessionDetails = styled.p`
+  font-size: 0.875rem;
+  color: ${props => props.theme.colors.textSecondary};
+  margin: 0;
+`;
+
+const SessionStatus = styled.span`
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: ${props => {
+    switch (props.status) {
+      case 'in_progress': return '#FEF3C7';
+      case 'completed': return '#D1FAE5';
+      case 'paused': return '#FEE2E2';
+      default: return '#F3F4F6';
+    }
+  }};
+  color: ${props => {
+    switch (props.status) {
+      case 'in_progress': return '#92400E';
+      case 'completed': return '#065F46';
+      case 'paused': return '#991B1B';
+      default: return '#374151';
+    }
+  }};
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: ${props => props.theme.spacing.xxl};
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const StartStocktakeSection = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: ${props => props.theme.spacing.md};
+  margin-top: ${props => props.theme.spacing.lg};
+
+  @media (min-width: ${props => props.theme.breakpoints.tablet}) {
+    grid-template-columns: 1fr 1fr;
     gap: ${props => props.theme.spacing.lg};
+  }
+
+  @media (min-width: ${props => props.theme.breakpoints.desktop}) {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
   }
 `;
 
@@ -200,7 +229,7 @@ const LoadingSpinner = styled.div`
   border-radius: 50%;
   border-top-color: white;
   animation: spin 1s ease-in-out infinite;
-  
+
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
@@ -218,29 +247,33 @@ const ErrorMessage = styled.div`
 const Dashboard = () => {
   const [venues, setVenues] = useState([]);
   const [selectedVenue, setSelectedVenue] = useState('');
+  const [sessions, setSessions] = useState([]);
+  const [filteredSessions, setFilteredSessions] = useState([]);
+  const [activeFilter, setActiveFilter] = useState('all');
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({
-    activeSessions: 0,
-    completedToday: 0,
-    totalVenues: 0,
-    avgAccuracy: 98
-  });
 
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchVenues();
-    fetchStats();
+    fetchSessions();
     fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    filterSessions();
+  }, [sessions, activeFilter, selectedVenue]);
 
   const fetchVenues = async () => {
     try {
       const response = await apiService.getVenues();
       if (response.success) {
         setVenues(response.data);
+        if (response.data.length > 0 && !selectedVenue) {
+          setSelectedVenue(response.data[0].id);
+        }
       } else {
         setError('Failed to load venues: ' + response.error);
       }
@@ -250,42 +283,16 @@ const Dashboard = () => {
     }
   };
 
-  const fetchStats = async () => {
+  const fetchSessions = async () => {
     try {
-      // Get active sessions
-      const activeSessions = await apiService.getSessions('in_progress');
-
-      // Get completed sessions
-      const completedSessions = await apiService.getSessions('completed');
-
-      // Get all sessions to calculate completed today
-      const allSessions = await apiService.getAllSessions();
-
-      let activeSessionsCount = 0;
-      let completedTodayCount = 0;
-
-      if (activeSessions.success) {
-        activeSessionsCount = activeSessions.data.sessions?.length || 0;
+      const response = await apiService.getAllSessions();
+      if (response.success) {
+        setSessions(response.data.sessions || []);
+      } else {
+        console.error('Failed to load sessions:', response.error);
       }
-
-      if (allSessions.success) {
-        const today = new Date().toISOString().split('T')[0];
-        completedTodayCount = allSessions.data.sessions?.filter(session =>
-          session.status === 'completed' &&
-          session.session_date === today
-        ).length || 0;
-      }
-
-      setStats(prev => ({
-        ...prev,
-        activeSessions: activeSessionsCount,
-        completedToday: completedTodayCount,
-        totalVenues: venues.length,
-        avgAccuracy: 98 // Keep this as static for now
-      }));
     } catch (error) {
-      console.error('Error fetching stats:', error);
-      // Don't show error for stats, just keep defaults
+      console.error('Error fetching sessions:', error);
     }
   };
 
@@ -296,7 +303,6 @@ const Dashboard = () => {
         setUserProfile(response.summary);
       } else {
         console.error('Failed to load user profile:', response.error);
-        // Set a default profile if load fails
         setUserProfile({
           first_name: 'Stock',
           last_name: 'Taker',
@@ -305,7 +311,6 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      // Set a default profile if error occurs
       setUserProfile({
         first_name: 'Stock',
         last_name: 'Taker',
@@ -314,8 +319,33 @@ const Dashboard = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const filterSessions = () => {
+    let filtered = sessions;
+
+    // First filter by venue if one is selected
+    if (selectedVenue) {
+      filtered = filtered.filter(session => session.venue_id === selectedVenue);
+    }
+
+    // Then filter by status
+    switch (activeFilter) {
+      case 'active':
+        filtered = filtered.filter(session =>
+          session.status === 'in_progress' || session.status === 'paused'
+        );
+        break;
+      case 'completed':
+        filtered = filtered.filter(session => session.status === 'completed');
+        break;
+      default:
+        // Keep all sessions for the selected venue
+        break;
+    }
+
+    setFilteredSessions(filtered);
+  };
+
+  const handleStartStocktake = async () => {
     if (!selectedVenue) {
       setError('Please select a venue.');
       return;
@@ -328,9 +358,39 @@ const Dashboard = () => {
 
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Use first + last name
+      // Check for open sessions
+      const openSessionsResponse = await apiService.getSessions('in_progress');
+      let openSessions = [];
+
+      if (openSessionsResponse.success) {
+        openSessions = openSessionsResponse.data.sessions || [];
+      }
+
+      // If there are open sessions, ask user to confirm closing them
+      if (openSessions.length > 0) {
+        const latestSession = openSessions.sort((a, b) => new Date(b.session_date) - new Date(a.session_date))[0];
+        const confirmClose = window.confirm(
+          `There is an open session from ${formatSessionDate(latestSession.session_date)} at ${getVenueName(latestSession.venue_id)}. ` +
+          `This session will be automatically completed before starting a new one. Continue?`
+        );
+
+        if (!confirmClose) {
+          setLoading(false);
+          return;
+        }
+
+        // Close all open sessions
+        for (const session of openSessions) {
+          try {
+            await apiService.updateSession(session.id, { status: 'completed' });
+          } catch (error) {
+            console.error('Error closing session:', session.id, error);
+          }
+        }
+      }
+
       const stocktakerName = `${userProfile.first_name} ${userProfile.last_name}`.trim();
 
       const sessionData = {
@@ -339,9 +399,10 @@ const Dashboard = () => {
         session_date: new Date().toISOString().split('T')[0],
         notes: 'Created from dashboard - Single user system'
       };
-      
+
       const response = await apiService.createSession(sessionData);
       if (response.success) {
+        // Navigate directly to counting page now
         navigate(`/stock-taking/${response.data.session.id}`);
       } else {
         setError('Failed to create session: ' + response.error);
@@ -354,160 +415,189 @@ const Dashboard = () => {
     }
   };
 
-  const handleViewHistory = () => {
-    navigate('/history');
+  const formatSessionDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  const getVenueName = (venueId) => {
+    const venue = venues.find(v => v.id === venueId);
+    return venue ? venue.name : 'Unknown Venue';
+  };
+
+  const handleSessionClick = (session) => {
+    // Only allow clicking on active sessions (in_progress or paused)
+    if (session.status === 'in_progress' || session.status === 'paused') {
+      navigate(`/stock-taking/${session.id}`);
+    }
+  };
+
+  const handleContinueSession = (e, session) => {
+    e.stopPropagation(); // Prevent card click
+    navigate(`/stock-taking/${session.id}`);
   };
 
   return (
     <DashboardContainer>
-      <Header>
-        <Title>Stock Management System</Title>
-        <Subtitle>
-          Professional inventory management for hospitality venues with real-time tracking and comprehensive reporting.
-        </Subtitle>
-      </Header>
+      <TopBar>
+        <VenueSection>
+          <VenueSelect
+            value={selectedVenue}
+            onChange={(e) => setSelectedVenue(e.target.value)}
+          >
+            <option value="">Select a venue...</option>
+            {venues.map((venue) => {
+              const addressParts = [
+                venue.address_line_1,
+                venue.city,
+                venue.county,
+                venue.postcode
+              ].filter(Boolean);
+              const displayAddress = addressParts.length > 0 ? addressParts.join(', ') : (venue.address || 'No address');
 
-      <StatsGrid>
-        <StatCard>
-          <StatNumber>{stats.activeSessions}</StatNumber>
-          <StatLabel>Active Sessions</StatLabel>
-        </StatCard>
-        <StatCard>
-          <StatNumber>{stats.completedToday}</StatNumber>
-          <StatLabel>Completed Today</StatLabel>
-        </StatCard>
-        <StatCard>
-          <StatNumber>{stats.totalVenues}</StatNumber>
-          <StatLabel>Total Venues</StatLabel>
-        </StatCard>
-        <StatCard>
-          <StatNumber>{stats.avgAccuracy}%</StatNumber>
-          <StatLabel>Average Accuracy</StatLabel>
-        </StatCard>
-      </StatsGrid>
+              return (
+                <option key={venue.id} value={venue.id}>
+                  {venue.name} - {displayAddress}
+                </option>
+              );
+            })}
+          </VenueSelect>
 
-      <ActionSection>
-        <ActionTitle>Start New Stock Take</ActionTitle>
-        
-        {error && <ErrorMessage>{error}</ErrorMessage>}
-        
-        <VenueForm onSubmit={handleSubmit}>
-          <FormGroup>
-            <Label htmlFor="venue">Select Venue</Label>
-            <Select
-              id="venue"
-              value={selectedVenue}
-              onChange={(e) => setSelectedVenue(e.target.value)}
-              required
-            >
-              <option value="">Choose a venue...</option>
-              {venues.map((venue) => {
-                const addressParts = [
-                  venue.address_line_1,
-                  venue.city,
-                  venue.county,
-                  venue.postcode
-                ].filter(Boolean);
-                const displayAddress = addressParts.length > 0 ? addressParts.join(', ') : (venue.address || 'No address');
+          <Button
+            variant="secondary"
+            onClick={() => navigate('/venue/new')}
+          >
+            Add New Venue
+          </Button>
+        </VenueSection>
 
-                return (
-                  <option key={venue.id} value={venue.id}>
-                    {venue.name} - {displayAddress}
-                  </option>
-                );
-              })}
-            </Select>
-          </FormGroup>
+        <Button
+          variant="outline"
+          onClick={() => navigate('/settings')}
+        >
+          ⚙️ Settings
+        </Button>
+      </TopBar>
 
-          <FormGroup>
-            <Label>Current User</Label>
-            {userProfile ? (
-              <div style={{
-                padding: '12px',
-                background: '#f8f9fa',
-                border: '1px solid #e9ecef',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '16px' }}>👤</span>
-                <div>
-                  <div style={{ fontWeight: '600', color: '#495057' }}>
-                    {`${userProfile.first_name} ${userProfile.last_name}`.trim()}
-                  </div>
-                  {!userProfile.profile_complete && (
-                    <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                      ⚠️ Profile incomplete - <button
-                        type="button"
-                        onClick={() => navigate('/settings')}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#007bff',
-                          cursor: 'pointer',
-                          textDecoration: 'underline',
-                          fontSize: '12px',
-                          padding: 0
-                        }}
-                      >
-                        Update in Settings
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                padding: '12px',
-                background: '#fff3cd',
-                border: '1px solid #ffeaa7',
-                borderRadius: '6px',
-                color: '#856404'
-              }}>
-                Loading user profile...
-              </div>
-            )}
-          </FormGroup>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
 
-          <ButtonGroup>
-            <Button
-              type="submit"
-              disabled={loading}
-              size="lg"
-            >
-              {loading ? <LoadingSpinner /> : 'Start Stock Take'}
-            </Button>
+      <SessionsSection>
+        <SectionTitle>Stock Taking Sessions</SectionTitle>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleViewHistory}
-              size="lg"
-            >
-              View History
-            </Button>
+        <FilterTabs>
+          <FilterTab
+            active={activeFilter === 'all'}
+            onClick={() => setActiveFilter('all')}
+          >
+            All Sessions
+          </FilterTab>
+          <FilterTab
+            active={activeFilter === 'active'}
+            onClick={() => setActiveFilter('active')}
+          >
+            Active
+          </FilterTab>
+          <FilterTab
+            active={activeFilter === 'completed'}
+            onClick={() => setActiveFilter('completed')}
+          >
+            Completed
+          </FilterTab>
+        </FilterTabs>
 
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => navigate('/venue/new')}
-              size="lg"
-            >
-              Add New Venue
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate('/settings')}
-              size="lg"
-              style={{ borderColor: '#6B7280', color: '#6B7280' }}
-            >
-              ⚙️ Settings
-            </Button>
-          </ButtonGroup>
-        </VenueForm>
-      </ActionSection>
+        <SessionsList>
+          {filteredSessions.length === 0 ? (
+            <EmptyState>
+              {activeFilter === 'all' && 'No sessions found'}
+              {activeFilter === 'active' && 'No active sessions'}
+              {activeFilter === 'completed' && 'No completed sessions'}
+            </EmptyState>
+          ) : (
+            filteredSessions.map((session) => {
+              const isActive = session.status === 'in_progress' || session.status === 'paused';
+
+              return (
+                <SessionCard
+                  key={session.id}
+                  isClickable={isActive}
+                  onClick={() => handleSessionClick(session)}
+                >
+                  <SessionHeader>
+                    <SessionInfo>
+                      <SessionVenue>
+                        {getVenueName(session.venue_id)}
+                      </SessionVenue>
+                      <SessionDetails>
+                        Date: {formatSessionDate(session.session_date)} •
+                        Stocktaker: {session.stocktaker_name}
+                      </SessionDetails>
+                      {session.notes && (
+                        <SessionDetails>
+                          Notes: {session.notes}
+                        </SessionDetails>
+                      )}
+                    </SessionInfo>
+
+                    <SessionActions>
+                      <SessionStatus status={session.status}>
+                        {session.status.replace('_', ' ')}
+                      </SessionStatus>
+
+                      {isActive && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => handleContinueSession(e, session)}
+                        >
+                          Continue
+                        </Button>
+                      )}
+                    </SessionActions>
+                  </SessionHeader>
+                </SessionCard>
+              );
+            })
+          )}
+        </SessionsList>
+      </SessionsSection>
+
+      <StartStocktakeSection>
+        <Button
+          onClick={handleStartStocktake}
+          disabled={loading || !selectedVenue}
+          size="lg"
+        >
+          {loading ? <LoadingSpinner /> : 'Start New Stock Take'}
+        </Button>
+
+        <Button
+          onClick={() => navigate(`/area-setup/${selectedVenue}`)}
+          disabled={!selectedVenue}
+          variant="secondary"
+          size="lg"
+        >
+          Set-up Areas
+        </Button>
+
+        <Button
+          onClick={() => navigate('/invoice-input')}
+          variant="outline"
+          size="lg"
+        >
+          Input Invoices
+        </Button>
+
+        <Button
+          onClick={() => navigate('/epos-csv-input')}
+          variant="outline"
+          size="lg"
+        >
+          Input Epos CSV
+        </Button>
+      </StartStocktakeSection>
     </DashboardContainer>
   );
 };

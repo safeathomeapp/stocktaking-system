@@ -137,3 +137,23 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Archived and temporary files
+archived-files/
+*.backup
+*.old
+*-new.js
+
+# Analysis and migration scripts
+backend/add-area-photos.js
+backend/analyze-current-schema.js
+backend/create-updated-server.js
+backend/investigate-stock-entries.js
+backend/migrate-to-three-table-architecture.js
+backend/test-stock-session-loading.js
+backend/update-api-to-new-tables.js
+
+# Unused components
+frontend/src/components/AreaSetup.js
+frontend/src/components/EposCsvInput.js
+frontend/src/components/InvoiceInput.js

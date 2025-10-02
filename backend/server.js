@@ -35,7 +35,7 @@ app.get('/api/health', async (req, res) => {
       database: 'connected',
       timestamp: new Date().toISOString(),
       db_time: result.rows[0].now,
-      version: '1.6.0-schema-modernized'
+      version: '2.0.1'
     });
   } catch (error) {
     res.status(500).json({
@@ -334,11 +334,11 @@ app.post('/api/venues/:id/areas', async (req, res) => {
 app.put('/api/areas/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, display_order, description } = req.body;
+    const { name, display_order, description, photo } = req.body;
 
     const result = await pool.query(
-      'UPDATE venue_areas SET name = $1, display_order = $2, description = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
-      [name, display_order, description, id]
+      'UPDATE venue_areas SET name = $1, display_order = $2, description = $3, photo = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *',
+      [name, display_order, description, photo, id]
     );
 
     if (result.rows.length === 0) {
@@ -346,13 +346,14 @@ app.put('/api/areas/:id', async (req, res) => {
     }
 
     res.json({
+      success: true,
       message: 'Area updated successfully',
       area: result.rows[0]
     });
 
   } catch (error) {
     console.error('Error updating area:', error);
-    res.status(500).json({ error: 'Failed to update area' });
+    res.status(500).json({ success: false, error: 'Failed to update area' });
   }
 });
 

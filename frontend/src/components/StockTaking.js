@@ -681,11 +681,97 @@ const SearchIcon = styled.button`
   min-height: 28px;
   min-width: 28px;
   transition: all 0.2s ease;
+  position: relative;
 
   &:hover {
     border-color: ${props => props.theme.colors.primary};
     color: ${props => props.theme.colors.primary};
   }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+const PhotoModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: ${props => props.theme.spacing.lg};
+
+  @media (max-width: ${props => props.theme.breakpoints.tablet}) {
+    padding: ${props => props.theme.spacing.md};
+  }
+`;
+
+const PhotoContainer = styled.div`
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+
+  @media (max-width: ${props => props.theme.breakpoints.tablet}) {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+`;
+
+const PhotoImage = styled.img`
+  width: 100%;
+  height: auto;
+  max-height: 80vh;
+  object-fit: contain;
+  display: block;
+`;
+
+const PhotoHeader = styled.div`
+  padding: ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.surface};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const PhotoTitle = styled.h3`
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: ${props => props.theme.colors.textSecondary};
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.background};
+    color: ${props => props.theme.colors.text};
+  }
+`;
+
+const NoPhotoPlaceholder = styled.div`
+  padding: ${props => props.theme.spacing.xxl};
+  text-align: center;
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: 1.125rem;
+  background: ${props => props.theme.colors.background};
 `;
 
 const SearchSection = styled.div`
@@ -780,17 +866,18 @@ const StockTaking = () => {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Voice recognition
-  const [isListening, setIsListening] = useState(false);
-  const [voiceSupported, setVoiceSupported] = useState(false);
-  const [voiceSuggestions, setVoiceSuggestions] = useState([]);
-  const [showVoiceSuggestions, setShowVoiceSuggestions] = useState(false);
-  const [voiceSearchLoading, setVoiceSearchLoading] = useState(false);
-  const recognition = useRef(null);
+
+  // Area photo display
+  const [showAreaPhoto, setShowAreaPhoto] = useState(false);
 
   // Drag and drop
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverItem, setDragOverItem] = useState(null);
+
+  // Get current area data including photo
+  const getCurrentAreaData = () => {
+    return updatedAreas.find(area => area.id === currentArea);
+  };
 
   // Product suggestion database for fuzzy search
   const productDatabase = [
@@ -801,46 +888,8 @@ const StockTaking = () => {
   ];
 
   useEffect(() => {
-    // Initialize voice recognition
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      setVoiceSupported(true);
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition.current = new SpeechRecognition();
-      recognition.current.continuous = false;
-      recognition.current.interimResults = false;
-      recognition.current.lang = 'en-US';
-
-      recognition.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        console.log('Voice transcript:', transcript);
-
-        // Check if this was for product input or search
-        if (recognition.current._isForProduct) {
-          handleVoiceResultForProduct(transcript);
-          recognition.current._isForProduct = false;
-        } else {
-          handleVoiceResult(transcript);
-        }
-      };
-
-      recognition.current.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.current.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-    }
-
     // Load session and venue data
     loadSessionData();
-
-    return () => {
-      if (recognition.current) {
-        recognition.current.abort();
-      }
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
@@ -946,6 +995,7 @@ const StockTaking = () => {
       areasArray = Object.values(areaGroups).map(area => ({
         id: area.id,
         name: area.name,
+        photo: area.photo, // Include photo from database
         completedItems: 0,
         totalItems: area.products.length
       }));
@@ -1153,122 +1203,16 @@ const StockTaking = () => {
     }
   };
 
-  // Voice recognition handlers
-  const handleVoiceStart = () => {
-    if (recognition.current && voiceSupported) {
-      setIsListening(true);
-      recognition.current.start();
-    }
+
+  // Handle area photo display
+  const handlePhotoButtonClick = () => {
+    setShowAreaPhoto(true);
   };
 
-  const handleVoiceStartForProduct = () => {
-    if (recognition.current && voiceSupported) {
-      setIsListening(true);
-      // Set a flag to indicate this is for product input
-      recognition.current._isForProduct = true;
-      recognition.current.start();
-    }
+  const closePhotoModal = () => {
+    setShowAreaPhoto(false);
   };
 
-  const handleVoiceResult = (transcript) => {
-    console.log('Processing voice search:', transcript);
-
-    // Use voice input to search existing products in current area
-    const searchTerm = transcript.trim().toLowerCase();
-
-    // Search through current area products
-    const matchingProducts = getCurrentAreaItems().filter(item =>
-      item.name.toLowerCase().includes(searchTerm) ||
-      item.category.toLowerCase().includes(searchTerm)
-    );
-
-    if (matchingProducts.length > 0) {
-      // Focus on the first matching product by scrolling to it
-      const firstMatch = matchingProducts[0];
-      const element = document.querySelector(`[data-product-id="${firstMatch.id}"]`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Briefly highlight the found product
-        element.style.border = '2px solid #3B82F6';
-        setTimeout(() => {
-          element.style.border = '';
-        }, 2000);
-      }
-
-      // Also set the search term to show all matches
-      setSearchTerm(searchTerm);
-      setShowSearch(true);
-    } else {
-      // If no matches found, clear search and maybe show a message
-      setSearchTerm('');
-      console.log('No products found matching:', searchTerm);
-    }
-
-    setIsListening(false);
-  };
-
-  const handleVoiceResultForProduct = async (transcript) => {
-    console.log('Processing voice for product input:', transcript);
-    setVoiceSearchLoading(true);
-
-    // Clean up the transcript
-    const cleanedQuery = transcript.replace(/^(add|create|new)\s+/i, '').trim();
-
-    try {
-      // Search master products database with fuzzy matching
-      const searchResult = await apiService.searchMasterProducts(
-        cleanedQuery,
-        sessionId,
-        venueData?.id,
-        10, // maxResults
-        30  // minConfidence (lower for more suggestions)
-      );
-
-      if (searchResult.success && searchResult.data?.suggestions?.length > 0) {
-        // Show voice suggestions to user for manual selection
-        setVoiceSuggestions(searchResult.data.suggestions);
-        setShowVoiceSuggestions(true);
-
-        // Keep the original transcript in the field as a fallback
-        setNewProductName(cleanedQuery);
-      } else {
-        // No suggestions found, use original input
-        console.log('No master product suggestions found, using original input');
-        setNewProductName(cleanedQuery);
-        setShowVoiceSuggestions(false);
-      }
-    } catch (error) {
-      console.error('Voice search error:', error);
-      // Fallback to original behavior
-      setNewProductName(cleanedQuery);
-      setShowVoiceSuggestions(false);
-    } finally {
-      setVoiceSearchLoading(false);
-      setIsListening(false);
-    }
-  };
-
-  // Handle voice suggestion selection
-  const handleVoiceSuggestionSelect = async (suggestion, rank) => {
-    console.log('Selected voice suggestion:', suggestion);
-
-    // Fill in the product form with suggestion data
-    setNewProductName(suggestion.name);
-    setNewProductCategory(suggestion.category || '');
-
-    // Record the selection for learning
-    if (suggestion.logId) {
-      try {
-        await apiService.recordProductSelection(suggestion.id, suggestion.logId, rank + 1);
-      } catch (error) {
-        console.error('Failed to record selection:', error);
-      }
-    }
-
-    // Hide suggestions
-    setShowVoiceSuggestions(false);
-    setVoiceSuggestions([]);
-  };
 
   // Add new product
   // Generate UUID for new products
@@ -1618,6 +1562,7 @@ const StockTaking = () => {
     };
   });
 
+
   if (loading) {
     return (
       <StockTakingContainer>
@@ -1646,7 +1591,7 @@ const StockTaking = () => {
         <HeaderContent>
           <Title>{venueData?.name || 'Stock Taking Session'}</Title>
           <SessionInfo>
-            Session: {sessionId ? String(sessionId).slice(-8) : 'Loading...'} • {sessionData?.stocktaker_name || 'Loading...'} • {sessionData?.session_date ? new Date(sessionData.session_date).toLocaleDateString() : new Date().toLocaleDateString()} • Overall: {completedItems}/{totalItems} • Areas: {updatedAreas.filter(a => a.completedItems >= a.totalItems).length}/{updatedAreas.length} • Voice: {voiceSupported ? 'Ready' : 'N/A'}
+            Session: {sessionId ? String(sessionId).slice(-8) : 'Loading...'} • {sessionData?.stocktaker_name || 'Loading...'} • {sessionData?.session_date ? new Date(sessionData.session_date).toLocaleDateString() : new Date().toLocaleDateString()} • Overall: {completedItems}/{totalItems} • Areas: {updatedAreas.filter(a => a.completedItems >= a.totalItems).length}/{updatedAreas.length}
           </SessionInfo>
         </HeaderContent>
         <Button variant="outline" onClick={handleBack} size="sm">
@@ -1781,20 +1726,15 @@ const StockTaking = () => {
                 >
                   🔍
                 </SearchIcon>
-                {voiceSupported && (
-                  <SearchIcon
-                    onClick={handleVoiceStart}
-                    disabled={isListening}
-                    title="Voice search products"
-                    style={{
-                      backgroundColor: isListening ? '#EF4444' : '',
-                      color: isListening ? 'white' : '',
-                      animation: isListening ? 'pulse 1.5s infinite' : 'none'
-                    }}
-                  >
-                    🎤
-                  </SearchIcon>
-                )}
+                <SearchIcon
+                  onClick={handlePhotoButtonClick}
+                  title={getCurrentAreaData()?.photo ? "View area photo" : "No area photo available"}
+                  style={{
+                    opacity: getCurrentAreaData()?.photo ? 1 : 0.5
+                  }}
+                >
+                  🖼️
+                </SearchIcon>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1873,18 +1813,6 @@ const StockTaking = () => {
             {/* Inline Add Product */}
             {showAddProduct ? (
               <AddProductForm>
-                {voiceSupported && (
-                  <VoiceButton
-                    variant={isListening ? "danger" : "secondary"}
-                    onClick={handleVoiceStartForProduct}
-                    disabled={isListening}
-                    listening={isListening}
-                    size="sm"
-                  >
-                    🎤
-                  </VoiceButton>
-                )}
-
                 <div style={{ position: 'relative', flex: 1 }}>
                   <CompactInput
                     type="text"
@@ -1894,48 +1822,8 @@ const StockTaking = () => {
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     autoFocus
                   />
-                  {/* Voice search loading indicator */}
-                  {voiceSearchLoading && (
-                    <SuggestionsList>
-                      <SuggestionItem style={{ color: '#666', fontStyle: 'italic' }}>
-                        🎤 Searching products...
-                      </SuggestionItem>
-                    </SuggestionsList>
-                  )}
-
-                  {/* Voice suggestions from master database */}
-                  {showVoiceSuggestions && voiceSuggestions.length > 0 && (
-                    <SuggestionsList>
-                      <SuggestionItem style={{
-                        backgroundColor: '#E3F2FD',
-                        color: '#1976D2',
-                        fontWeight: 'bold',
-                        fontSize: '0.8rem',
-                        padding: '4px 8px'
-                      }}>
-                        🎤 Voice Suggestions:
-                      </SuggestionItem>
-                      {voiceSuggestions.map((suggestion, index) => (
-                        <SuggestionItem
-                          key={`voice-${index}`}
-                          onMouseDown={() => handleVoiceSuggestionSelect(suggestion, index)}
-                          style={{ borderLeft: '3px solid #2196F3' }}
-                        >
-                          <div>
-                            <strong>{suggestion.name}</strong>
-                            {suggestion.brand && <span> ({suggestion.brand})</span>}
-                            {suggestion.size && <span> - {suggestion.size}</span>}
-                            <div style={{ fontSize: '0.75rem', color: '#666' }}>
-                              {suggestion.category} • {suggestion.confidence}% match
-                            </div>
-                          </div>
-                        </SuggestionItem>
-                      ))}
-                    </SuggestionsList>
-                  )}
-
                   {/* Regular typed suggestions */}
-                  {showSuggestions && productSuggestions.length > 0 && !showVoiceSuggestions && (
+                  {showSuggestions && productSuggestions.length > 0 && (
                     <SuggestionsList>
                       {productSuggestions.map((suggestion, index) => (
                         <SuggestionItem
@@ -2020,6 +1908,46 @@ const StockTaking = () => {
         </div>
         </DisabledOverlay>
       </MainContent>
+
+      {/* Area Photo Modal */}
+      {showAreaPhoto && getCurrentAreaData()?.photo && (
+        <PhotoModal onClick={closePhotoModal}>
+          <PhotoContainer onClick={e => e.stopPropagation()}>
+            <PhotoHeader>
+              <PhotoTitle>{getCurrentAreaData()?.name} - Reference Photo</PhotoTitle>
+              <CloseButton onClick={closePhotoModal} title="Close photo">
+                ✕
+              </CloseButton>
+            </PhotoHeader>
+            <PhotoImage
+              src={getCurrentAreaData()?.photo}
+              alt={`${getCurrentAreaData()?.name} reference photo`}
+              onError={(e) => {
+                console.error('Failed to load area photo');
+                closePhotoModal();
+              }}
+            />
+          </PhotoContainer>
+        </PhotoModal>
+      )}
+
+      {/* No Photo Modal */}
+      {showAreaPhoto && !getCurrentAreaData()?.photo && (
+        <PhotoModal onClick={closePhotoModal}>
+          <PhotoContainer onClick={e => e.stopPropagation()}>
+            <PhotoHeader>
+              <PhotoTitle>{getCurrentAreaData()?.name} - No Photo Available</PhotoTitle>
+              <CloseButton onClick={closePhotoModal} title="Close">
+                ✕
+              </CloseButton>
+            </PhotoHeader>
+            <NoPhotoPlaceholder>
+              📷<br />No reference photo has been captured for this area yet.<br />
+              <small>Go to Area Setup to capture a reference photo.</small>
+            </NoPhotoPlaceholder>
+          </PhotoContainer>
+        </PhotoModal>
+      )}
     </StockTakingContainer>
   );
 };
