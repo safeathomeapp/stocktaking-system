@@ -838,6 +838,8 @@ const StockTaking = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [stockItems, setStockItems] = useState([]);
   const [stockCounts, setStockCounts] = useState({});
+  const [stockCases, setStockCases] = useState({}); // Cases count per product
+  const [stockUnits, setStockUnits] = useState({}); // Units count per product
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
 
@@ -1347,6 +1349,50 @@ const StockTaking = () => {
     }
   };
 
+  const handleCasesChange = (itemId, cases) => {
+    const numericValue = parseInt(cases);
+    if (!isNaN(numericValue) || cases === '') {
+      setStockCases(prev => ({
+        ...prev,
+        [itemId]: cases
+      }));
+
+      // Calculate total: cases * case_size + units
+      const caseCount = parseInt(cases) || 0;
+      const unitCount = parseInt(stockUnits[itemId]) || 0;
+      const product = stockItems.find(p => p.id === itemId);
+      const caseSize = product?.case_size || 24; // Default to 24 if not specified
+
+      const total = (caseCount * caseSize) + unitCount;
+      setStockCounts(prev => ({
+        ...prev,
+        [itemId]: total.toString()
+      }));
+    }
+  };
+
+  const handleUnitsChange = (itemId, units) => {
+    const numericValue = parseInt(units);
+    if (!isNaN(numericValue) || units === '') {
+      setStockUnits(prev => ({
+        ...prev,
+        [itemId]: units
+      }));
+
+      // Calculate total: cases * case_size + units
+      const caseCount = parseInt(stockCases[itemId]) || 0;
+      const unitCount = parseInt(units) || 0;
+      const product = stockItems.find(p => p.id === itemId);
+      const caseSize = product?.case_size || 24; // Default to 24 if not specified
+
+      const total = (caseCount * caseSize) + unitCount;
+      setStockCounts(prev => ({
+        ...prev,
+        [itemId]: total.toString()
+      }));
+    }
+  };
+
   const handleDecimalCount = (itemId, expectedCount, fraction) => {
     const value = (expectedCount * fraction).toFixed(2);
     setStockCounts(prev => ({
@@ -1815,14 +1861,40 @@ const StockTaking = () => {
                   </ProductDetails>
 
                   <CompactCountSection>
-                    <DecimalInput
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={stockCounts[item.id] || ''}
-                      onChange={(e) => handleCountChange(item.id, e.target.value)}
-                    />
-                    <UnitLabel>{item.unit}</UnitLabel>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <DecimalInput
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={stockCases[item.id] || ''}
+                          onChange={(e) => handleCasesChange(item.id, e.target.value)}
+                          style={{ width: '60px' }}
+                        />
+                        <UnitLabel>Cases</UnitLabel>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <DecimalInput
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={stockUnits[item.id] || ''}
+                          onChange={(e) => handleUnitsChange(item.id, e.target.value)}
+                          style={{ width: '60px' }}
+                        />
+                        <UnitLabel>Units</UnitLabel>
+                      </div>
+                      {stockCounts[item.id] && (
+                        <div style={{
+                          fontSize: '0.75rem',
+                          color: '#10B981',
+                          fontWeight: '600',
+                          textAlign: 'right'
+                        }}>
+                          Total: {stockCounts[item.id]}
+                        </div>
+                      )}
+                    </div>
                   </CompactCountSection>
                 </ProductCountGrid>
               </DraggableItem>
