@@ -419,10 +419,10 @@ app.get('/api/venues/:id/products', async (req, res) => {
     const { id } = req.params;
     const result = await pool.query(
       `SELECT p.*, va.name as area_name
-       FROM venue_item_list p
-       LEFT JOIN venue_areas va ON p.ven_location_area = va.id
+       FROM products p
+       LEFT JOIN venue_areas va ON p.area_id = va.id
        WHERE p.venue_id = $1
-       ORDER BY va.display_order, p.ven_category, p.ven_name`,
+       ORDER BY va.display_order, p.category, p.name`,
       [id]
     );
     res.json(result.rows);

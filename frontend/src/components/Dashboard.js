@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Button } from '../styles/components/Button';
 import { Container } from '../styles/GlobalStyles';
 import { apiService } from '../services/apiService';
+
 
 // Styled Components
 const DashboardContainer = styled(Container)`
@@ -246,7 +247,10 @@ const ErrorMessage = styled.div`
 
 const Dashboard = () => {
   const [venues, setVenues] = useState([]);
-  const [selectedVenue, setSelectedVenue] = useState('');
+  const [selectedVenue, setSelectedVenue] = useState(() => {
+    // Initialize from localStorage if available
+    return localStorage.getItem('selectedVenue') || '';
+  });
   const [sessions, setSessions] = useState([]);
   const [filteredSessions, setFilteredSessions] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -255,6 +259,13 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
 
   const navigate = useNavigate();
+
+  // Update localStorage whenever selectedVenue changes
+  useEffect(() => {
+    if (selectedVenue) {
+      localStorage.setItem('selectedVenue', selectedVenue);
+    }
+  }, [selectedVenue]);
 
   useEffect(() => {
     fetchVenues();
@@ -266,12 +277,19 @@ const Dashboard = () => {
     filterSessions();
   }, [sessions, activeFilter, selectedVenue]);
 
-  const fetchVenues = async () => {
+  const fetchVenues = useCallback(async () => {
     try {
+      const savedVenue = localStorage.getItem('selectedVenue');
       const response = await apiService.getVenues();
       if (response.success) {
         setVenues(response.data);
-        if (response.data.length > 0 && !selectedVenue) {
+
+        // Validate saved venue still exists, otherwise use first venue
+        if (savedVenue && response.data.some(v => v.id === savedVenue)) {
+          // Saved venue is valid, keep it selected
+          setSelectedVenue(savedVenue);
+        } else if (response.data.length > 0) {
+          // No saved venue or saved venue doesn't exist, use first venue
           setSelectedVenue(response.data[0].id);
         }
       } else {
@@ -281,7 +299,7 @@ const Dashboard = () => {
       console.error('Error fetching venues:', error);
       setError('Failed to load venues. Please refresh the page.');
     }
-  };
+  }, []);
 
   const fetchSessions = async () => {
     try {
