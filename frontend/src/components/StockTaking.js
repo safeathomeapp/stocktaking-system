@@ -1806,7 +1806,11 @@ const StockTaking = () => {
                   <ProductDetails>
                     <ProductName>{item.name}</ProductName>
                     <ProductInfo>
-                      {item.category} • {item.expectedCount} {item.unit}
+                      {[
+                        item.category,
+                        item.brand,
+                        item.size
+                      ].filter(Boolean).join(' • ')}
                     </ProductInfo>
                   </ProductDetails>
 
