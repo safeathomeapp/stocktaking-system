@@ -938,14 +938,30 @@ const StockTaking = () => {
 
       if (entriesResponse.success) {
         const counts = {};
+        const cases = {};
+        const units = {};
         // Fix: The API returns {entries: [...]} not a direct array
         const entries = entriesResponse.data.entries || [];
 
         entries.forEach(entry => {
-          counts[entry.product_id] = entry.quantity_units.toString();
+          const totalQuantity = parseFloat(entry.quantity_units) || 0;
+          counts[entry.product_id] = totalQuantity.toString();
+
+          // Split total back into cases and units
+          // Find the product to get case_size
+          const product = productsResponse.data.find(p => p.id === entry.product_id);
+          const caseSize = product?.case_size || 24;
+
+          const caseCount = Math.floor(totalQuantity / caseSize);
+          const unitCount = totalQuantity % caseSize;
+
+          cases[entry.product_id] = caseCount > 0 ? caseCount.toString() : '';
+          units[entry.product_id] = unitCount > 0 ? unitCount.toString() : '';
         });
 
         setStockCounts(counts);
+        setStockCases(cases);
+        setStockUnits(units);
       }
 
     } catch (error) {
