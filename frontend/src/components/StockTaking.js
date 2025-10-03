@@ -839,6 +839,7 @@ const StockTaking = () => {
   const [stockItems, setStockItems] = useState([]);
   const [stockCounts, setStockCounts] = useState({});
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
 
   // Session and venue data
   const [sessionData, setSessionData] = useState(null);
@@ -1356,6 +1357,7 @@ const StockTaking = () => {
 
   const handleSaveProgress = async () => {
     setSaving(true);
+    setSaveStatus('saving');
     setError(null);
 
     try {
@@ -1417,9 +1419,21 @@ const StockTaking = () => {
       }
 
       console.log('Stock progress saved successfully');
+      setSaveStatus('saved');
+
+      // Reset to idle after 2 seconds
+      setTimeout(() => {
+        setSaveStatus('idle');
+      }, 2000);
     } catch (error) {
       console.error('Error saving progress:', error);
       setError('Failed to save progress. Please try again.');
+      setSaveStatus('error');
+
+      // Reset to idle after 3 seconds on error
+      setTimeout(() => {
+        setSaveStatus('idle');
+      }, 3000);
     } finally {
       setSaving(false);
     }
@@ -1892,9 +1906,18 @@ const StockTaking = () => {
             onClick={handleSaveProgress}
             disabled={saving}
             size="sm"
-            style={{ flex: 1, maxWidth: '120px' }}
+            style={{
+              flex: 1,
+              maxWidth: '120px',
+              backgroundColor: saveStatus === 'saved' ? '#10B981' : saveStatus === 'error' ? '#EF4444' : undefined,
+              color: saveStatus === 'saved' || saveStatus === 'error' ? 'white' : undefined,
+              transition: 'all 0.3s ease'
+            }}
           >
-            {saving ? <LoadingSpinner /> : 'Save'}
+            {saveStatus === 'saving' ? <LoadingSpinner /> :
+             saveStatus === 'saved' ? '✓ Saved' :
+             saveStatus === 'error' ? '✕ Error' :
+             'Save'}
           </Button>
           <Button
             variant="primary"
