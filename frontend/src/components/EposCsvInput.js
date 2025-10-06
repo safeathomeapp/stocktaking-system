@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import { Button } from '../styles/components/Button';
 import { Container } from '../styles/GlobalStyles';
@@ -202,6 +202,27 @@ const Select = styled.select`
   }
 `;
 
+const Input = styled.input`
+  width: 100%;
+  padding: ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  font-size: 1rem;
+  color: ${props => props.theme.colors.text};
+  background: ${props => props.theme.colors.background};
+
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const DateRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: ${props => props.theme.spacing.md};
+`;
+
 const ColumnMappingGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -243,22 +264,34 @@ const StatLabel = styled.div`
 
 const EposCsvInput = () => {
   const navigate = useNavigate();
+  const { venueId } = useParams();
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [csvData, setCsvData] = useState([]);
   const [error, setError] = useState(null);
   const [venues, setVenues] = useState([]);
   const [selectedVenue, setSelectedVenue] = useState('');
+  const [venueName, setVenueName] = useState('');
   const [columnMapping, setColumnMapping] = useState({
-    item_code: 0,
-    item_description: 1,
-    quantity_sold: 2,
-    unit_price: 3,
-    total_value: 4
+    item_code: -1,  // -1 means N/A
+    item_description: 0,
+    quantity_sold: -1,
+    unit_price: -1,
+    total_value: -1
   });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(null);
+  const [periodStartDate, setPeriodStartDate] = useState('');
+  const [periodEndDate, setPeriodEndDate] = useState('');
   const fileInputRef = React.useRef(null);
+
+  // Initialize venue from route params or localStorage
+  useEffect(() => {
+    const initVenue = venueId || localStorage.getItem('selectedVenue');
+    if (initVenue) {
+      setSelectedVenue(initVenue);
+    }
+  }, [venueId]);
 
   // Fetch venues on mount
   useEffect(() => {
@@ -266,12 +299,20 @@ const EposCsvInput = () => {
       const result = await apiService.getVenues();
       if (result.success) {
         setVenues(result.data);
+
+        // Set venue name if venue is already selected
+        if (selectedVenue) {
+          const venue = result.data.find(v => v.id === selectedVenue);
+          if (venue) {
+            setVenueName(venue.name);
+          }
+        }
       } else {
         setError('Failed to load venues: ' + result.error);
       }
     };
     fetchVenues();
-  }, []);
+  }, [selectedVenue]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -353,14 +394,13 @@ const EposCsvInput = () => {
 
     try {
       // Parse CSV data based on column mapping
-      const headers = csvData[0];
       const records = csvData.slice(1).map(row => {
         const record = {
-          item_code: row[columnMapping.item_code] || '',
-          item_description: row[columnMapping.item_description] || '',
-          quantity_sold: parseFloat(row[columnMapping.quantity_sold]) || 0,
-          unit_price: parseFloat(row[columnMapping.unit_price]) || 0,
-          total_value: parseFloat(row[columnMapping.total_value]) || 0
+          item_code: columnMapping.item_code >= 0 ? (row[columnMapping.item_code] || '') : '',
+          item_description: columnMapping.item_description >= 0 ? (row[columnMapping.item_description] || '') : '',
+          quantity_sold: columnMapping.quantity_sold >= 0 ? (parseFloat(row[columnMapping.quantity_sold]) || 0) : 0,
+          unit_price: columnMapping.unit_price >= 0 ? (parseFloat(row[columnMapping.unit_price]) || 0) : 0,
+          total_value: columnMapping.total_value >= 0 ? (parseFloat(row[columnMapping.total_value]) || 0) : 0
         };
         return record;
       }).filter(record => record.item_description); // Filter out empty rows
@@ -369,6 +409,8 @@ const EposCsvInput = () => {
         epos_system_name: 'Generic CSV',
         original_filename: selectedFile.name,
         imported_by: 'User',
+        period_start_date: periodStartDate || null,
+        period_end_date: periodEndDate || null,
         records: records
       };
 
@@ -466,80 +508,120 @@ const EposCsvInput = () => {
           <ConfigSection>
             <SectionTitle>Import Configuration</SectionTitle>
 
+            {venueName && (
+              <FormGroup>
+                <Label>Venue</Label>
+                <div style={{ padding: '12px', background: '#F3F4F6', borderRadius: '8px', fontWeight: '600' }}>
+                  {venueName}
+                </div>
+              </FormGroup>
+            )}
+
+            {!selectedVenue && (
+              <FormGroup>
+                <Label>Select Venue *</Label>
+                <Select
+                  value={selectedVenue}
+                  onChange={(e) => setSelectedVenue(e.target.value)}
+                  required
+                >
+                  <option value="">-- Choose a venue --</option>
+                  {venues.map(venue => (
+                    <option key={venue.id} value={venue.id}>
+                      {venue.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormGroup>
+            )}
+
             <FormGroup>
-              <Label>Select Venue *</Label>
-              <Select
-                value={selectedVenue}
-                onChange={(e) => setSelectedVenue(e.target.value)}
-                required
-              >
-                <option value="">-- Choose a venue --</option>
-                {venues.map(venue => (
-                  <option key={venue.id} value={venue.id}>
-                    {venue.name}
-                  </option>
-                ))}
-              </Select>
+              <Label>Report Period (Optional)</Label>
+              <UploadHint style={{ marginBottom: '0.5rem' }}>
+                Specify the date range covered by this EPOS report
+              </UploadHint>
+              <DateRow>
+                <div>
+                  <Label>Start Date</Label>
+                  <Input
+                    type="date"
+                    value={periodStartDate}
+                    onChange={(e) => setPeriodStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>End Date</Label>
+                  <Input
+                    type="date"
+                    value={periodEndDate}
+                    onChange={(e) => setPeriodEndDate(e.target.value)}
+                  />
+                </div>
+              </DateRow>
             </FormGroup>
 
             <FormGroup>
               <Label>Column Mapping</Label>
               <UploadHint style={{ marginBottom: '1rem' }}>
-                Map your CSV columns to our fields. Column numbers start at 0.
+                Map your CSV columns to the fields below. Select "N/A" if a field is not available in your CSV.
               </UploadHint>
               <ColumnMappingGrid>
                 <div>
-                  <Label>Item Code (Column #)</Label>
+                  <Label>Item Code</Label>
                   <Select
                     value={columnMapping.item_code}
                     onChange={(e) => setColumnMapping({...columnMapping, item_code: parseInt(e.target.value)})}
                   >
+                    <option value={-1}>N/A</option>
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{idx}: {header}</option>
+                      <option key={idx} value={idx}>{header}</option>
                     ))}
                   </Select>
                 </div>
                 <div>
-                  <Label>Item Description (Column #) *</Label>
+                  <Label>Item Description *</Label>
                   <Select
                     value={columnMapping.item_description}
                     onChange={(e) => setColumnMapping({...columnMapping, item_description: parseInt(e.target.value)})}
                   >
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{idx}: {header}</option>
+                      <option key={idx} value={idx}>{header}</option>
                     ))}
                   </Select>
                 </div>
                 <div>
-                  <Label>Quantity Sold (Column #)</Label>
+                  <Label>Quantity Sold</Label>
                   <Select
                     value={columnMapping.quantity_sold}
                     onChange={(e) => setColumnMapping({...columnMapping, quantity_sold: parseInt(e.target.value)})}
                   >
+                    <option value={-1}>N/A</option>
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{idx}: {header}</option>
+                      <option key={idx} value={idx}>{header}</option>
                     ))}
                   </Select>
                 </div>
                 <div>
-                  <Label>Unit Price (Column #)</Label>
+                  <Label>Unit Price</Label>
                   <Select
                     value={columnMapping.unit_price}
                     onChange={(e) => setColumnMapping({...columnMapping, unit_price: parseInt(e.target.value)})}
                   >
+                    <option value={-1}>N/A</option>
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{idx}: {header}</option>
+                      <option key={idx} value={idx}>{header}</option>
                     ))}
                   </Select>
                 </div>
                 <div>
-                  <Label>Total Value (Column #)</Label>
+                  <Label>Total Value</Label>
                   <Select
                     value={columnMapping.total_value}
                     onChange={(e) => setColumnMapping({...columnMapping, total_value: parseInt(e.target.value)})}
                   >
+                    <option value={-1}>N/A</option>
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{idx}: {header}</option>
+                      <option key={idx} value={idx}>{header}</option>
                     ))}
                   </Select>
                 </div>

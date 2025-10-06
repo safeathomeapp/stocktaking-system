@@ -26,7 +26,7 @@ function App() {
             <Route path="/venue/new" element={<VenueManagement />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/invoice-input" element={<InvoiceInput />} />
-            <Route path="/epos-csv-input" element={<EposCsvInput />} />
+            <Route path="/epos-csv-input/:venueId?" element={<EposCsvInput />} />
             <Route path="/area-setup/:venueId" element={<AreaSetup />} />
           </Routes>
         </div>
