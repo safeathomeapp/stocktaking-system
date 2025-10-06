@@ -2008,10 +2008,322 @@ app.get('/api/user/summary', async (req, res) => {
   }
 });
 
+// ==================== SUPPLIER ITEM LIST ENDPOINTS ====================
+
+// Get all supplier items (with optional filtering)
+app.get('/api/supplier-items', async (req, res) => {
+  try {
+    const { supplier_id, master_product_id, active } = req.query;
+
+    let query = `
+      SELECT
+        sil.*,
+        s.sup_name as supplier_name,
+        mp.name as master_product_name,
+        mp.brand as master_product_brand,
+        mp.category as master_product_category
+      FROM supplier_item_list sil
+      LEFT JOIN suppliers s ON sil.supplier_id = s.sup_id
+      LEFT JOIN master_products mp ON sil.master_product_id = mp.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramCount = 1;
+
+    if (supplier_id) {
+      query += ` AND sil.supplier_id = $${paramCount}`;
+      params.push(supplier_id);
+      paramCount++;
+    }
+
+    if (master_product_id) {
+      query += ` AND sil.master_product_id = $${paramCount}`;
+      params.push(master_product_id);
+      paramCount++;
+    }
+
+    if (active !== undefined) {
+      query += ` AND sil.active = $${paramCount}`;
+      params.push(active === 'true');
+      paramCount++;
+    }
+
+    query += ` ORDER BY sil.supplier_name, sil.created_at DESC`;
+
+    const result = await pool.query(query, params);
+
+    res.json({
+      success: true,
+      data: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching supplier items:', error);
+    res.status(500).json({ error: 'Failed to fetch supplier items' });
+  }
+});
+
+// Get supplier item by ID
+app.get('/api/supplier-items/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      SELECT
+        sil.*,
+        s.sup_name as supplier_name,
+        mp.name as master_product_name,
+        mp.brand as master_product_brand,
+        mp.category as master_product_category,
+        mp.case_size as master_case_size
+      FROM supplier_item_list sil
+      LEFT JOIN suppliers s ON sil.supplier_id = s.sup_id
+      LEFT JOIN master_products mp ON sil.master_product_id = mp.id
+      WHERE sil.id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Supplier item not found' });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error fetching supplier item:', error);
+    res.status(500).json({ error: 'Failed to fetch supplier item' });
+  }
+});
+
+// Create new supplier item
+app.post('/api/supplier-items', async (req, res) => {
+  try {
+    const {
+      supplier_id,
+      master_product_id,
+      supplier_sku,
+      supplier_name,
+      supplier_description,
+      supplier_brand,
+      supplier_category,
+      supplier_size,
+      supplier_barcode,
+      unit_cost,
+      case_cost,
+      pack_size,
+      case_size,
+      minimum_order,
+      auto_matched,
+      verified,
+      confidence_score,
+      created_by
+    } = req.body;
+
+    // Validate required fields
+    if (!supplier_id || !supplier_sku || !supplier_name) {
+      return res.status(400).json({
+        error: 'Missing required fields: supplier_id, supplier_sku, supplier_name'
+      });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO supplier_item_list (
+        supplier_id, master_product_id, supplier_sku, supplier_name,
+        supplier_description, supplier_brand, supplier_category, supplier_size,
+        supplier_barcode, unit_cost, case_cost, pack_size, case_size,
+        minimum_order, auto_matched, verified, confidence_score, created_by
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+      )
+      RETURNING *
+    `, [
+      supplier_id, master_product_id, supplier_sku, supplier_name,
+      supplier_description, supplier_brand, supplier_category, supplier_size,
+      supplier_barcode, unit_cost, case_cost, pack_size || 1, case_size,
+      minimum_order || 1, auto_matched || false, verified || false,
+      confidence_score || 0, created_by
+    ]);
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Supplier item created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating supplier item:', error);
+    if (error.code === '23505') { // Unique constraint violation
+      res.status(400).json({ error: 'Supplier SKU already exists for this supplier' });
+    } else {
+      res.status(500).json({ error: 'Failed to create supplier item' });
+    }
+  }
+});
+
+// Update supplier item
+app.put('/api/supplier-items/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Build dynamic update query
+    const updateFields = [];
+    const values = [];
+    let paramCount = 1;
+
+    const allowedFields = [
+      'master_product_id', 'supplier_sku', 'supplier_name', 'supplier_description',
+      'supplier_brand', 'supplier_category', 'supplier_size', 'supplier_barcode',
+      'unit_cost', 'case_cost', 'pack_size', 'case_size', 'minimum_order',
+      'auto_matched', 'verified', 'confidence_score', 'match_notes',
+      'last_cost_update', 'last_ordered', 'order_frequency_days', 'active'
+    ];
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedFields.includes(key)) {
+        updateFields.push(`${key} = $${paramCount}`);
+        values.push(value);
+        paramCount++;
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    values.push(id); // Add id as last parameter
+
+    const result = await pool.query(`
+      UPDATE supplier_item_list
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramCount}
+      RETURNING *
+    `, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Supplier item not found' });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Supplier item updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating supplier item:', error);
+    res.status(500).json({ error: 'Failed to update supplier item' });
+  }
+});
+
+// Delete supplier item
+app.delete('/api/supplier-items/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      DELETE FROM supplier_item_list
+      WHERE id = $1
+      RETURNING *
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Supplier item not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Supplier item deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting supplier item:', error);
+    res.status(500).json({ error: 'Failed to delete supplier item' });
+  }
+});
+
+// Search supplier items by name or SKU
+app.get('/api/supplier-items/search/:query', async (req, res) => {
+  try {
+    const { query } = req.params;
+    const { supplier_id } = req.query;
+
+    let sqlQuery = `
+      SELECT
+        sil.*,
+        s.sup_name as supplier_name,
+        mp.name as master_product_name
+      FROM supplier_item_list sil
+      LEFT JOIN suppliers s ON sil.supplier_id = s.sup_id
+      LEFT JOIN master_products mp ON sil.master_product_id = mp.id
+      WHERE sil.active = true
+        AND (
+          sil.supplier_name ILIKE $1
+          OR sil.supplier_sku ILIKE $1
+          OR sil.supplier_barcode ILIKE $1
+        )
+    `;
+    const params = [`%${query}%`];
+
+    if (supplier_id) {
+      sqlQuery += ` AND sil.supplier_id = $2`;
+      params.push(supplier_id);
+    }
+
+    sqlQuery += ` ORDER BY sil.supplier_name LIMIT 50`;
+
+    const result = await pool.query(sqlQuery, params);
+
+    res.json({
+      success: true,
+      data: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error searching supplier items:', error);
+    res.status(500).json({ error: 'Failed to search supplier items' });
+  }
+});
+
+// Link supplier item to master product
+app.post('/api/supplier-items/:id/link-master', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { master_product_id, verified, confidence_score } = req.body;
+
+    if (!master_product_id) {
+      return res.status(400).json({ error: 'master_product_id is required' });
+    }
+
+    const result = await pool.query(`
+      UPDATE supplier_item_list
+      SET
+        master_product_id = $1,
+        verified = $2,
+        confidence_score = $3,
+        auto_matched = false
+      WHERE id = $4
+      RETURNING *
+    `, [master_product_id, verified || false, confidence_score || 100, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Supplier item not found' });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: 'Supplier item linked to master product successfully'
+    });
+  } catch (error) {
+    console.error('Error linking supplier item:', error);
+    res.status(500).json({ error: 'Failed to link supplier item' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Voice Recognition API ready at /api/master-products/search`);
   console.log(`User Profile API ready at /api/user/profile`);
+  console.log(`Supplier Item List API ready at /api/supplier-items`);
 });
 
 // Force redeploy $(date)// Force redeploy Fri Sep 26 00:02:49 GMTST 2025

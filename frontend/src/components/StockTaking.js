@@ -645,15 +645,27 @@ const CompactCountSection = styled.div`
 `;
 
 const DecimalInput = styled.input`
-  width: 80px;
+  width: 100px;
   padding: ${props => props.theme.spacing.md};
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: 6px;
   background: ${props => props.theme.colors.surface};
   color: ${props => props.theme.colors.text};
-  font-size: 1rem;
+  font-size: 1.25rem;
   text-align: center;
-  height: 48px;
+  height: 56px;
+
+  /* Remove up/down arrows */
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Firefox */
+  &[type=number] {
+    -moz-appearance: textfield;
+  }
 
   &:focus {
     border-color: ${props => props.theme.colors.primary};
@@ -910,6 +922,9 @@ const StockTaking = () => {
       if (!sessionResponse.success) throw new Error('Failed to load session');
       setSessionData(sessionResponse.data);
 
+      // Declare productsResponse outside the conditional block so it's accessible later
+      let productsResponse = null;
+
       // Get venue details
       if (sessionResponse.data.venue_id) {
         const venueResponse = await apiService.getVenues();
@@ -919,7 +934,7 @@ const StockTaking = () => {
         }
 
         // Get venue products
-        const productsResponse = await apiService.getVenueProducts(sessionResponse.data.venue_id);
+        productsResponse = await apiService.getVenueProducts(sessionResponse.data.venue_id);
 
         // Get venue areas
         const areasResponse = await apiService.getVenueAreas(sessionResponse.data.venue_id);
@@ -949,7 +964,7 @@ const StockTaking = () => {
 
           // Split total back into cases and units
           // Find the product to get case_size
-          const product = productsResponse.data.find(p => p.id === entry.product_id);
+          const product = productsResponse?.data?.find(p => p.id === entry.product_id);
           const caseSize = product?.case_size || 24;
 
           const caseCount = Math.floor(totalQuantity / caseSize);
@@ -1388,24 +1403,48 @@ const StockTaking = () => {
   };
 
   const handleUnitsChange = (itemId, units) => {
-    const numericValue = parseInt(units);
+    // Allow floats with up to 2 decimal places
+    const numericValue = parseFloat(units);
     if (!isNaN(numericValue) || units === '') {
-      setStockUnits(prev => ({
-        ...prev,
-        [itemId]: units
-      }));
+      // Validate decimal places (max 2)
+      const parts = units.split('.');
+      if (parts.length > 1 && parts[1].length > 2) {
+        // Round to 2 decimal places
+        const rounded = parseFloat(units).toFixed(2);
+        setStockUnits(prev => ({
+          ...prev,
+          [itemId]: rounded
+        }));
 
-      // Calculate total: cases * case_size + units
-      const caseCount = parseInt(stockCases[itemId]) || 0;
-      const unitCount = parseInt(units) || 0;
-      const product = stockItems.find(p => p.id === itemId);
-      const caseSize = product?.case_size || 24; // Default to 24 if not specified
+        // Calculate total with rounded value
+        const caseCount = parseInt(stockCases[itemId]) || 0;
+        const unitCount = parseFloat(rounded) || 0;
+        const product = stockItems.find(p => p.id === itemId);
+        const caseSize = product?.case_size || 24;
+        const total = (caseCount * caseSize) + unitCount;
 
-      const total = (caseCount * caseSize) + unitCount;
-      setStockCounts(prev => ({
-        ...prev,
-        [itemId]: total.toString()
-      }));
+        setStockCounts(prev => ({
+          ...prev,
+          [itemId]: total.toFixed(2)
+        }));
+      } else {
+        setStockUnits(prev => ({
+          ...prev,
+          [itemId]: units
+        }));
+
+        // Calculate total: cases * case_size + units
+        const caseCount = parseInt(stockCases[itemId]) || 0;
+        const unitCount = parseFloat(units) || 0;
+        const product = stockItems.find(p => p.id === itemId);
+        const caseSize = product?.case_size || 24; // Default to 24 if not specified
+
+        const total = (caseCount * caseSize) + unitCount;
+        setStockCounts(prev => ({
+          ...prev,
+          [itemId]: total.toFixed(2)
+        }));
+      }
     }
   };
 
@@ -1885,7 +1924,6 @@ const StockTaking = () => {
                           placeholder="0"
                           value={stockCases[item.id] || ''}
                           onChange={(e) => handleCasesChange(item.id, e.target.value)}
-                          style={{ width: '60px' }}
                         />
                         <UnitLabel>Cases</UnitLabel>
                       </div>
@@ -1893,10 +1931,10 @@ const StockTaking = () => {
                         <DecimalInput
                           type="number"
                           min="0"
+                          step="0.01"
                           placeholder="0"
                           value={stockUnits[item.id] || ''}
                           onChange={(e) => handleUnitsChange(item.id, e.target.value)}
-                          style={{ width: '60px' }}
                         />
                         <UnitLabel>Units</UnitLabel>
                       </div>
