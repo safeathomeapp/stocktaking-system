@@ -1653,10 +1653,12 @@ const StockTaking = () => {
     }
   };
 
-  const filteredItems = stockItems.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItems = stockItems.filter(item => {
+    const productName = item.venue_name || item.name || '';
+    const productCategory = item.category || '';
+    return productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           productCategory.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const currentAreaItems = getCurrentAreaItems();
   const completedItems = Object.keys(stockCounts).length;
@@ -1905,7 +1907,7 @@ const StockTaking = () => {
 
                 <ProductCountGrid>
                   <ProductDetails>
-                    <ProductName>{item.name}</ProductName>
+                    <ProductName>{item.venue_name || item.name}</ProductName>
                     <ProductInfo>
                       {[
                         item.category,
