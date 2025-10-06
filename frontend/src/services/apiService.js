@@ -485,6 +485,37 @@ export const apiService = {
     }
   },
 
+  // CSV Preferences
+  getVenueCsvPreferences: async (venueId) => {
+    try {
+      const response = await api.get(`/api/venues/${venueId}/csv-preferences`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get CSV preferences error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  saveVenueCsvPreferences: async (venueId, preferences) => {
+    try {
+      const response = await api.put(`/api/venues/${venueId}/csv-preferences`, preferences);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Save CSV preferences error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getVenueLastSessionDate: async (venueId) => {
+    try {
+      const response = await api.get(`/api/venues/${venueId}/last-session-date`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get last session date error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
 };
 
 export default apiService;

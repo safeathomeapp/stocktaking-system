@@ -2330,7 +2330,19 @@ app.post('/api/epos-imports', async (req, res) => {
           matchConfidence = 100;
           matchedCount++;
         } else {
-          unmatchedCount++;
+          // No match found - automatically create a new venue_product
+          const newProduct = await client.query(
+            `INSERT INTO venue_products (venue_id, name)
+             VALUES ($1, $2)
+             RETURNING id, master_product_id`,
+            [venue_id, item_description.trim()]
+          );
+
+          venueProductId = newProduct.rows[0].id;
+          masterProductId = newProduct.rows[0].master_product_id; // Will be null initially
+          matchStatus = 'exact'; // It's exact because we created it from EPOS name
+          matchConfidence = 100;
+          matchedCount++;
         }
       } else {
         unmatchedCount++;
@@ -2518,6 +2530,126 @@ app.put('/api/epos-records/:id/match', async (req, res) => {
   } catch (error) {
     console.error('Error matching EPOS record:', error);
     res.status(500).json({ error: 'Failed to match product' });
+  }
+});
+
+// ============================================================================
+// VENUE CSV PREFERENCES
+// ============================================================================
+
+// Get CSV preferences for a venue
+app.get('/api/venues/:venueId/csv-preferences', async (req, res) => {
+  try {
+    const { venueId } = req.params;
+
+    const result = await pool.query(
+      `SELECT * FROM venue_csv_preferences WHERE venue_id = $1`,
+      [venueId]
+    );
+
+    if (result.rows.length === 0) {
+      // Return default preferences if none exist
+      return res.json({
+        success: true,
+        preferences: {
+          item_code_column: -1,
+          item_description_column: 0,
+          quantity_sold_column: -1,
+          unit_price_column: -1,
+          total_value_column: -1
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      preferences: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error fetching CSV preferences:', error);
+    res.status(500).json({ error: 'Failed to fetch CSV preferences' });
+  }
+});
+
+// Save CSV preferences for a venue
+app.put('/api/venues/:venueId/csv-preferences', async (req, res) => {
+  try {
+    const { venueId } = req.params;
+    const {
+      item_code_column,
+      item_description_column,
+      quantity_sold_column,
+      unit_price_column,
+      total_value_column
+    } = req.body;
+
+    // Upsert preferences
+    const result = await pool.query(
+      `INSERT INTO venue_csv_preferences (
+        venue_id,
+        item_code_column,
+        item_description_column,
+        quantity_sold_column,
+        unit_price_column,
+        total_value_column,
+        updated_by,
+        last_updated
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      ON CONFLICT (venue_id)
+      DO UPDATE SET
+        item_code_column = $2,
+        item_description_column = $3,
+        quantity_sold_column = $4,
+        unit_price_column = $5,
+        total_value_column = $6,
+        updated_by = $7,
+        last_updated = CURRENT_TIMESTAMP
+      RETURNING *`,
+      [
+        venueId,
+        item_code_column,
+        item_description_column,
+        quantity_sold_column,
+        unit_price_column,
+        total_value_column,
+        'user'
+      ]
+    );
+
+    res.json({
+      success: true,
+      message: 'CSV preferences saved',
+      preferences: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error saving CSV preferences:', error);
+    res.status(500).json({ error: 'Failed to save CSV preferences' });
+  }
+});
+
+// Get last session date for a venue (to pre-fill date inputs)
+app.get('/api/venues/:venueId/last-session-date', async (req, res) => {
+  try {
+    const { venueId } = req.params;
+
+    const result = await pool.query(
+      `SELECT completed_at FROM sessions
+       WHERE venue_id = $1 AND status = 'completed'
+       ORDER BY completed_at DESC
+       LIMIT 1`,
+      [venueId]
+    );
+
+    res.json({
+      success: true,
+      lastSessionDate: result.rows[0]?.completed_at || null
+    });
+
+  } catch (error) {
+    console.error('Error fetching last session date:', error);
+    res.status(500).json({ error: 'Failed to fetch last session date' });
   }
 });
 

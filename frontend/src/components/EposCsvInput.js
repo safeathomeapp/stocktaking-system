@@ -314,6 +314,43 @@ const EposCsvInput = () => {
     fetchVenues();
   }, [selectedVenue]);
 
+  // Load CSV preferences and last session date when venue is selected
+  useEffect(() => {
+    const loadVenueData = async () => {
+      if (!selectedVenue) return;
+
+      try {
+        // Load CSV preferences
+        const prefsResult = await apiService.getVenueCsvPreferences(selectedVenue);
+        if (prefsResult.success && prefsResult.data.preferences) {
+          const prefs = prefsResult.data.preferences;
+          setColumnMapping({
+            item_code: prefs.item_code_column ?? -1,
+            item_description: prefs.item_description_column ?? 0,
+            quantity_sold: prefs.quantity_sold_column ?? -1,
+            unit_price: prefs.unit_price_column ?? -1,
+            total_value: prefs.total_value_column ?? -1
+          });
+        }
+
+        // Load last session date to pre-fill date inputs
+        const dateResult = await apiService.getVenueLastSessionDate(selectedVenue);
+        if (dateResult.success && dateResult.data.lastSessionDate) {
+          const lastDate = new Date(dateResult.data.lastSessionDate);
+          setPeriodStartDate(lastDate.toISOString().split('T')[0]);
+
+          // Set end date to today
+          const today = new Date();
+          setPeriodEndDate(today.toISOString().split('T')[0]);
+        }
+      } catch (err) {
+        console.error('Error loading venue data:', err);
+      }
+    };
+
+    loadVenueData();
+  }, [selectedVenue]);
+
   const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -451,6 +488,15 @@ const EposCsvInput = () => {
       const result = await apiService.importEposData(selectedVenue, importData);
 
       if (result.success) {
+        // Save CSV preferences for next time
+        await apiService.saveVenueCsvPreferences(selectedVenue, {
+          item_code_column: columnMapping.item_code,
+          item_description_column: columnMapping.item_description,
+          quantity_sold_column: columnMapping.quantity_sold,
+          unit_price_column: columnMapping.unit_price,
+          total_value_column: columnMapping.total_value
+        });
+
         setUploadSuccess({
           total: result.data.import.total_records,
           matched: result.data.import.matched_records,
