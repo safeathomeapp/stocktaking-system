@@ -169,15 +169,11 @@ unit_type          varchar(50)
 barcode            varchar(100)
 area_id            integer       REFERENCES venue_areas(id)
 expected_count     integer       DEFAULT 0
-local_name         varchar(255)
-supplier           varchar(100)
-cost_price         numeric
-selling_price      numeric
-local_notes        text
-auto_matched       boolean       DEFAULT false
 created_at         timestamp     DEFAULT CURRENT_TIMESTAMP
 updated_at         timestamp     DEFAULT CURRENT_TIMESTAMP
 ```
+
+**Note**: Pricing and supplier data moved to `supplier_item_list` table.
 
 #### STOCK_SESSIONS
 ```sql
@@ -276,6 +272,40 @@ sup_created_at        timestamp     DEFAULT CURRENT_TIMESTAMP
 sup_updated_at        timestamp     DEFAULT CURRENT_TIMESTAMP
 ```
 
+#### SUPPLIER_ITEM_LIST
+Maps supplier-specific product names and SKUs to master products for invoice OCR matching.
+
+```sql
+id                     serial         PRIMARY KEY
+supplier_id            uuid          NOT NULL REFERENCES suppliers(sup_id)
+master_product_id      uuid          REFERENCES master_products(id)
+supplier_sku           varchar(100)  NOT NULL
+supplier_name          varchar(255)  NOT NULL
+supplier_description   text
+supplier_brand         varchar(100)
+supplier_category      varchar(100)
+supplier_size          varchar(50)
+supplier_barcode       varchar(100)
+unit_cost              numeric(10,2)
+case_cost              numeric(10,2)
+pack_size              integer       DEFAULT 1
+case_size              integer
+minimum_order          integer       DEFAULT 1
+auto_matched           boolean       DEFAULT false
+verified               boolean       DEFAULT false
+confidence_score       numeric(5,2)  DEFAULT 0
+match_notes            text
+last_cost_update       timestamp
+last_ordered           timestamp
+order_frequency_days   integer
+active                 boolean       DEFAULT true
+created_at             timestamp     DEFAULT CURRENT_TIMESTAMP
+updated_at             timestamp     DEFAULT CURRENT_TIMESTAMP
+created_by             varchar(100)
+
+CONSTRAINT unique_supplier_sku UNIQUE(supplier_id, supplier_sku)
+```
+
 #### USER_PROFILES
 ```sql
 id                  uuid           PRIMARY KEY
@@ -350,7 +380,6 @@ venues (1) --> (many) venue_areas
 venues (1) --> (many) products
 venues (1) --> (many) stock_sessions
 
-venue_areas (1) --> (many) products
 venue_areas (1) --> (many) stock_entries
 
 stock_sessions (1) --> (many) stock_entries
@@ -358,6 +387,9 @@ stock_sessions (1) --> (many) stock_entries
 products (1) --> (many) stock_entries
 master_products (1) --> (many) products
 master_products (1) --> (many) product_aliases
+master_products (1) --> (many) supplier_item_list
+
+suppliers (1) --> (many) supplier_item_list
 ```
 
 ### Key Constraints
