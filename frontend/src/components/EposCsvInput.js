@@ -362,7 +362,41 @@ const EposCsvInput = () => {
         // Filter out empty rows
         const filteredRows = rows.filter(row => row.some(cell => cell !== ''));
 
-        setCsvData(filteredRows);
+        if (filteredRows.length === 0) {
+          setError('CSV file is empty');
+          return;
+        }
+
+        // Identify empty columns (no header and no data in any row)
+        const headers = filteredRows[0];
+        const emptyColumns = [];
+
+        for (let colIdx = 0; colIdx < headers.length; colIdx++) {
+          const hasHeader = headers[colIdx] !== '';
+          const hasData = filteredRows.slice(1).some(row => row[colIdx] && row[colIdx] !== '');
+
+          if (!hasHeader && !hasData) {
+            emptyColumns.push(colIdx);
+          }
+        }
+
+        // Remove empty columns from all rows
+        const cleanedRows = filteredRows.map(row =>
+          row.filter((_, idx) => !emptyColumns.includes(idx))
+        );
+
+        setCsvData(cleanedRows);
+
+        // Reset column mapping to defaults with cleaned column count
+        if (cleanedRows[0] && cleanedRows[0].length > 0) {
+          setColumnMapping({
+            item_code: -1,
+            item_description: 0,
+            quantity_sold: -1,
+            unit_price: -1,
+            total_value: -1
+          });
+        }
       } catch (err) {
         setError('Error parsing CSV file: ' + err.message);
       }
@@ -574,7 +608,7 @@ const EposCsvInput = () => {
                   >
                     <option value={-1}>N/A</option>
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{header}</option>
+                      <option key={idx} value={idx}>{header || `Column ${idx + 1}`}</option>
                     ))}
                   </Select>
                 </div>
@@ -585,7 +619,7 @@ const EposCsvInput = () => {
                     onChange={(e) => setColumnMapping({...columnMapping, item_description: parseInt(e.target.value)})}
                   >
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{header}</option>
+                      <option key={idx} value={idx}>{header || `Column ${idx + 1}`}</option>
                     ))}
                   </Select>
                 </div>
@@ -597,7 +631,7 @@ const EposCsvInput = () => {
                   >
                     <option value={-1}>N/A</option>
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{header}</option>
+                      <option key={idx} value={idx}>{header || `Column ${idx + 1}`}</option>
                     ))}
                   </Select>
                 </div>
@@ -609,7 +643,7 @@ const EposCsvInput = () => {
                   >
                     <option value={-1}>N/A</option>
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{header}</option>
+                      <option key={idx} value={idx}>{header || `Column ${idx + 1}`}</option>
                     ))}
                   </Select>
                 </div>
@@ -621,7 +655,7 @@ const EposCsvInput = () => {
                   >
                     <option value={-1}>N/A</option>
                     {csvData[0]?.map((header, idx) => (
-                      <option key={idx} value={idx}>{header}</option>
+                      <option key={idx} value={idx}>{header || `Column ${idx + 1}`}</option>
                     ))}
                   </Select>
                 </div>
