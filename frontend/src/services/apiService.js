@@ -435,6 +435,56 @@ export const apiService = {
     }
   },
 
-}; 
+  // EPOS Sales Imports
+  importEposData: async (venueId, eposData) => {
+    try {
+      const response = await api.post('/api/epos-imports', {
+        venue_id: venueId,
+        ...eposData
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Import EPOS data error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getEposImports: async (venueId) => {
+    try {
+      const response = await api.get(`/api/epos-imports?venue_id=${venueId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get EPOS imports error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getEposImportRecords: async (importId, matchStatus = null) => {
+    try {
+      const url = matchStatus
+        ? `/api/epos-imports/${importId}/records?match_status=${matchStatus}`
+        : `/api/epos-imports/${importId}/records`;
+      const response = await api.get(url);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get EPOS import records error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  matchEposRecord: async (recordId, venueProductId, matchedBy) => {
+    try {
+      const response = await api.put(`/api/epos-records/${recordId}/match`, {
+        venue_product_id: venueProductId,
+        matched_by: matchedBy
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Match EPOS record error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+};
 
 export default apiService;

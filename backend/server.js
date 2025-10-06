@@ -2242,11 +2242,291 @@ app.post('/api/supplier-items/:id/link-master', async (req, res) => {
   }
 });
 
+// ===== EPOS SALES IMPORT ENDPOINTS =====
+
+// Upload EPOS CSV data
+app.post('/api/epos-imports', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const {
+      venue_id,
+      epos_system_name,
+      original_filename,
+      period_start_date,
+      period_end_date,
+      imported_by,
+      import_notes,
+      records // Array of sales records from CSV
+    } = req.body;
+
+    // Validation
+    if (!venue_id || !records || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({
+        error: 'venue_id and records array are required'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Create import record
+    const importResult = await client.query(
+      `INSERT INTO epos_imports (
+        venue_id, epos_system_name, original_filename,
+        period_start_date, period_end_date, imported_by, import_notes,
+        total_records
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *`,
+      [
+        venue_id,
+        epos_system_name || 'Unknown',
+        original_filename || 'upload.csv',
+        period_start_date || null,
+        period_end_date || null,
+        imported_by || 'user',
+        import_notes || null,
+        records.length
+      ]
+    );
+
+    const importId = importResult.rows[0].id;
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+    let totalSalesValue = 0;
+
+    // Insert each sales record and attempt to match products
+    for (const record of records) {
+      const {
+        item_code,
+        item_description,
+        category,
+        quantity_sold,
+        unit_price,
+        total_value,
+        epos_data // Any extra fields as JSON
+      } = record;
+
+      // Attempt to match to venue product by name
+      let venueProductId = null;
+      let masterProductId = null;
+      let matchStatus = 'unmatched';
+      let matchConfidence = null;
+
+      if (item_description) {
+        // Try exact match first
+        const exactMatch = await client.query(
+          `SELECT vp.id, vp.master_product_id
+           FROM venue_products vp
+           WHERE vp.venue_id = $1
+           AND LOWER(vp.name) = LOWER($2)
+           LIMIT 1`,
+          [venue_id, item_description.trim()]
+        );
+
+        if (exactMatch.rows.length > 0) {
+          venueProductId = exactMatch.rows[0].id;
+          masterProductId = exactMatch.rows[0].master_product_id;
+          matchStatus = 'exact';
+          matchConfidence = 100;
+          matchedCount++;
+        } else {
+          unmatchedCount++;
+        }
+      } else {
+        unmatchedCount++;
+      }
+
+      // Insert sales record
+      await client.query(
+        `INSERT INTO epos_sales_records (
+          import_id, venue_id, item_code, item_description, category,
+          quantity_sold, unit_price, total_value, epos_data,
+          venue_product_id, master_product_id, match_status, match_confidence,
+          matched_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        [
+          importId,
+          venue_id,
+          item_code || null,
+          item_description || null,
+          category || null,
+          quantity_sold || 0,
+          unit_price || 0,
+          total_value || 0,
+          epos_data ? JSON.stringify(epos_data) : null,
+          venueProductId,
+          masterProductId,
+          matchStatus,
+          matchConfidence,
+          matchStatus !== 'unmatched' ? new Date() : null
+        ]
+      );
+
+      totalSalesValue += parseFloat(total_value || 0);
+    }
+
+    // Update import summary statistics
+    await client.query(
+      `UPDATE epos_imports
+       SET matched_records = $1,
+           unmatched_records = $2,
+           total_sales_value = $3,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [matchedCount, unmatchedCount, totalSalesValue, importId]
+    );
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      success: true,
+      message: 'EPOS data imported successfully',
+      import: {
+        id: importId,
+        total_records: records.length,
+        matched_records: matchedCount,
+        unmatched_records: unmatchedCount,
+        total_sales_value: totalSalesValue,
+        match_rate: ((matchedCount / records.length) * 100).toFixed(1) + '%'
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error importing EPOS data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to import EPOS data',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Get all EPOS imports for a venue
+app.get('/api/epos-imports', async (req, res) => {
+  try {
+    const { venue_id } = req.query;
+
+    if (!venue_id) {
+      return res.status(400).json({ error: 'venue_id is required' });
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM epos_imports
+       WHERE venue_id = $1
+       ORDER BY import_date DESC`,
+      [venue_id]
+    );
+
+    res.json({
+      success: true,
+      imports: result.rows
+    });
+
+  } catch (error) {
+    console.error('Error fetching EPOS imports:', error);
+    res.status(500).json({ error: 'Failed to fetch EPOS imports' });
+  }
+});
+
+// Get sales records for a specific import
+app.get('/api/epos-imports/:id/records', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { match_status } = req.query; // Filter by match_status if provided
+
+    let query = `
+      SELECT
+        esr.*,
+        vp.name as venue_product_name,
+        mp.brand,
+        mp.size,
+        mp.category as master_category
+      FROM epos_sales_records esr
+      LEFT JOIN venue_products vp ON esr.venue_product_id = vp.id
+      LEFT JOIN master_products mp ON esr.master_product_id = mp.id
+      WHERE esr.import_id = $1
+    `;
+
+    const params = [id];
+
+    if (match_status) {
+      query += ` AND esr.match_status = $2`;
+      params.push(match_status);
+    }
+
+    query += ` ORDER BY esr.item_description`;
+
+    const result = await pool.query(query, params);
+
+    res.json({
+      success: true,
+      records: result.rows
+    });
+
+  } catch (error) {
+    console.error('Error fetching EPOS sales records:', error);
+    res.status(500).json({ error: 'Failed to fetch sales records' });
+  }
+});
+
+// Manually match an EPOS record to a product
+app.put('/api/epos-records/:id/match', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { venue_product_id, matched_by } = req.body;
+
+    if (!venue_product_id) {
+      return res.status(400).json({ error: 'venue_product_id is required' });
+    }
+
+    // Get master_product_id from venue_product
+    const productResult = await pool.query(
+      'SELECT master_product_id FROM venue_products WHERE id = $1',
+      [venue_product_id]
+    );
+
+    if (productResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Venue product not found' });
+    }
+
+    const masterProductId = productResult.rows[0].master_product_id;
+
+    // Update the EPOS record
+    const result = await pool.query(
+      `UPDATE epos_sales_records
+       SET venue_product_id = $1,
+           master_product_id = $2,
+           match_status = 'manual',
+           match_confidence = 100,
+           matched_at = CURRENT_TIMESTAMP,
+           matched_by = $3,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4
+       RETURNING *`,
+      [venue_product_id, masterProductId, matched_by || 'user', id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Product matched successfully',
+      record: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error matching EPOS record:', error);
+    res.status(500).json({ error: 'Failed to match product' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Master Products API ready at /api/master-products`);
   console.log(`User Profile API ready at /api/user/profile`);
   console.log(`Supplier Item List API ready at /api/supplier-items`);
+  console.log(`EPOS Sales Import API ready at /api/epos-imports`);
 });
 
 // Force redeploy $(date)// Force redeploy Fri Sep 26 00:02:49 GMTST 2025
