@@ -294,7 +294,7 @@ class FuzzyMatchingService {
   }
 
   /**
-   * Search venue-specific aliases
+   * Search venue-specific product names
    */
   async aliasSearch(query, venueId) {
     if (!venueId) return [];
@@ -302,17 +302,17 @@ class FuzzyMatchingService {
     const sql = `
       SELECT
         mp.*,
-        pa.alias_name,
+        vp.name as alias_name,
         'alias' as match_type,
         90 as base_confidence
       FROM master_products mp
-      JOIN product_aliases pa ON mp.id = pa.master_product_id
-      WHERE pa.venue_id = $1
+      JOIN venue_products vp ON mp.id = vp.master_product_id
+      WHERE vp.venue_id = $1
         AND (
-          LOWER(pa.alias_name) = $2
-          OR pa.alias_name % $2
+          LOWER(vp.name) = $2
+          OR vp.name % $2
         )
-      ORDER BY pa.usage_frequency DESC, mp.usage_count DESC
+      ORDER BY mp.usage_count DESC
       LIMIT 10
     `;
 

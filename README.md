@@ -156,24 +156,20 @@ created_at     timestamp     DEFAULT CURRENT_TIMESTAMP
 updated_at     timestamp     DEFAULT CURRENT_TIMESTAMP
 ```
 
-#### PRODUCTS
+#### VENUE_PRODUCTS
 ```sql
 id                 uuid           PRIMARY KEY
 venue_id           uuid          NOT NULL REFERENCES venues(id)
 master_product_id  uuid          REFERENCES master_products(id)
 name               varchar(255)  NOT NULL
-category           varchar(100)
-brand              varchar(100)
-size               varchar(50)
-unit_type          varchar(50)
-barcode            varchar(100)
-area_id            integer       REFERENCES venue_areas(id)
-expected_count     integer       DEFAULT 0
 created_at         timestamp     DEFAULT CURRENT_TIMESTAMP
 updated_at         timestamp     DEFAULT CURRENT_TIMESTAMP
+
+UNIQUE(venue_id, master_product_id)
 ```
 
-**Note**: Pricing and supplier data moved to `supplier_item_list` table.
+**Purpose**: Stores venue-specific product names (e.g., what a venue calls a product in their EPOS system).
+All product specifications (brand, size, category, barcode) come from `master_products` via join.
 
 #### STOCK_SESSIONS
 ```sql
@@ -194,7 +190,7 @@ updated_at       timestamp     DEFAULT CURRENT_TIMESTAMP
 ```sql
 id              uuid           PRIMARY KEY
 session_id      uuid          NOT NULL REFERENCES stock_sessions(id)
-product_id      uuid          NOT NULL REFERENCES products(id)
+product_id      uuid          NOT NULL REFERENCES venue_products(id)
 venue_area_id   integer       REFERENCES venue_areas(id)
 quantity_units  decimal(10,2) DEFAULT 0.00 CHECK (quantity_units >= 0)
 created_at      timestamp     DEFAULT CURRENT_TIMESTAMP
@@ -242,17 +238,6 @@ updated_at             timestamp     DEFAULT CURRENT_TIMESTAMP
 created_by             varchar(100)
 ```
 
-#### PRODUCT_ALIASES
-```sql
-id                 integer        PRIMARY KEY AUTO_INCREMENT
-master_product_id  uuid          NOT NULL REFERENCES master_products(id)
-venue_id           uuid          REFERENCES venues(id)
-alias_name         varchar(255)  NOT NULL
-alias_type         varchar(50)
-usage_frequency    integer       DEFAULT 1
-created_at         timestamp     DEFAULT CURRENT_TIMESTAMP
-created_by         varchar(100)
-```
 
 #### SUPPLIERS
 ```sql
@@ -359,7 +344,7 @@ audio_quality             varchar(20)
 search_strategy           varchar(50)
 suggestions_returned      jsonb
 total_suggestions         integer       DEFAULT 0
-selected_product_id       uuid          REFERENCES products(id)
+selected_product_id       uuid          REFERENCES venue_products(id)
 selection_rank            integer
 user_selected             boolean       DEFAULT false
 manual_entry              boolean       DEFAULT false
@@ -377,16 +362,15 @@ created_at                timestamp     DEFAULT CURRENT_TIMESTAMP
 ### Table Relationships
 ```
 venues (1) --> (many) venue_areas
-venues (1) --> (many) products
+venues (1) --> (many) venue_products
 venues (1) --> (many) stock_sessions
 
 venue_areas (1) --> (many) stock_entries
 
 stock_sessions (1) --> (many) stock_entries
 
-products (1) --> (many) stock_entries
-master_products (1) --> (many) products
-master_products (1) --> (many) product_aliases
+venue_products (1) --> (many) stock_entries
+master_products (1) --> (many) venue_products
 master_products (1) --> (many) supplier_item_list
 
 suppliers (1) --> (many) supplier_item_list

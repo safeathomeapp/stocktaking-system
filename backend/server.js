@@ -418,11 +418,23 @@ app.get('/api/venues/:id/products', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT p.*, va.name as area_name
-       FROM products p
-       LEFT JOIN venue_areas va ON p.area_id = va.id
-       WHERE p.venue_id = $1
-       ORDER BY va.display_order, p.category, p.name`,
+      `SELECT
+         vp.id,
+         vp.venue_id,
+         vp.name as venue_name,
+         vp.master_product_id,
+         vp.created_at,
+         vp.updated_at,
+         mp.brand,
+         mp.size,
+         mp.unit_type,
+         mp.category,
+         mp.barcode,
+         mp.case_size
+       FROM venue_products vp
+       LEFT JOIN master_products mp ON vp.master_product_id = mp.id
+       WHERE vp.venue_id = $1
+       ORDER BY mp.category, vp.name`,
       [id]
     );
     res.json(result.rows);
@@ -435,7 +447,7 @@ app.get('/api/venues/:id/products', async (req, res) => {
 app.post('/api/venues/:id/products', async (req, res) => {
   try {
     const venueId = req.params.id;
-    const { name, category, unit, area_id, brand, size, barcode } = req.body;
+    const { name, master_product_id } = req.body;
 
     // Validate required fields
     if (!name) {
@@ -448,12 +460,12 @@ app.post('/api/venues/:id/products', async (req, res) => {
       return res.status(404).json({ error: 'Venue not found' });
     }
 
-    // Create the product
+    // Create the venue product
     const result = await pool.query(
-      `INSERT INTO products (venue_id, area_id, name, category, brand, size, unit_type, barcode, expected_count)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO venue_products (venue_id, name, master_product_id)
+       VALUES ($1, $2, $3)
        RETURNING *`,
-      [venueId, area_id || null, name, category || 'General', brand || null, size || null, unit || 'bottle', barcode || null, 0]
+      [venueId, name, master_product_id || null]
     );
 
     res.status(201).json({
@@ -1002,7 +1014,7 @@ app.post('/api/sessions/:id/entries', async (req, res) => {
 
     // Verify product exists and belongs to the same venue as the session
     const productCheck = await pool.query(
-      'SELECT id, name FROM products WHERE id = $1 AND venue_id = $2', 
+      'SELECT id, name FROM venue_products WHERE id = $1 AND venue_id = $2',
       [product_id, sessionCheck.rows[0].venue_id]
     );
     
@@ -1037,14 +1049,16 @@ app.post('/api/sessions/:id/entries', async (req, res) => {
     const entryWithProduct = await pool.query(
       `SELECT
          se.*,
-         p.name as product_name,
-         p.brand,
-         p.size,
-         p.category,
-         p.unit_type,
+         vp.name as product_name,
+         mp.brand,
+         mp.size,
+         mp.category,
+         mp.unit_type,
+         mp.case_size,
          va.name as venue_area_name
        FROM stock_entries se
-       JOIN products p ON se.product_id = p.id
+       JOIN venue_products vp ON se.product_id = vp.id
+       LEFT JOIN master_products mp ON vp.master_product_id = mp.id
        LEFT JOIN venue_areas va ON se.venue_area_id = va.id
        WHERE se.id = $1`,
       [result.rows[0].id]
@@ -1079,15 +1093,17 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
     let query = `
       SELECT
         se.*,
-        p.name as product_name,
-        p.brand,
-        p.size,
-        p.category,
-        p.unit_type,
-        p.barcode,
+        vp.name as product_name,
+        mp.brand,
+        mp.size,
+        mp.category,
+        mp.unit_type,
+        mp.barcode,
+        mp.case_size,
         va.name as venue_area_name
       FROM stock_entries se
-      JOIN products p ON se.product_id = p.id
+      JOIN venue_products vp ON se.product_id = vp.id
+      LEFT JOIN master_products mp ON vp.master_product_id = mp.id
       LEFT JOIN venue_areas va ON se.venue_area_id = va.id
       WHERE se.session_id = $1
     `;
@@ -1096,7 +1112,7 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
     let paramCount = 2;
 
     if (category) {
-      query += ` AND p.category = $${paramCount}`;
+      query += ` AND mp.category = $${paramCount}`;
       queryParams.push(category);
       paramCount++;
     }
@@ -1105,7 +1121,7 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
       query += ` AND se.quantity_units > 0`;
     }
 
-    query += ` ORDER BY p.category, p.name`;
+    query += ` ORDER BY mp.category, vp.name`;
 
     const result = await pool.query(query, queryParams);
 
@@ -1114,9 +1130,10 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
       `SELECT
          COUNT(*) as total_entries,
          COUNT(CASE WHEN quantity_units > 0 THEN 1 END) as completed_entries,
-         COUNT(DISTINCT p.category) as categories_covered
+         COUNT(DISTINCT mp.category) as categories_covered
        FROM stock_entries se
-       JOIN products p ON se.product_id = p.id
+       JOIN venue_products vp ON se.product_id = vp.id
+       LEFT JOIN master_products mp ON vp.master_product_id = mp.id
        WHERE se.session_id = $1`,
       [session_id]
     );
@@ -1205,15 +1222,17 @@ app.put('/api/entries/:id', async (req, res) => {
     const entryWithProduct = await pool.query(
       `SELECT
          se.*,
-         p.name as product_name,
-         p.brand,
-         p.size,
-         p.category,
-         p.unit_type,
-         p.barcode,
+         vp.name as product_name,
+         mp.brand,
+         mp.size,
+         mp.category,
+         mp.unit_type,
+         mp.barcode,
+         mp.case_size,
          va.name as venue_area_name
        FROM stock_entries se
-       JOIN products p ON se.product_id = p.id
+       JOIN venue_products vp ON se.product_id = vp.id
+       LEFT JOIN master_products mp ON vp.master_product_id = mp.id
        LEFT JOIN venue_areas va ON se.venue_area_id = va.id
        WHERE se.id = $1`,
       [id]
@@ -1246,11 +1265,11 @@ app.delete('/api/entries/:id', async (req, res) => {
 
     // Check if entry exists and session is in progress
     const entryCheck = await pool.query(
-      `SELECT se.id, se.session_id, ss.status, p.name as product_name
-       FROM stock_entries se 
-       JOIN stock_sessions ss ON se.session_id = ss.id 
-       JOIN products p ON se.product_id = p.id
-       WHERE se.id = $1`, 
+      `SELECT se.id, se.session_id, ss.status, vp.name as product_name
+       FROM stock_entries se
+       JOIN stock_sessions ss ON se.session_id = ss.id
+       JOIN venue_products vp ON se.product_id = vp.id
+       WHERE se.id = $1`,
       [id]
     );
 
@@ -1293,7 +1312,7 @@ app.get('/api/sessions/:id/progress', async (req, res) => {
 
     // Get detailed progress information
     const progressResult = await pool.query(
-      `SELECT 
+      `SELECT
          -- Total products available for this venue
          venue_products.total_products,
          -- Products with stock entries
@@ -1304,39 +1323,41 @@ app.get('/api/sessions/:id/progress', async (req, res) => {
          COALESCE(entries.categories_data, '[]'::json) as categories_breakdown
        FROM (
          -- Get total products for the venue
-         SELECT 
+         SELECT
            COUNT(*) as total_products
-         FROM products p
-         JOIN stock_sessions ss ON p.venue_id = ss.venue_id
+         FROM venue_products vp
+         JOIN stock_sessions ss ON vp.venue_id = ss.venue_id
          WHERE ss.id = $1
        ) venue_products
        LEFT JOIN (
          -- Get entry statistics
-         SELECT 
+         SELECT
            COUNT(DISTINCT se.product_id) as products_counted,
            COUNT(CASE WHEN se.quantity_units > 0 THEN 1 END) as products_completed,
            json_agg(
              json_build_object(
-               'category', p.category,
+               'category', mp.category,
                'total', category_stats.total,
                'counted', category_stats.counted,
                'completed', category_stats.completed
              )
            ) as categories_data
          FROM stock_entries se
-         JOIN products p ON se.product_id = p.id
+         JOIN venue_products vp ON se.product_id = vp.id
+         LEFT JOIN master_products mp ON vp.master_product_id = mp.id
          JOIN (
            -- Category-wise breakdown
-           SELECT 
-             p2.category,
+           SELECT
+             mp2.category,
              COUNT(*) as total,
              COUNT(se2.id) as counted,
              COUNT(CASE WHEN se2.quantity_units > 0 THEN 1 END) as completed
-           FROM products p2
-           JOIN stock_sessions ss2 ON p2.venue_id = ss2.venue_id AND ss2.id = $1
-           LEFT JOIN stock_entries se2 ON p2.id = se2.product_id AND se2.session_id = $1
-           GROUP BY p2.category
-         ) category_stats ON p.category = category_stats.category
+           FROM venue_products vp2
+           LEFT JOIN master_products mp2 ON vp2.master_product_id = mp2.id
+           JOIN stock_sessions ss2 ON vp2.venue_id = ss2.venue_id AND ss2.id = $1
+           LEFT JOIN stock_entries se2 ON vp2.id = se2.product_id AND se2.session_id = $1
+           GROUP BY mp2.category
+         ) category_stats ON mp.category = category_stats.category
          WHERE se.session_id = $1
        ) entries ON true`,
       [session_id]
@@ -1594,8 +1615,8 @@ app.post('/api/venues/:venueId/products/:productId/link-master', async (req, res
 
     // Update the venue product to link to master product
     const result = await pool.query(
-      `UPDATE products
-       SET master_product_id = $1, auto_matched = false
+      `UPDATE venue_products
+       SET master_product_id = $1
        WHERE id = $2 AND venue_id = $3
        RETURNING *`,
       [masterProductId, productId, venueId]
