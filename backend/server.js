@@ -1387,64 +1387,7 @@ app.get('/api/sessions/:id/progress', async (req, res) => {
 });
 
 
-// ===== VOICE RECOGNITION & MASTER PRODUCTS ENDPOINTS =====
-
-// Import voice recognition service when needed to prevent startup errors
-
-// Search master products with fuzzy matching
-app.post('/api/master-products/search', async (req, res) => {
-  try {
-    const { query, sessionId, venueId, maxResults, minConfidence } = req.body;
-
-    if (!query || query.trim() === '') {
-      return res.status(400).json({ error: 'Search query is required' });
-    }
-
-    const options = {
-      maxResults: maxResults || 20,
-      minConfidence: minConfidence || 40,
-      sessionId: sessionId || null,
-      venueId: venueId || null,
-      includeAliases: true
-    };
-
-    const fuzzyMatchingService = require('./services/fuzzyMatchingService');
-    const searchResults = await fuzzyMatchingService.searchMasterProducts(query.trim(), options);
-
-    res.json(searchResults);
-
-  } catch (error) {
-    console.error('Error searching master products:', error);
-    res.status(500).json({
-      error: 'Search service unavailable',
-      details: error.message
-    });
-  }
-});
-
-// Record product selection for learning
-app.post('/api/voice-recognition/select', async (req, res) => {
-  try {
-    const { productId, logId, selectionRank } = req.body;
-
-    if (!productId || !logId) {
-      return res.status(400).json({ error: 'Product ID and log ID are required' });
-    }
-
-    const fuzzyMatchingService = require('./services/fuzzyMatchingService');
-    await fuzzyMatchingService.recordProductSelection(
-      productId,
-      logId,
-      selectionRank || 1
-    );
-
-    res.json({ message: 'Selection recorded successfully' });
-
-  } catch (error) {
-    console.error('Error recording product selection:', error);
-    res.status(500).json({ error: 'Failed to record selection' });
-  }
-});
+// ===== MASTER PRODUCTS ENDPOINTS =====
 
 // Add new master product
 app.post('/api/master-products', async (req, res) => {
@@ -1456,33 +1399,43 @@ app.post('/api/master-products', async (req, res) => {
       subcategory,
       size,
       unit_type,
+      case_size,
       alcohol_percentage,
       barcode,
-      venue_id
+      ean_code,
+      upc_code,
+      sku
     } = req.body;
 
     if (!name || name.trim() === '') {
       return res.status(400).json({ error: 'Product name is required' });
     }
 
-    const productData = {
-      name: name.trim(),
-      brand: brand?.trim() || null,
-      category: category?.trim() || null,
-      subcategory: subcategory?.trim() || null,
-      size: size?.trim() || null,
-      unit_type: unit_type || 'other',
-      alcohol_percentage: alcohol_percentage || null,
-      barcode: barcode?.trim() || null,
-      venue_id: venue_id || null
-    };
-
-    const fuzzyMatchingService = require('./services/fuzzyMatchingService');
-    const newProduct = await fuzzyMatchingService.addMasterProduct(productData);
+    const result = await pool.query(
+      `INSERT INTO master_products (
+        name, brand, category, subcategory, size, unit_type,
+        case_size, alcohol_percentage, barcode, ean_code, upc_code, sku
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING *`,
+      [
+        name.trim(),
+        brand?.trim() || null,
+        category?.trim() || null,
+        subcategory?.trim() || null,
+        size?.trim() || null,
+        unit_type || 'other',
+        case_size || null,
+        alcohol_percentage || null,
+        barcode?.trim() || null,
+        ean_code?.trim() || null,
+        upc_code?.trim() || null,
+        sku?.trim() || null
+      ]
+    );
 
     res.status(201).json({
       message: 'Master product created successfully',
-      product: newProduct
+      product: result.rows[0]
     });
 
   } catch (error) {
@@ -1510,57 +1463,6 @@ app.get('/api/master-products/:id', async (req, res) => {
   } catch (error) {
     console.error('Error fetching master product:', error);
     res.status(500).json({ error: 'Failed to fetch master product' });
-  }
-});
-
-// Get voice recognition analytics
-app.get('/api/voice-recognition/analytics', async (req, res) => {
-  try {
-    const { venueId, days = 30 } = req.query;
-
-    // Basic analytics query
-    const analyticsQuery = `
-      SELECT
-        COUNT(*) as total_requests,
-        COUNT(selected_product_id) as successful_selections,
-        AVG(confidence_score) as avg_confidence,
-        AVG(processing_time_ms) as avg_processing_time,
-        COUNT(CASE WHEN selection_rank = 1 THEN 1 END) as first_choice_selections,
-        COUNT(CASE WHEN manual_entry = true THEN 1 END) as manual_entries
-      FROM voice_recognition_log
-      WHERE created_at >= NOW() - INTERVAL '${parseInt(days)} days'
-      ${venueId ? 'AND venue_id = $1' : ''}
-    `;
-
-    const params = venueId ? [venueId] : [];
-    const result = await pool.query(analyticsQuery, params);
-
-    const analytics = result.rows[0];
-
-    // Calculate success rate
-    const successRate = analytics.total_requests > 0
-      ? (analytics.successful_selections / analytics.total_requests * 100).toFixed(2)
-      : 0;
-
-    // Calculate first choice accuracy
-    const firstChoiceAccuracy = analytics.successful_selections > 0
-      ? (analytics.first_choice_selections / analytics.successful_selections * 100).toFixed(2)
-      : 0;
-
-    res.json({
-      totalRequests: parseInt(analytics.total_requests),
-      successfulSelections: parseInt(analytics.successful_selections),
-      successRate: parseFloat(successRate),
-      firstChoiceAccuracy: parseFloat(firstChoiceAccuracy),
-      avgConfidence: parseFloat(analytics.avg_confidence || 0).toFixed(2),
-      avgProcessingTime: parseFloat(analytics.avg_processing_time || 0).toFixed(0),
-      manualEntries: parseInt(analytics.manual_entries),
-      periodDays: parseInt(days)
-    });
-
-  } catch (error) {
-    console.error('Error fetching voice recognition analytics:', error);
-    res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });
 
@@ -2342,7 +2244,7 @@ app.post('/api/supplier-items/:id/link-master', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Voice Recognition API ready at /api/master-products/search`);
+  console.log(`Master Products API ready at /api/master-products`);
   console.log(`User Profile API ready at /api/user/profile`);
   console.log(`Supplier Item List API ready at /api/supplier-items`);
 });

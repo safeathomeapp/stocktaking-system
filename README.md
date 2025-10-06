@@ -330,34 +330,6 @@ last_login          timestamp
 notes               text
 ```
 
-#### VOICE_RECOGNITION_LOG
-Tracks voice recognition usage (planned feature).
-
-```sql
-id                        integer        PRIMARY KEY AUTO_INCREMENT
-session_id                uuid          REFERENCES stock_sessions(id)
-user_identifier           varchar(100)
-raw_audio_text            text          NOT NULL
-processed_query           text
-confidence_score          numeric
-audio_quality             varchar(20)
-search_strategy           varchar(50)
-suggestions_returned      jsonb
-total_suggestions         integer       DEFAULT 0
-selected_product_id       uuid          REFERENCES venue_products(id)
-selection_rank            integer
-user_selected             boolean       DEFAULT false
-manual_entry              boolean       DEFAULT false
-user_feedback             varchar(20)
-processing_time_ms        integer
-suggestion_accuracy       numeric
-api_response_time_ms      integer
-venue_id                  uuid          REFERENCES venues(id)
-area_id                   integer       REFERENCES venue_areas(id)
-time_of_day               time
-background_noise_level    varchar(20)
-created_at                timestamp     DEFAULT CURRENT_TIMESTAMP
-```
 
 ### Table Relationships
 ```
@@ -396,10 +368,10 @@ suppliers (1) --> (many) supplier_item_list
 - Professional styled-components design
 
 ### In Development
-- Voice recognition for stock counting
 - Photo upload for products
 - Advanced reporting and analytics
 - Invoice processing (AWS Textract)
+- Master product linking and management
 
 ---
 
