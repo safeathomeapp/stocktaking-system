@@ -206,8 +206,8 @@ name             varchar(255)  NOT NULL
 brand            varchar(100)
 category         varchar(100)
 subcategory      varchar(100)
-master_category  varchar(50)
 unit_type        varchar(50)
+unit_size        varchar(100)
 case_size        integer
 barcode          varchar(100)
 ean_code         varchar(20)

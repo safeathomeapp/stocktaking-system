@@ -27,7 +27,7 @@ class SupplierMappingService {
     const productInfo = {
       name: this.extractProductName(bookersData.description),
       case_size: parseInt(bookersData.pack) || 1,
-      master_category: this.determineMasterCategory(bookersData.description),
+      unit_size: this.generateUnitSize(bookersData.pack, bookersData.size, bookersData.description),
       category: this.determineCategory(bookersData.description),
       brand: this.extractBrand(bookersData.description)
     };
@@ -259,13 +259,13 @@ class SupplierMappingService {
   async createMasterProduct(productInfo) {
     const result = await this.pool.query(`
       INSERT INTO master_products (
-        name, master_category, category, case_size, brand, active
+        name, category, unit_size, case_size, brand, active
       ) VALUES ($1, $2, $3, $4, $5, true)
       RETURNING *
     `, [
       productInfo.name,
-      productInfo.master_category,
       productInfo.category,
+      productInfo.unit_size,
       productInfo.case_size,
       productInfo.brand
     ]);

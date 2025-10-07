@@ -484,7 +484,7 @@ app.post('/api/venues/:id/products', async (req, res) => {
 // Get all master products with filtering
 app.get('/api/master-products', async (req, res) => {
   try {
-    const { category, master_category, search, active = 'true' } = req.query;
+    const { category, search, active = 'true' } = req.query;
 
     let query = 'SELECT * FROM master_products WHERE 1=1';
     const params = [];
@@ -502,14 +502,8 @@ app.get('/api/master-products', async (req, res) => {
       paramCount++;
     }
 
-    if (master_category) {
-      query += ` AND master_category = $${paramCount}`;
-      params.push(master_category);
-      paramCount++;
-    }
-
     if (search) {
-      query += ` AND (name ILIKE $${paramCount} OR brand ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
+      query += ` AND (name ILIKE $${paramCount} OR brand ILIKE $${paramCount})`;
       params.push(`%${search}%`);
       paramCount++;
     }
@@ -551,7 +545,7 @@ app.get('/api/master-products/:id', async (req, res) => {
 // Get master product categories summary
 app.get('/api/master-products/categories/summary', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM master_products_summary ORDER BY master_category, category');
+    const result = await pool.query('SELECT * FROM master_products_summary ORDER BY category');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching categories summary:', error);
@@ -1569,7 +1563,7 @@ app.get('/api/suppliers/:id/mappings', async (req, res) => {
     const { search, limit = 50 } = req.query;
 
     let query = `
-      SELECT spm.*, mp.name as master_product_name, mp.master_category
+      SELECT spm.*, mp.name as master_product_name
       FROM supplier_product_mappings spm
       JOIN master_products mp ON spm.master_product_id = mp.id
       WHERE spm.supplier_id = $1
@@ -2350,8 +2344,7 @@ app.get('/api/epos-imports/:id/records', async (req, res) => {
         esr.*,
         vp.name as venue_product_name,
         mp.brand,
-        mp.size,
-        mp.category as master_category
+        mp.category
       FROM epos_sales_records esr
       LEFT JOIN venue_products vp ON esr.venue_product_id = vp.id
       LEFT JOIN master_products mp ON esr.master_product_id = mp.id

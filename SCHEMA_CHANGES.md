@@ -70,3 +70,70 @@
 - Removed older endpoint (lines 549-655) which used deprecated fields
 - Updated newer POST endpoint (line 1314) to use new schema
 - Supplier mapping service updated to not generate dropped fields
+
+---
+
+## REVISION - Date: 2025-10-07 (Same Day)
+
+### Additional Changes Requested:
+User requested to **remove master_category** and **restore unit_size** column.
+
+### Changes Made:
+
+#### Columns REMOVED (Additional):
+1. `master_category` - not required
+
+#### Columns RESTORED:
+1. `unit_size` (VARCHAR(100)) - user wants this field for storing unit size descriptions
+
+### Final Schema (v2):
+- id (uuid)
+- name (varchar)
+- brand (varchar)
+- category (varchar)
+- subcategory (varchar)
+- unit_type (varchar)
+- **unit_size (varchar(100))** ✅ RESTORED
+- case_size (integer)
+- barcode (varchar)
+- ean_code (varchar)
+- upc_code (varchar)
+- active (boolean)
+- created_at (timestamp)
+- updated_at (timestamp)
+- created_by_id (uuid)
+
+### Migration File:
+✅ Created `/backend/migrations/restore-unit-size-drop-master-category.js`
+✅ Executed successfully
+
+### Code Changes:
+
+#### Backend Files Updated:
+1. **server.js**:
+   - Line 487: Removed master_category from query params
+   - Line 505-509: Removed master_category filter logic
+   - Line 512: Removed description from search (dropped column)
+   - Line 548: Updated ORDER BY to remove master_category
+   - Line 1566: Removed mp.master_category from SELECT
+   - Line 2347-2348: Removed mp.size, changed mp.category as master_category to just mp.category
+
+2. **supplier-mapping-service.js**:
+   - Line 30: Replaced master_category with unit_size in parseBookersData
+   - Line 262: Updated INSERT to use unit_size instead of master_category
+   - Line 267-268: Updated values array accordingly
+
+#### Frontend:
+✅ No changes required (no references to master_category found)
+
+#### Documentation:
+✅ Updated README.md master_products schema (removed master_category, added unit_size)
+✅ Updated SCHEMA_CHANGES.md with revision notes
+
+### Implementation Status (Revision):
+✅ Migration completed (restore-unit-size-drop-master-category.js)
+✅ Updated server.js (removed all master_category references)
+✅ Updated supplier-mapping-service.js (unit_size restored)
+✅ Updated README.md
+✅ Updated SCHEMA_CHANGES.md
+✅ Frontend - no changes needed
