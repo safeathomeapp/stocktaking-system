@@ -283,6 +283,7 @@ const EposCsvInput = () => {
   const [uploadSuccess, setUploadSuccess] = useState(null);
   const [periodStartDate, setPeriodStartDate] = useState('');
   const [periodEndDate, setPeriodEndDate] = useState('');
+  const [userProfile, setUserProfile] = useState(null);
   const fileInputRef = React.useRef(null);
 
   // Initialize venue from route params or localStorage
@@ -292,6 +293,34 @@ const EposCsvInput = () => {
       setSelectedVenue(initVenue);
     }
   }, [venueId]);
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await apiService.getUserSummary();
+        if (response.success) {
+          setUserProfile(response.summary);
+        } else {
+          console.error('Failed to load user profile:', response.error);
+          // Fallback to default
+          setUserProfile({
+            first_name: 'Stock',
+            last_name: 'Taker'
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        // Fallback to default
+        setUserProfile({
+          first_name: 'Stock',
+          last_name: 'Taker'
+        });
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   // Fetch venues on mount
   useEffect(() => {
@@ -477,10 +506,15 @@ const EposCsvInput = () => {
         return record;
       }).filter(record => record.item_description); // Filter out empty rows
 
+      // Get user name from profile
+      const importedBy = userProfile
+        ? `${userProfile.first_name} ${userProfile.last_name}`.trim()
+        : 'User';
+
       const importData = {
         epos_system_name: 'Generic CSV',
         original_filename: selectedFile.name,
-        imported_by: 'User',
+        imported_by: importedBy,
         period_start_date: periodStartDate || null,
         period_end_date: periodEndDate || null,
         records: records
