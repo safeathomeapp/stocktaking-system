@@ -456,16 +456,8 @@ const EposCsvInput = () => {
 
         setCsvData(cleanedRows);
 
-        // Reset column mapping to defaults with cleaned column count
-        if (cleanedRows[0] && cleanedRows[0].length > 0) {
-          setColumnMapping({
-            item_code: -1,
-            item_description: 0,
-            quantity_sold: -1,
-            unit_price: -1,
-            total_value: -1
-          });
-        }
+        // Don't reset column mapping - preferences have already been loaded
+        // The mapping will use saved preferences from the venue
       } catch (err) {
         setError('Error parsing CSV file: ' + err.message);
       }

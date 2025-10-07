@@ -2273,7 +2273,7 @@ app.post('/api/epos-imports', async (req, res) => {
     const importResult = await client.query(
       `INSERT INTO epos_imports (
         venue_id, epos_system_name, original_filename,
-        period_start_date, period_end_date, imported_by, import_notes,
+        start_date, end_date, imported_by, import_notes,
         total_records
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *`,
