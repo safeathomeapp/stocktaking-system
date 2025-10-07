@@ -877,6 +877,7 @@ const StockTaking = () => {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [newProductCategory, setNewProductCategory] = useState('');
+  const [masterProducts, setMasterProducts] = useState([]);
   const [newProductUnit, setNewProductUnit] = useState('bottle');
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -894,19 +895,26 @@ const StockTaking = () => {
     return updatedAreas.find(area => area.id === currentArea);
   };
 
-  // Product suggestion database for fuzzy search
-  const productDatabase = [
-    'Absolute Vodka', 'Bacardi Rum', 'Bailey\'s Irish Cream', 'Bombay Gin', 'Budweiser', 'Corona', 'Guinness',
-    'Heineken', 'Jack Daniel\'s', 'Jameson', 'Johnny Walker', 'Martini Rosso', 'Smirnoff', 'Stella Artois',
-    'Tanqueray', 'Tequila', 'Veuve Clicquot', 'Wine - Chardonnay', 'Wine - Merlot', 'Wine - Pinot Grigio',
-    'Cleaning Spray', 'Paper Towels', 'Dish Soap', 'Olive Oil', 'Balsamic Vinegar', 'Salt', 'Pepper'
-  ];
+  // Product suggestion database for fuzzy search - derived from master_products
+  const productDatabase = masterProducts.map(product => product.name);
 
   useEffect(() => {
     // Load session and venue data
     loadSessionData();
+    loadMasterProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  const loadMasterProducts = async () => {
+    try {
+      const response = await apiService.getMasterProducts();
+      if (response.success && response.data.products) {
+        setMasterProducts(response.data.products);
+      }
+    } catch (error) {
+      console.error('Error loading master products:', error);
+    }
+  };
 
   const loadSessionData = async () => {
     // Ensure sessionId is a string and not an object
