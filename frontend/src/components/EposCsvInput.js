@@ -529,7 +529,8 @@ const EposCsvInput = () => {
           item_description_column: columnMapping.item_description,
           quantity_sold_column: columnMapping.quantity_sold,
           unit_price_column: columnMapping.unit_price,
-          total_value_column: columnMapping.total_value
+          total_value_column: columnMapping.total_value,
+          updated_by: importedBy
         });
 
         setUploadSuccess({

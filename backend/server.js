@@ -2581,7 +2581,8 @@ app.put('/api/venues/:venueId/csv-preferences', async (req, res) => {
       item_description_column,
       quantity_sold_column,
       unit_price_column,
-      total_value_column
+      total_value_column,
+      updated_by
     } = req.body;
 
     // Upsert preferences
@@ -2613,7 +2614,7 @@ app.put('/api/venues/:venueId/csv-preferences', async (req, res) => {
         quantity_sold_column,
         unit_price_column,
         total_value_column,
-        'user'
+        updated_by || 'user'
       ]
     );
 
