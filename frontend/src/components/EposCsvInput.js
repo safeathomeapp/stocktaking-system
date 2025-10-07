@@ -351,8 +351,10 @@ const EposCsvInput = () => {
       try {
         // Load CSV preferences
         const prefsResult = await apiService.getVenueCsvPreferences(selectedVenue);
-        if (prefsResult.success && prefsResult.data.preferences) {
+        console.log('Loaded preferences:', prefsResult);
+        if (prefsResult.success && prefsResult.data && prefsResult.data.preferences) {
           const prefs = prefsResult.data.preferences;
+          console.log('Setting column mapping to:', prefs);
           setColumnMapping({
             item_code: prefs.item_code_column ?? -1,
             item_description: prefs.item_description_column ?? 0,
@@ -515,10 +517,15 @@ const EposCsvInput = () => {
         epos_system_name: 'Generic CSV',
         original_filename: selectedFile.name,
         imported_by: importedBy,
-        period_start_date: periodStartDate || null,
-        period_end_date: periodEndDate || null,
+        period_start_date: periodStartDate && periodStartDate.trim() !== '' ? periodStartDate : null,
+        period_end_date: periodEndDate && periodEndDate.trim() !== '' ? periodEndDate : null,
         records: records
       };
+
+      console.log('Uploading EPOS data:', {
+        ...importData,
+        records: `${importData.records.length} records`
+      });
 
       const result = await apiService.importEposData(selectedVenue, importData);
 
