@@ -7,6 +7,7 @@ import { theme } from './styles/theme';
 import Dashboard from './components/Dashboard';
 import StockTaking from './components/StockTaking';
 import SessionHistory from './components/SessionHistory';
+import Analysis from './components/Analysis';
 import VenueManagement from './components/VenueManagement';
 import Settings from './components/Settings';
 import InvoiceInput from './components/InvoiceInput';
@@ -23,6 +24,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/stock-taking/:sessionId" element={<StockTaking />} />
             <Route path="/history" element={<SessionHistory />} />
+            <Route path="/analysis" element={<Analysis />} />
             <Route path="/venue/new" element={<VenueManagement />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/invoice-input" element={<InvoiceInput />} />

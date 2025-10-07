@@ -378,19 +378,22 @@ const Dashboard = () => {
     setError(null);
 
     try {
-      // Check for open sessions
+      // Check for open sessions FOR THIS VENUE ONLY
       const openSessionsResponse = await apiService.getSessions('in_progress');
       let openSessions = [];
 
       if (openSessionsResponse.success) {
-        openSessions = openSessionsResponse.data.sessions || [];
+        // Filter to only show sessions for the currently selected venue
+        openSessions = (openSessionsResponse.data.sessions || []).filter(
+          session => session.venue_id === selectedVenue
+        );
       }
 
-      // If there are open sessions, ask user to confirm closing them
+      // If there are open sessions for this venue, ask user to confirm closing them
       if (openSessions.length > 0) {
         const latestSession = openSessions.sort((a, b) => new Date(b.session_date) - new Date(a.session_date))[0];
         const confirmClose = window.confirm(
-          `There is an open session from ${formatSessionDate(latestSession.session_date)} at ${getVenueName(latestSession.venue_id)}. ` +
+          `There is an open session from ${formatSessionDate(latestSession.session_date)} for this venue. ` +
           `This session will be automatically completed before starting a new one. Continue?`
         );
 
@@ -399,7 +402,7 @@ const Dashboard = () => {
           return;
         }
 
-        // Close all open sessions
+        // Close open sessions for this venue only
         for (const session of openSessions) {
           try {
             await apiService.updateSession(session.id, { status: 'completed' });

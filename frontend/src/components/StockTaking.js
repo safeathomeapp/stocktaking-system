@@ -1637,9 +1637,9 @@ const StockTaking = () => {
         if (savedCount < totalCount) {
           setError(`Session completed but only ${savedCount}/${totalCount} stock entries were saved successfully.`);
           // Still navigate after a delay to show the message
-          setTimeout(() => navigate('/history'), 3000);
+          setTimeout(() => navigate('/analysis'), 3000);
         } else {
-          navigate('/history');
+          navigate('/analysis');
         }
       } else {
         console.error('Failed to update session status:', updateResponse.error);
