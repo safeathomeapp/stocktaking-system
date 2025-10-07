@@ -963,12 +963,18 @@ const StockTaking = () => {
         const counts = {};
         const cases = {};
         const units = {};
+        const areaAssignments = {}; // Track which area each product was counted in
         // Fix: The API returns {entries: [...]} not a direct array
         const entries = entriesResponse.data.entries || [];
 
         entries.forEach(entry => {
           const totalQuantity = parseFloat(entry.quantity_units) || 0;
           counts[entry.product_id] = totalQuantity.toString();
+
+          // Track which area this product was counted in
+          if (entry.venue_area_id) {
+            areaAssignments[entry.product_id] = entry.venue_area_id;
+          }
 
           // Split total back into cases and units
           // Find the product to get case_size
@@ -985,6 +991,25 @@ const StockTaking = () => {
         setStockCounts(counts);
         setStockCases(cases);
         setStockUnits(units);
+
+        // Update products with their saved area assignments
+        if (productsResponse && productsResponse.data && Object.keys(areaAssignments).length > 0) {
+          const updatedProducts = productsResponse.data.map(product => {
+            if (areaAssignments[product.id]) {
+              return {
+                ...product,
+                area_id: areaAssignments[product.id]
+              };
+            }
+            return product;
+          });
+
+          // Re-process products and areas with updated assignments
+          const areasResponse = await apiService.getVenueAreas(sessionResponse.data.venue_id);
+          if (areasResponse.success) {
+            processProductsAndAreas(updatedProducts, areasResponse.data.areas);
+          }
+        }
       }
 
     } catch (error) {
