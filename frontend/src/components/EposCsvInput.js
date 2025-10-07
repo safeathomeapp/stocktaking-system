@@ -334,14 +334,15 @@ const EposCsvInput = () => {
         }
 
         // Load last session date to pre-fill date inputs
+        // Always set end date to today
+        const today = new Date();
+        setPeriodEndDate(today.toISOString().split('T')[0]);
+
+        // Try to get last stock entry date for start date
         const dateResult = await apiService.getVenueLastSessionDate(selectedVenue);
         if (dateResult.success && dateResult.data.lastSessionDate) {
-          const lastDate = new Date(dateResult.data.lastSessionDate);
-          setPeriodStartDate(lastDate.toISOString().split('T')[0]);
-
-          // Set end date to today
-          const today = new Date();
-          setPeriodEndDate(today.toISOString().split('T')[0]);
+          // Use the last stock entry date as the start date
+          setPeriodStartDate(dateResult.data.lastSessionDate);
         }
       } catch (err) {
         console.error('Error loading venue data:', err);

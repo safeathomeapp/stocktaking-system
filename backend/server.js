@@ -2634,17 +2634,18 @@ app.get('/api/venues/:venueId/last-session-date', async (req, res) => {
   try {
     const { venueId } = req.params;
 
+    // Get the most recent stock_entry date for this venue
     const result = await pool.query(
-      `SELECT completed_at FROM sessions
-       WHERE venue_id = $1 AND status = 'completed'
-       ORDER BY completed_at DESC
-       LIMIT 1`,
+      `SELECT MAX(DATE(se.created_at)) as last_entry_date
+       FROM stock_entries se
+       JOIN stock_sessions ss ON se.session_id = ss.id
+       WHERE ss.venue_id = $1`,
       [venueId]
     );
 
     res.json({
       success: true,
-      lastSessionDate: result.rows[0]?.completed_at || null
+      lastSessionDate: result.rows[0]?.last_entry_date || null
     });
 
   } catch (error) {
