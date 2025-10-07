@@ -486,38 +486,43 @@ app.get('/api/master-products', async (req, res) => {
   try {
     const { category, master_category, search, active = 'true' } = req.query;
 
-    let query = 'SELECT * FROM master_item_list WHERE 1=1';
+    let query = 'SELECT * FROM master_products WHERE 1=1';
     const params = [];
     let paramCount = 1;
 
     if (active !== 'all') {
-      query += ` AND mas_active = $${paramCount}`;
+      query += ` AND active = $${paramCount}`;
       params.push(active === 'true');
       paramCount++;
     }
 
     if (category) {
-      query += ` AND mas_category ILIKE $${paramCount}`;
+      query += ` AND category ILIKE $${paramCount}`;
       params.push(`%${category}%`);
       paramCount++;
     }
 
     if (master_category) {
-      query += ` AND mas_category = $${paramCount}`;
+      query += ` AND master_category = $${paramCount}`;
       params.push(master_category);
       paramCount++;
     }
 
     if (search) {
-      query += ` AND (mas_name ILIKE $${paramCount} OR mas_brand ILIKE $${paramCount} OR mas_description ILIKE $${paramCount})`;
+      query += ` AND (name ILIKE $${paramCount} OR brand ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
       params.push(`%${search}%`);
       paramCount++;
     }
 
-    query += ' ORDER BY mas_category, mas_brand, mas_name';
+    query += ' ORDER BY category, brand, name';
 
     const result = await pool.query(query, params);
-    res.json(result.rows);
+
+    // Return in expected format for apiService
+    res.json({
+      success: true,
+      products: result.rows
+    });
   } catch (error) {
     console.error('Error fetching master products:', error);
     res.status(500).json({ error: 'Failed to fetch master products' });
