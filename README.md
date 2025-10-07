@@ -358,22 +358,98 @@ suppliers (1) --> (many) supplier_item_list
 
 ## Features
 
-### Implemented
-- Venue Management with structured addresses
-- Venue Areas (Bar, Kitchen, Storage, etc.)
-- Product catalog with master product linking
-- Stock-taking sessions with status tracking
-- Stock entries with decimal quantity support
-- Responsive tablet-optimized UI
-- Professional styled-components design
+### ✅ Implemented (v2.0.1)
+- **Venue Management** with structured addresses (multi-line, city, postcode, country)
+- **Venue Areas** (Bar, Kitchen, Storage, etc.) with drag-and-drop ordering
+- **Product Catalog** with master product linking
+- **Stock-taking Sessions** with status tracking (in_progress, completed)
+- **Stock Entries** with decimal quantity support and area assignment
+- **EPOS CSV Import System**:
+  - Flexible column mapping for different EPOS formats
+  - Auto-saves column preferences per venue
+  - Auto-populates dates (last stocktake → today)
+  - Automatically filters empty CSV columns
+  - Auto-creates venue_products for unmatched items
+  - Supports N/A for optional fields (unit price, quantity, etc.)
+- **Session History** with filtering and reopening capability
+- **Cases & Units** input with automatic total calculation
+- **Responsive Tablet-Optimized UI** with professional design
+- **Master Products Database** with fuzzy search and smart matching
 
-### In Development
+### 🚧 In Development
 - Photo upload for products
 - Advanced reporting and analytics
-- Invoice processing (AWS Textract)
-- Master product linking and management
+- Invoice processing (OCR)
+- EPOS sales analysis and variance reporting
+
+---
+
+## EPOS CSV Import
+
+### New Tables
+- **`epos_imports`** - Tracks each CSV upload with metadata
+- **`epos_sales_records`** - Individual sales line items from EPOS
+- **`venue_csv_preferences`** - Stores column mapping preferences per venue
+
+### API Endpoints
+- `POST /api/epos-imports` - Upload EPOS CSV data
+- `GET /api/epos-imports?venue_id=X` - List imports for venue
+- `GET /api/epos-imports/:id/records` - View sales records
+- `GET /api/venues/:venueId/csv-preferences` - Get saved column mappings
+- `PUT /api/venues/:venueId/csv-preferences` - Save column mappings
+- `GET /api/venues/:venueId/last-session-date` - Get last stocktake date
+
+### How It Works
+1. **First Import**: User manually maps CSV columns to fields
+2. **Auto-Save**: Column mappings saved after successful upload
+3. **Next Import**: Mappings pre-filled, dates auto-populated (last stocktake → today)
+4. **Auto-Match**: Products matched by name; unmatched items auto-created as venue_products
+5. **Flexible**: Supports different EPOS systems (Lightspeed, Square, Bookers, etc.)
+
+---
+
+## Product-Area Relationships
+
+**Q: Where is product-area information stored?**
+
+**A:** The `stock_entries` table stores the relationship via `venue_area_id`:
+
+```sql
+stock_entries
+├── product_id      (which product)
+├── venue_area_id   (which area it was counted in)
+└── quantity_units  (how many)
+```
+
+- **Products** (`venue_products`) are venue-wide, not tied to specific areas
+- **Areas** (`venue_areas`) are physical locations in the venue
+- **Stock Entries** link a product to an area for each count during stocktaking
+
+Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
+- `product_id` = Beck's
+- `venue_area_id` = Main Bar
+- `quantity_units` = 5
+
+---
+
+## TODO: Next Session
+
+### 🧪 Beta Testing Required
+- [ ] Test EPOS CSV import with real CSV files from different systems
+- [ ] Verify column mapping saves and loads correctly
+- [ ] Test auto-date population from last stocktake
+- [ ] Verify empty column filtering works
+- [ ] Test auto-creation of venue_products for unmatched items
+- [ ] Check Cases + Units input functionality
+- [ ] Test reopening completed stocktakes
+
+### 🚀 After Beta Testing
+- [ ] Update version numbers in all files to v2.1.0
+- [ ] Update README.md with beta test results
+- [ ] Commit to GitHub as "Working Prototype v2.1.0"
+- [ ] Tag release in GitHub
 
 ---
 
 **Version**: 2.0.1
-**Last Updated**: October 2, 2025
+**Last Updated**: October 7, 2025
