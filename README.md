@@ -201,41 +201,21 @@ updated_at      timestamp     DEFAULT CURRENT_TIMESTAMP
 Global product catalog for matching across venues.
 
 ```sql
-id                     uuid           PRIMARY KEY
-name                   varchar(255)  NOT NULL
-brand                  varchar(100)
-category               varchar(100)
-subcategory            varchar(100)
-master_category        varchar(50)
-size                   varchar(50)
-unit_type              varchar(50)
-unit_size              varchar(100)
-container_type         varchar(50)
-container_size         varchar(50)
-case_size              integer
-alcohol_percentage     numeric
-barcode                varchar(100)
-ean_code               varchar(20)
-upc_code               varchar(20)
-sku                    varchar(100)
-description            text
-search_terms           text[]
-phonetic_key           varchar(100)
-normalized_name        varchar(255)
-usage_count            integer       DEFAULT 0
-success_rate           numeric       DEFAULT 0.0
-last_used              timestamp
-venues_seen            uuid[]
-first_seen_venue       uuid
-total_venues_count     integer       DEFAULT 1
-verification_status    varchar(20)   DEFAULT 'unverified'
-confidence_score       numeric       DEFAULT 50.0
-suggested_retail_price numeric
-currency               varchar(3)    DEFAULT 'GBP'
-active                 boolean       DEFAULT true
-created_at             timestamp     DEFAULT CURRENT_TIMESTAMP
-updated_at             timestamp     DEFAULT CURRENT_TIMESTAMP
-created_by             varchar(100)
+id               uuid           PRIMARY KEY
+name             varchar(255)  NOT NULL
+brand            varchar(100)
+category         varchar(100)
+subcategory      varchar(100)
+master_category  varchar(50)
+unit_type        varchar(50)
+case_size        integer
+barcode          varchar(100)
+ean_code         varchar(20)
+upc_code         varchar(20)
+active           boolean       DEFAULT true
+created_at       timestamp     DEFAULT CURRENT_TIMESTAMP
+updated_at       timestamp     DEFAULT CURRENT_TIMESTAMP
+created_by_id    uuid
 ```
 
 

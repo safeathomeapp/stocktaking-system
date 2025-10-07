@@ -26,10 +26,7 @@ class SupplierMappingService {
     // Extract product information using parsing rules
     const productInfo = {
       name: this.extractProductName(bookersData.description),
-      container_type: this.extractContainerType(bookersData.description),
-      container_size: this.normalizeSize(bookersData.size),
       case_size: parseInt(bookersData.pack) || 1,
-      unit_size: this.generateUnitSize(bookersData.pack, bookersData.size, bookersData.description),
       master_category: this.determineMasterCategory(bookersData.description),
       category: this.determineCategory(bookersData.description),
       brand: this.extractBrand(bookersData.description)
@@ -262,18 +259,14 @@ class SupplierMappingService {
   async createMasterProduct(productInfo) {
     const result = await this.pool.query(`
       INSERT INTO master_products (
-        name, master_category, category, container_type, container_size,
-        case_size, unit_size, brand, active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+        name, master_category, category, case_size, brand, active
+      ) VALUES ($1, $2, $3, $4, $5, true)
       RETURNING *
     `, [
       productInfo.name,
       productInfo.master_category,
       productInfo.category,
-      productInfo.container_type,
-      productInfo.container_size,
       productInfo.case_size,
-      productInfo.unit_size,
       productInfo.brand
     ]);
 

@@ -546,113 +546,7 @@ app.get('/api/master-products/:id', async (req, res) => {
   }
 });
 
-// Create new master product
-app.post('/api/master-products', async (req, res) => {
-  try {
-    const {
-      name,
-      description,
-      category,
-      master_category,
-      container_type,
-      container_size,
-      case_size,
-      unit_size,
-      brand,
-      alcohol_percentage,
-      barcode,
-      sku,
-      suggested_retail_price,
-      currency = 'GBP'
-    } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: 'Product name is required' });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO master_products
-       (name, description, category, master_category, container_type, container_size, case_size, unit_size,
-        brand, alcohol_percentage, barcode, sku, suggested_retail_price, currency)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-       RETURNING *`,
-      [name, description, category, master_category, container_type, container_size, case_size, unit_size,
-       brand, alcohol_percentage, barcode, sku, suggested_retail_price, currency]
-    );
-
-    res.status(201).json({
-      message: 'Master product created successfully',
-      product: result.rows[0]
-    });
-  } catch (error) {
-    console.error('Error creating master product:', error);
-    res.status(500).json({ error: 'Failed to create master product' });
-  }
-});
-
-// Update master product
-app.put('/api/master-products/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      name,
-      description,
-      category,
-      master_category,
-      container_type,
-      container_size,
-      case_size,
-      unit_size,
-      brand,
-      alcohol_percentage,
-      barcode,
-      sku,
-      suggested_retail_price,
-      currency,
-      active
-    } = req.body;
-
-    // Build dynamic update query
-    const updateFields = [];
-    const values = [];
-    let paramCount = 1;
-
-    const fields = {
-      name, description, category, master_category, container_type, container_size,
-      case_size, unit_size, brand, alcohol_percentage, barcode, sku, suggested_retail_price,
-      currency, active
-    };
-
-    Object.entries(fields).forEach(([key, value]) => {
-      if (value !== undefined) {
-        updateFields.push(`${key} = $${paramCount}`);
-        values.push(value);
-        paramCount++;
-      }
-    });
-
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-
-    values.push(id);
-    const query = `UPDATE master_products SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
-
-    const result = await pool.query(query, values);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Master product not found' });
-    }
-
-    res.json({
-      message: 'Master product updated successfully',
-      product: result.rows[0]
-    });
-  } catch (error) {
-    console.error('Error updating master product:', error);
-    res.status(500).json({ error: 'Failed to update master product' });
-  }
-});
+// NOTE: Duplicate old POST/PUT endpoints removed. Using newer endpoints below (around line 1300+)
 
 // Get master product categories summary
 app.get('/api/master-products/categories/summary', async (req, res) => {
@@ -1418,23 +1312,20 @@ app.post('/api/master-products', async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO master_products (
-        name, brand, category, subcategory, size, unit_type,
-        case_size, alcohol_percentage, barcode, ean_code, upc_code, sku
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        name, brand, category, subcategory, unit_type,
+        case_size, barcode, ean_code, upc_code
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         name.trim(),
         brand?.trim() || null,
         category?.trim() || null,
         subcategory?.trim() || null,
-        size?.trim() || null,
         unit_type || 'other',
         case_size || null,
-        alcohol_percentage || null,
         barcode?.trim() || null,
         ean_code?.trim() || null,
-        upc_code?.trim() || null,
-        sku?.trim() || null
+        upc_code?.trim() || null
       ]
     );
 
@@ -1580,7 +1471,7 @@ app.get('/api/suppliers/:id', async (req, res) => {
     }
 
     const mappingsResult = await pool.query(`
-      SELECT spm.*, mp.name as master_product_name, mp.unit_size
+      SELECT spm.*, mp.name as master_product_name
       FROM supplier_product_mappings spm
       JOIN master_products mp ON spm.master_product_id = mp.id
       WHERE spm.supplier_id = $1
@@ -1678,7 +1569,7 @@ app.get('/api/suppliers/:id/mappings', async (req, res) => {
     const { search, limit = 50 } = req.query;
 
     let query = `
-      SELECT spm.*, mp.name as master_product_name, mp.unit_size, mp.master_category
+      SELECT spm.*, mp.name as master_product_name, mp.master_category
       FROM supplier_product_mappings spm
       JOIN master_products mp ON spm.master_product_id = mp.id
       WHERE spm.supplier_id = $1
