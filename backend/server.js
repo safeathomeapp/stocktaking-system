@@ -426,8 +426,8 @@ app.get('/api/venues/:id/products', async (req, res) => {
          vp.created_at,
          vp.updated_at,
          mp.brand,
-         mp.size,
          mp.unit_type,
+         mp.unit_size,
          mp.category,
          mp.barcode,
          mp.case_size
@@ -944,9 +944,9 @@ app.post('/api/sessions/:id/entries', async (req, res) => {
          se.*,
          vp.name as product_name,
          mp.brand,
-         mp.size,
          mp.category,
          mp.unit_type,
+         mp.unit_size,
          mp.case_size,
          va.name as venue_area_name
        FROM stock_entries se
@@ -988,9 +988,9 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
         se.*,
         vp.name as product_name,
         mp.brand,
-        mp.size,
         mp.category,
         mp.unit_type,
+        mp.unit_size,
         mp.barcode,
         mp.case_size,
         va.name as venue_area_name
@@ -1117,9 +1117,9 @@ app.put('/api/entries/:id', async (req, res) => {
          se.*,
          vp.name as product_name,
          mp.brand,
-         mp.size,
          mp.category,
          mp.unit_type,
+         mp.unit_size,
          mp.barcode,
          mp.case_size,
          va.name as venue_area_name

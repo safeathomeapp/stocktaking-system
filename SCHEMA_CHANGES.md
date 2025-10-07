@@ -137,3 +137,31 @@ User requested to **remove master_category** and **restore unit_size** column.
 ✅ Updated README.md
 ✅ Updated SCHEMA_CHANGES.md
 ✅ Frontend - no changes needed
+
+---
+
+## HOTFIX - Date: 2025-10-07 (Same Day)
+
+### Issue:
+After deploying schema changes, discovered 500 errors when opening stocktaking sessions:
+- GET `/api/venues/:id/products` - 500 error
+- GET `/api/sessions/:id/entries` - 500 error
+
+### Root Cause:
+SQL queries were still referencing `mp.size` column which was dropped in initial migration.
+
+### Locations Fixed:
+1. **server.js line 429**: GET `/api/venues/:id/products` - removed `mp.size`, added `mp.unit_size`
+2. **server.js line 991**: GET `/api/sessions/:id/entries` - removed `mp.size`, added `mp.unit_size`
+3. **server.js line 947**: POST stock entry creation - removed `mp.size`, added `mp.unit_size`
+4. **server.js line 1120**: PUT stock entry update - removed `mp.size`, added `mp.unit_size`
+
+### Changes:
+All 4 SQL queries updated to:
+- **REMOVE**: `mp.size` (dropped column)
+- **ADD**: `mp.unit_size` (restored column)
+
+### Status:
+✅ All `mp.size` references removed from server.js
+✅ All queries now use `mp.unit_size` instead
+✅ Ready to commit and deploy
