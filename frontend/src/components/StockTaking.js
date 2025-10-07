@@ -1838,12 +1838,6 @@ const StockTaking = () => {
                   {updatedAreas.find(a => a.id === currentArea)?.name || 'No area selected'}
                 </SectionTitle>
                 <SearchIcon
-                  onClick={() => setShowSearch(!showSearch)}
-                  title="Search products"
-                >
-                  🔍
-                </SearchIcon>
-                <SearchIcon
                   onClick={handlePhotoButtonClick}
                   title={getCurrentAreaData()?.photo ? "View area photo" : "No area photo available"}
                   style={{
@@ -1875,16 +1869,6 @@ const StockTaking = () => {
                 </div>
               </div>
             </SearchSection>
-
-            <CollapsibleSearch show={showSearch}>
-              <SearchInput
-                type="text"
-                placeholder="Search items..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ fontSize: '0.875rem', padding: '8px 12px', width: '200px' }}
-              />
-            </CollapsibleSearch>
 
           <DraggableProductList>
             {currentAreaItems.map(item => (
