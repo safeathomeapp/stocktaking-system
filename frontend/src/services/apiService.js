@@ -187,7 +187,16 @@ export const apiService = {
       return { success: false, error: error.response?.data?.error || error.message };
     }
   },
-  
+
+  deleteStockEntry: async (sessionId, productId) => {
+    try {
+      const response = await api.delete(`${API_BASE_URL}/api/sessions/${sessionId}/entries/product/${productId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
   // Session History (add these to the apiService object)
   getVenueSessions: async (venueId, status = null, limit = 50, offset = 0) => {
     try {

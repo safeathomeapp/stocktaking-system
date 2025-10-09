@@ -596,6 +596,31 @@ const DragHandle = styled.div`
   }
 `;
 
+const RemoveButton = styled.button`
+  display: ${props => props.editMode ? 'flex' : 'none'};
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid ${props => props.theme.colors.danger};
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.danger};
+  cursor: pointer;
+  font-size: 1.25rem;
+  transition: all 0.2s ease;
+  padding: 0;
+
+  &:hover {
+    background: ${props => props.theme.colors.danger};
+    color: white;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
 const DragDot = styled.div`
   width: 3px;
   height: 3px;
@@ -627,6 +652,9 @@ const ProductName = styled.h4`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 `;
 
 const ProductInfo = styled.span`
@@ -876,11 +904,16 @@ const StockTaking = () => {
   // Add new product functionality
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState('');
+  const [newProductBrand, setNewProductBrand] = useState('');
   const [newProductCategory, setNewProductCategory] = useState('');
+  const [newProductSubcategory, setNewProductSubcategory] = useState('');
   const [masterProducts, setMasterProducts] = useState([]);
   const [newProductUnit, setNewProductUnit] = useState('bottle');
+  const [newProductUnitSize, setNewProductUnitSize] = useState('');
+  const [newProductCaseSize, setNewProductCaseSize] = useState('');
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedMasterProduct, setSelectedMasterProduct] = useState(null);
 
 
   // Area photo display
@@ -895,8 +928,8 @@ const StockTaking = () => {
     return updatedAreas.find(area => area.id === currentArea);
   };
 
-  // Product suggestion database for fuzzy search - derived from master_products
-  const productDatabase = masterProducts.map(product => product.name);
+  // Product suggestion database for fuzzy search - use full master_products
+  const productDatabase = masterProducts;
 
   useEffect(() => {
     // Load session and venue data
@@ -1104,6 +1137,25 @@ const StockTaking = () => {
     navigate('/');
   };
 
+  // Smart unit conversion for display
+  const formatUnitSize = (unitSizeMl) => {
+    if (!unitSizeMl || isNaN(unitSizeMl)) return '';
+
+    const ml = parseInt(unitSizeMl);
+
+    if (ml <= 1000) {
+      return `${ml}ml`;
+    } else if (ml < 10000) {
+      // Convert to cl (centiliters)
+      const cl = ml / 10;
+      return `${cl}cl`;
+    } else {
+      // Convert to L (liters)
+      const l = ml / 1000;
+      return `${l}L`;
+    }
+  };
+
   // Area management
   const handleAreaChange = (areaId) => {
     if (!editAreasMode) {
@@ -1224,17 +1276,18 @@ const StockTaking = () => {
     if (!query) return [];
 
     const queryLower = query.toLowerCase();
-    return items.filter(item => {
-      const itemLower = item.toLowerCase();
+    return items.filter(product => {
+      // Search in product name and brand
+      const searchText = `${product.name} ${product.brand || ''}`.toLowerCase();
       // Simple fuzzy logic: check if all characters in query exist in order
       let queryIndex = 0;
-      for (let i = 0; i < itemLower.length && queryIndex < queryLower.length; i++) {
-        if (itemLower[i] === queryLower[queryIndex]) {
+      for (let i = 0; i < searchText.length && queryIndex < queryLower.length; i++) {
+        if (searchText[i] === queryLower[queryIndex]) {
           queryIndex++;
         }
       }
       return queryIndex === queryLower.length;
-    }).slice(0, 5);
+    }).slice(0, 10);
   };
 
   // Handle product name input change with fuzzy search
@@ -1251,23 +1304,16 @@ const StockTaking = () => {
   };
 
   // Handle suggestion selection
-  const handleSuggestionSelect = (suggestion) => {
-    setNewProductName(suggestion);
+  const handleSuggestionSelect = (masterProduct) => {
+    setSelectedMasterProduct(masterProduct);
+    setNewProductName(masterProduct.name);
+    setNewProductBrand(masterProduct.brand || '');
+    setNewProductCategory(masterProduct.category || '');
+    setNewProductSubcategory(masterProduct.subcategory || '');
+    setNewProductUnit(masterProduct.unit_type || 'bottle');
+    setNewProductUnitSize(masterProduct.unit_size ? String(masterProduct.unit_size) : '');
+    setNewProductCaseSize(masterProduct.case_size ? String(masterProduct.case_size) : '');
     setShowSuggestions(false);
-
-    // Auto-populate category based on product name
-    const lowerSuggestion = suggestion.toLowerCase();
-    if (lowerSuggestion.includes('wine') || lowerSuggestion.includes('champagne')) {
-      setNewProductCategory('Wine');
-    } else if (lowerSuggestion.includes('beer') || lowerSuggestion.includes('lager') || lowerSuggestion.includes('ale')) {
-      setNewProductCategory('Beer');
-    } else if (lowerSuggestion.includes('vodka') || lowerSuggestion.includes('whiskey') || lowerSuggestion.includes('rum') || lowerSuggestion.includes('gin')) {
-      setNewProductCategory('Spirits');
-    } else if (lowerSuggestion.includes('clean') || lowerSuggestion.includes('paper') || lowerSuggestion.includes('soap')) {
-      setNewProductCategory('Supplies');
-    } else {
-      setNewProductCategory('Other');
-    }
   };
 
 
@@ -1292,7 +1338,7 @@ const StockTaking = () => {
   };
 
   const handleAddProduct = async () => {
-    if (newProductName && newProductCategory && venueData?.id && currentArea) {
+    if (newProductName && venueData?.id && currentArea) {
       try {
         // Find the current area object to get its database ID
         const currentAreaObj = areas.find(area => area.id === currentArea);
@@ -1302,18 +1348,79 @@ const StockTaking = () => {
           return;
         }
 
+        // Determine master_product_id
+        let masterProductId = null;
+
+        // If product was selected from suggestions, use its ID
+        if (selectedMasterProduct) {
+          masterProductId = selectedMasterProduct.id;
+        } else {
+          // Check if a similar product exists in master_products
+          const similarProduct = masterProducts.find(mp =>
+            mp.name.toLowerCase() === newProductName.toLowerCase() &&
+            (mp.brand || '').toLowerCase() === (newProductBrand || '').toLowerCase() &&
+            mp.unit_size === (newProductUnitSize ? parseInt(newProductUnitSize) : null)
+          );
+
+          if (similarProduct) {
+            // Use existing master product
+            masterProductId = similarProduct.id;
+          } else {
+            // Ask user if they want to add to master_products
+            const shouldAddToMaster = window.confirm(
+              `This product is not in the master products database. Would you like to add it?\n\n` +
+              `Name: ${newProductName}\n` +
+              `Brand: ${newProductBrand || 'N/A'}\n` +
+              `Category: ${newProductCategory}\n` +
+              `Subcategory: ${newProductSubcategory || 'N/A'}\n` +
+              `Unit Size: ${newProductUnitSize || 'N/A'} ml\n` +
+              `Case Size: ${newProductCaseSize || 'N/A'}`
+            );
+
+            if (shouldAddToMaster) {
+              try {
+                const masterProductData = {
+                  name: newProductName,
+                  brand: newProductBrand,
+                  category: newProductCategory,
+                  subcategory: newProductSubcategory,
+                  unit_type: newProductUnit,
+                  unit_size: newProductUnitSize ? parseInt(newProductUnitSize) : null,
+                  case_size: newProductCaseSize ? parseInt(newProductCaseSize) : null,
+                  active: true
+                };
+
+                const masterResponse = await apiService.createMasterProduct(masterProductData);
+                if (masterResponse.success) {
+                  console.log('Added to master_products:', masterResponse.data);
+                  // Get the new master product ID
+                  masterProductId = masterResponse.data.product?.id || masterResponse.data.id;
+                  // Reload master products
+                  await loadMasterProducts();
+                }
+              } catch (err) {
+                console.error('Failed to add to master products:', err);
+                // Continue anyway - still add to venue products without master_product_id
+              }
+            }
+          }
+        }
+
         // Prepare product data for database
         const productData = {
           name: newProductName,
+          brand: newProductBrand,
           category: newProductCategory,
-          unit: newProductUnit,
-          area_id: typeof currentAreaObj.id === 'number' ? currentAreaObj.id : null, // Only use database area IDs
-          brand: '',
-          size: '',
-          barcode: ''
+          subcategory: newProductSubcategory,
+          unit_type: newProductUnit,
+          unit_size: newProductUnitSize ? parseInt(newProductUnitSize) : null,
+          case_size: newProductCaseSize ? parseInt(newProductCaseSize) : null,
+          area_id: typeof currentAreaObj.id === 'number' ? currentAreaObj.id : null,
+          barcode: '',
+          master_product_id: masterProductId
         };
 
-        // Save product to database immediately
+        // Save product to venue products
         const response = await apiService.createVenueProduct(venueData.id, productData);
 
         if (response.success) {
@@ -1321,13 +1428,15 @@ const StockTaking = () => {
           const newProduct = {
             id: response.data.product.id,
             name: response.data.product.name,
+            brand: response.data.product.brand,
             category: response.data.product.category,
+            subcategory: response.data.product.subcategory,
             unit_type: response.data.product.unit_type,
+            unit_size: response.data.product.unit_size,
+            case_size: response.data.product.case_size,
             area_id: response.data.product.area_id,
             area: currentArea, // Keep area reference for UI
             expectedCount: 0,
-            brand: response.data.product.brand,
-            size: response.data.product.size,
             barcode: response.data.product.barcode
           };
 
@@ -1335,8 +1444,13 @@ const StockTaking = () => {
 
           // Reset form
           setNewProductName('');
+          setNewProductBrand('');
           setNewProductCategory('');
+          setNewProductSubcategory('');
           setNewProductUnit('bottle');
+          setNewProductUnitSize('');
+          setNewProductCaseSize('');
+          setSelectedMasterProduct(null);
           setShowAddProduct(false);
           setShowSuggestions(false);
           console.log('Product saved to database:', response.data.product);
@@ -1351,8 +1465,39 @@ const StockTaking = () => {
     } else {
       if (!currentArea) {
         setError('Please select an area before adding products.');
-      } else if (!newProductName || !newProductCategory) {
-        setError('Please fill in product name and category.');
+      } else if (!newProductName) {
+        setError('Please fill in product name.');
+      }
+    }
+  };
+
+  // Remove product from counting session
+  const handleRemoveProduct = async (productId) => {
+    if (window.confirm('Remove this product from the current counting session?\n\nThis will not delete it from your venue products.')) {
+      try {
+        // Delete stock entry from database
+        await apiService.deleteStockEntry(sessionId, productId);
+
+        // Update local state
+        setStockItems(prev => prev.filter(item => item.id !== productId));
+        setStockCounts(prev => {
+          const newCounts = { ...prev };
+          delete newCounts[productId];
+          return newCounts;
+        });
+        setStockCases(prev => {
+          const newCases = { ...prev };
+          delete newCases[productId];
+          return newCases;
+        });
+        setStockUnits(prev => {
+          const newUnits = { ...prev };
+          delete newUnits[productId];
+          return newUnits;
+        });
+      } catch (error) {
+        console.error('Error deleting stock entry:', error);
+        setError('Failed to remove product from session');
       }
     }
   };
@@ -1924,12 +2069,24 @@ const StockTaking = () => {
 
                 <ProductCountGrid>
                   <ProductDetails>
-                    <ProductName>{item.venue_name || item.name}</ProductName>
+                    <ProductName>
+                      <span>{item.venue_name || item.name}</span>
+                      <RemoveButton
+                        editMode={editProductsMode}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveProduct(item.id);
+                        }}
+                        title="Remove from counting session"
+                      >
+                        ✕
+                      </RemoveButton>
+                    </ProductName>
                     <ProductInfo>
                       {[
-                        item.category,
-                        item.brand,
-                        item.size
+                        formatUnitSize(item.unit_size),
+                        item.unit_type ? item.unit_type.charAt(0).toUpperCase() + item.unit_type.slice(1) + 's' : null,
+                        item.case_size ? `Case of ${item.case_size}` : null
                       ].filter(Boolean).join(' • ')}
                     </ProductInfo>
                   </ProductDetails>
@@ -1957,16 +2114,6 @@ const StockTaking = () => {
                         />
                         <UnitLabel>Units</UnitLabel>
                       </div>
-                      {stockCounts[item.id] && (
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: '#10B981',
-                          fontWeight: '600',
-                          textAlign: 'right'
-                        }}>
-                          Total: {stockCounts[item.id]}
-                        </div>
-                      )}
                     </div>
                   </CompactCountSection>
                 </ProductCountGrid>
@@ -1988,12 +2135,17 @@ const StockTaking = () => {
                   {/* Regular typed suggestions */}
                   {showSuggestions && productSuggestions.length > 0 && (
                     <SuggestionsList>
-                      {productSuggestions.map((suggestion, index) => (
+                      {productSuggestions.map((product, index) => (
                         <SuggestionItem
                           key={index}
-                          onMouseDown={() => handleSuggestionSelect(suggestion)}
+                          onMouseDown={() => handleSuggestionSelect(product)}
                         >
-                          {suggestion}
+                          <div style={{ fontWeight: '600' }}>{product.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '2px' }}>
+                            {product.brand && `${product.brand} • `}
+                            {product.category}{product.subcategory ? ` • ${product.subcategory}` : ''}
+                            {product.unit_size && ` • ${product.unit_size}ml`}
+                          </div>
                         </SuggestionItem>
                       ))}
                     </SuggestionsList>
@@ -2002,26 +2154,42 @@ const StockTaking = () => {
 
                 <CompactInput
                   type="text"
-                  placeholder="Category"
-                  value={newProductCategory}
-                  onChange={(e) => setNewProductCategory(e.target.value)}
+                  placeholder="Brand"
+                  value={newProductBrand}
+                  onChange={(e) => setNewProductBrand(e.target.value)}
                 />
 
                 <CompactSelect
                   value={newProductUnit}
                   onChange={(e) => setNewProductUnit(e.target.value)}
                 >
-                  <option value="bottle">Bottles</option>
-                  <option value="cans">Cans</option>
-                  <option value="kegs">Kegs</option>
-                  <option value="units">Units</option>
-                  <option value="boxes">Boxes</option>
+                  <option value="bottle">Bottle</option>
+                  <option value="can">Can</option>
+                  <option value="keg">Keg</option>
+                  <option value="cask">Cask</option>
+                  <option value="bag-in-box">Bag-in-Box</option>
                 </CompactSelect>
+
+                <CompactInput
+                  type="number"
+                  placeholder="Unit Size (ml)"
+                  value={newProductUnitSize}
+                  onChange={(e) => setNewProductUnitSize(e.target.value)}
+                  style={{ width: '120px' }}
+                />
+
+                <CompactInput
+                  type="number"
+                  placeholder="Case Size"
+                  value={newProductCaseSize}
+                  onChange={(e) => setNewProductCaseSize(e.target.value)}
+                  style={{ width: '100px' }}
+                />
 
                 <Button
                   variant="primary"
                   onClick={handleAddProduct}
-                  disabled={!newProductName || !newProductCategory}
+                  disabled={!newProductName}
                   size="sm"
                 >
                   ✓
@@ -2032,7 +2200,13 @@ const StockTaking = () => {
                   onClick={() => {
                     setShowAddProduct(false);
                     setNewProductName('');
+                    setNewProductBrand('');
                     setNewProductCategory('');
+                    setNewProductSubcategory('');
+                    setNewProductUnit('bottle');
+                    setNewProductUnitSize('');
+                    setNewProductCaseSize('');
+                    setSelectedMasterProduct(null);
                     setShowSuggestions(false);
                   }}
                   size="sm"

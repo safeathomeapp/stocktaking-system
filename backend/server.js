@@ -421,20 +421,23 @@ app.get('/api/venues/:id/products', async (req, res) => {
       `SELECT
          vp.id,
          vp.venue_id,
-         vp.name as venue_name,
+         mp.name,
+         mp.name as venue_name,
          vp.master_product_id,
+         vp.area_id,
          vp.created_at,
          vp.updated_at,
          mp.brand,
          mp.unit_type,
          mp.unit_size,
          mp.category,
+         mp.subcategory,
          mp.barcode,
          mp.case_size
        FROM venue_products vp
        LEFT JOIN master_products mp ON vp.master_product_id = mp.id
        WHERE vp.venue_id = $1
-       ORDER BY mp.category, vp.name`,
+       ORDER BY mp.category, mp.name`,
       [id]
     );
     res.json(result.rows);
@@ -447,7 +450,18 @@ app.get('/api/venues/:id/products', async (req, res) => {
 app.post('/api/venues/:id/products', async (req, res) => {
   try {
     const venueId = req.params.id;
-    const { name, master_product_id } = req.body;
+    const {
+      name,
+      brand,
+      category,
+      subcategory,
+      unit_type,
+      unit_size,
+      case_size,
+      area_id,
+      barcode,
+      master_product_id
+    } = req.body;
 
     // Validate required fields
     if (!name) {
@@ -462,10 +476,24 @@ app.post('/api/venues/:id/products', async (req, res) => {
 
     // Create the venue product
     const result = await pool.query(
-      `INSERT INTO venue_products (venue_id, name, master_product_id)
-       VALUES ($1, $2, $3)
+      `INSERT INTO venue_products (
+        venue_id, name, brand, category, subcategory,
+        unit_type, unit_size, case_size, area_id, barcode, master_product_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [venueId, name, master_product_id || null]
+      [
+        venueId,
+        name,
+        brand || null,
+        category || null,
+        subcategory || null,
+        unit_type || null,
+        unit_size || null,
+        case_size || null,
+        area_id || null,
+        barcode || null,
+        master_product_id || null
+      ]
     );
 
     res.status(201).json({
@@ -1042,6 +1070,23 @@ app.get('/api/sessions/:id/entries', async (req, res) => {
   }
 });
 
+// Delete stock entry for a product in a session
+app.delete('/api/sessions/:sessionId/entries/product/:productId', async (req, res) => {
+  try {
+    const { sessionId, productId } = req.params;
+
+    await pool.query(
+      `DELETE FROM stock_entries WHERE session_id = $1 AND product_id = $2`,
+      [sessionId, productId]
+    );
+
+    res.json({ success: true, message: 'Stock entry deleted' });
+  } catch (error) {
+    console.error('Error deleting stock entry:', error);
+    res.status(500).json({ error: 'Failed to delete stock entry' });
+  }
+});
+
 // Add this endpoint after the GET /api/sessions/:id/entries endpoint in your server.js
 
 // Update stock entry (quantity and venue area)
@@ -1290,14 +1335,13 @@ app.post('/api/master-products', async (req, res) => {
       brand,
       category,
       subcategory,
-      size,
       unit_type,
+      unit_size,
       case_size,
-      alcohol_percentage,
       barcode,
       ean_code,
       upc_code,
-      sku
+      active
     } = req.body;
 
     if (!name || name.trim() === '') {
@@ -1306,20 +1350,22 @@ app.post('/api/master-products', async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO master_products (
-        name, brand, category, subcategory, unit_type,
-        case_size, barcode, ean_code, upc_code
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        name, brand, category, subcategory, unit_type, unit_size,
+        case_size, barcode, ean_code, upc_code, active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
       [
         name.trim(),
         brand?.trim() || null,
         category?.trim() || null,
         subcategory?.trim() || null,
-        unit_type || 'other',
+        unit_type || 'bottle',
+        unit_size || null,
         case_size || null,
         barcode?.trim() || null,
         ean_code?.trim() || null,
-        upc_code?.trim() || null
+        upc_code?.trim() || null,
+        active !== undefined ? active : true
       ]
     );
 

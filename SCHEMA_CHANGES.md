@@ -165,3 +165,139 @@ All 4 SQL queries updated to:
 ✅ All `mp.size` references removed from server.js
 ✅ All queries now use `mp.unit_size` instead
 ✅ Ready to commit and deploy
+
+---
+
+## COMPREHENSIVE MASTER PRODUCTS IMPORT - Date: 2025-10-09
+
+### Background:
+User requested comprehensive master products database populated with researched UK pub/bar/hotel products (wet trade only).
+
+### Research & Data Collection:
+
+#### Categories Researched:
+1. **Spirits** (269 products)
+   - Vodka (49): Smirnoff, Absolut, Grey Goose, Belvedere, Russian Standard, Stolichnaya, Ciroc, Ketel One, Skyy
+   - Gin (52): Gordon's, Bombay Sapphire, Tanqueray, Beefeater, Hendrick's, Warner's, Whitley Neill, Manchester, Mermaid, Sipsmith, Edinburgh, Monkey 47, The Botanist, Opihr, Malfy, Plymouth, Hayman's
+   - Whisky (85): Blended Scotch, Single Malt, Irish, American Bourbon, Japanese
+   - Rum (35): Bacardi, Captain Morgan, Kraken, Malibu, Havana Club, Mount Gay, Sailor Jerry, Dead Man's Fingers
+   - Tequila (15): Jose Cuervo, Olmeca, Sierra, Patron, Don Julio, Casamigos, El Jimador
+   - Liqueurs & Specialities (23): Baileys, Kahlua, Tia Maria, Disaronno, Cointreau, Grand Marnier, Drambuie, Southern Comfort, Jägermeister
+   - Aperitifs & Digestifs (8): Aperol, Campari, Martini, Pimm's
+   - Bitters & Syrups (3): Angostura, Peychaud's
+   - Low & No Alcohol (9): Seedlip, Lyre's, Gordon's 0.0%
+
+2. **Wines** (124 products)
+   - Bottled Wine (66): Hardys, Echo Falls, Blossom Hill, Yellow Tail, Barefoot, Casillero del Diablo, Campo Viejo, Jacob's Creek, Gallo, Trivento, 19 Crimes, Oyster Bay
+   - Sparkling Wine (19): Prosecco (Mionetto, Freixenet, Galeotti, La Marca, Bottega), Champagne (Moët & Chandon, Veuve Clicquot, Lanson, Bollinger, Taittinger), Cava
+   - Fortified Wine (19): Port (Graham's, Taylor's, Cockburn's, Sandeman, Warre's, Fonseca, Dow's), Sherry (Harveys, Tio Pepe, Croft, Lustau)
+   - Bag-in-Box Wine (16): Stowells, BIB Wine Company, Wine Route, Isla Negra, Shallow Bay, Torri Cantine
+   - Low & No Alcohol Wine (8): McGuigan Zero, Eisberg
+
+3. **Beers & Ales** (83 products)
+   - Lager (57): Carling, Stella Artois, Foster's, Heineken, Carlsberg, Budweiser, Corona, Peroni, San Miguel, Kronenbourg, Moretti, Amstel, Grolsch, Beck's, Asahi, Cobra, Tiger, Estrella, Modelo, Pacifico
+   - Cask Ale (13): Guinness, John Smith's, Greene King, London Pride, Timothy Taylor, Doom Bar, Old Speckled Hen, Pedigree, Bass, Newcastle Brown
+   - Craft Beer (16): BrewDog, Camden Town, Beavertown, Meantime, Thornbridge, Cloudwater, Northern Monk, Tiny Rebel, Vocation
+   - Low & No Alcohol (10): Heineken 0.0, Peroni Libera, Budweiser Zero, Guinness 0.0, Corona Cero, Beck's Blue, Stella 0.0%, BrewDog Nanny State, Erdinger Alkoholfrei
+   - RTDs (7): WKD, Smirnoff Ice, Gordon's Premix, Bacardi & Cola, Jack Daniel's & Cola, Captain Morgan & Cola
+
+4. **Soft Drinks** (67 products)
+   - Bottled Soft Drinks (24): Coca-Cola, Pepsi, 7UP, Sprite, Fanta, Schweppes
+   - Bag-in-Box (5): Coca-Cola, Coca-Cola Zero, Diet Coke, Pepsi, Pepsi Max
+   - Mixers & Tonics (10): Schweppes, Fever-Tree
+   - Juices & Cordials (12): Britvic, J2O, Robinsons
+   - Energy Drinks (7): Red Bull, Monster, Relentless, Rockstar, Lucozade
+   - Bottled Water (9): Evian, Highland Spring, Volvic, San Pellegrino, Perrier, Buxton
+
+5. **Cider & Perry** (27 products)
+   - Draught Cider (4): Strongbow, Magners, Bulmers, Thatchers
+   - Bottled Cider (23): Strongbow, Magners, Kopparberg, Rekorderlig, Bulmers, Old Mout, Thatchers, Aspall, Somersby, Henry Weston's
+
+### Files Created:
+
+1. **master_products_comprehensive.csv** (571 lines)
+   - 1 header row
+   - 570 product rows
+   - Format: name, brand, category, subcategory, unit_type, unit_size, case_size
+
+2. **backend/migrations/drop-old-search-trigger.js**
+   - Dropped legacy trigger `trigger_update_master_product_search`
+   - Dropped functions `update_master_product_search_fields()` and `normalize_for_search()`
+   - Required because trigger referenced dropped columns (`normalized_name`, `size`)
+
+3. **backend/migrations/update-unit-type-constraint.js**
+   - Cleared master_products table
+   - Dropped existing `unit_type` check constraint
+   - Added new constraint: CHECK (unit_type IN ('bottle', 'can', 'keg', 'cask', 'bag-in-box'))
+
+4. **backend/migrations/import-master-products.js**
+   - Reads CSV file
+   - Clears existing master_products data
+   - Imports all 570 products in batches of 50
+   - Displays category statistics
+   - Verifies import success
+
+5. **MASTER_PRODUCTS_CATALOG.md**
+   - Comprehensive documentation of all imported products
+   - Category breakdowns
+   - Schema structure
+   - Unit type and case size standards
+   - Import process documentation
+
+### Database Changes:
+
+#### Triggers/Functions Removed:
+- `trigger_update_master_product_search` - referenced dropped columns
+- `update_master_product_search_fields()` function
+- `normalize_for_search(text)` function
+
+#### Constraints Updated:
+- **unit_type** check constraint updated from ('bottle', 'can', 'keg') to ('bottle', 'can', 'keg', 'cask', 'bag-in-box')
+
+### Import Results:
+
+**Total Products Imported:** 570
+
+| Category | Count |
+|----------|-------|
+| Spirits | 269 |
+| Wines | 124 |
+| Beers & Ales | 83 |
+| Soft Drinks | 67 |
+| Cider & Perry | 27 |
+
+### Migration Execution:
+
+```bash
+cd backend
+export DATABASE_URL="postgresql://[connection-string]"
+
+# Step 1: Drop old search trigger and functions
+node migrations/drop-old-search-trigger.js
+
+# Step 2: Update unit_type constraint and clear table
+node migrations/update-unit-type-constraint.js
+
+# Step 3: Import comprehensive product catalog
+node migrations/import-master-products.js
+```
+
+### Implementation Status:
+✅ Researched comprehensive UK pub/bar/hotel products (5 categories)
+✅ Created master_products_comprehensive.csv (570 products)
+✅ Created import script with batch processing
+✅ Dropped legacy search triggers and functions
+✅ Updated unit_type constraint to include 'cask' and 'bag-in-box'
+✅ Successfully imported all 570 products
+✅ Created comprehensive catalog documentation
+✅ Verified database contains 570 records
+
+### Notes:
+- Focus: UK pubs, nightclubs, hotels (wet trade only)
+- Comprehensive approach: All major brands and variants included
+- Flavoured varieties included (vodka, gin)
+- All whisky variants (Scotch, Irish, Bourbon, Japanese)
+- Multiple container sizes where available
+- Industry standard case sizes used where exact info unavailable
+- Barcodes skipped for now (can be added later)
+- CSV format chosen for easy review and modification
