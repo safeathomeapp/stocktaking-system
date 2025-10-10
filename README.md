@@ -704,6 +704,23 @@ The system tracks opening stock, purchases, sales, wastage, and closing stock to
 - Variance by category
 - Variance by area
 - Products with significant discrepancies flagged
+- **Days Stock**: How long current stock will last at current usage rate
+
+**Days Stock Calculation**:
+```
+Days Stock = (Closing Stock × Period Days) ÷ Usage
+```
+
+**Example**: If you have 8.6 litres of Smirnoff and used 13.4 litres over 35 days:
+```
+Days Stock = (8.6 × 35) ÷ 13.4 = 22 days until reorder needed
+```
+
+**Usage Insights**:
+- **0-30 days**: Fast-moving - reorder soon
+- **30-90 days**: Normal stock levels
+- **90+ days**: Slow-moving or overstocked
+- **High values (500+ days)**: Dead stock - consider discontinuing
 
 **Data Storage**: Generated on-demand from live data (no separate variance table yet)
 
@@ -872,17 +889,30 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 - [ ] Test reopening completed stocktakes
 
 ### 🎯 Next Development Phase - Invoice & Variance System
-- [ ] Opening stock import UI (Step 3)
-- [ ] Product matching UI for opening stock (Step 4)
-- [ ] Invoice upload UI (OCR/CSV/Manual) (Step 5)
+
+#### Opening Stock Import (Steps 3-4)
+- [ ] Opening stock import UI with CSV/Manual/PDF input
+- [ ] Handle Stockcheck report format (DZ decimal notation: 2.05 = 2 dozen + 5 units)
+- [ ] Dozen decimal converter: (dozens × 12) + units
+- [ ] Product matching UI for opening stock
+- [ ] Fuzzy match to master_products
+- [ ] Create opening stock session (status=completed, historical date)
+
+#### Invoice Processing (Step 5)
+- [ ] Invoice upload UI (OCR/CSV/Manual)
 - [ ] Invoice line item matching to master_products
 - [ ] Supplier item list auto-matching logic
-- [ ] Wastage recording UI (Step 8)
-- [ ] Variance report generation (Step 9)
-- [ ] Variance report UI (per-product, by category, by area)
 - [ ] API endpoints for invoices CRUD
 - [ ] API endpoints for invoice line items
+
+#### Wastage & Variance (Steps 8-9)
+- [ ] Wastage recording UI
 - [ ] API endpoints for wastage records
+- [ ] Variance report generation engine
+- [ ] Variance report UI (per-product, by category, by area)
+- [ ] **Days Stock calculation**: (closing × period) ÷ usage
+- [ ] Dead stock alerts (>180 days stock)
+- [ ] Reorder suggestions (0-30 days stock)
 
 ### 🎯 Future Enhancements
 - [ ] Photo upload for products
