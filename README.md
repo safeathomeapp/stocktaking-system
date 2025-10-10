@@ -333,6 +333,87 @@ created_by             varchar(100)
 CONSTRAINT unique_supplier_sku UNIQUE(supplier_id, supplier_sku)
 ```
 
+#### INVOICES
+Tracks supplier invoices with import method (OCR/CSV/Manual).
+
+```sql
+id                uuid           PRIMARY KEY DEFAULT uuid_generate_v4()
+invoice_number    varchar(100)   NOT NULL
+venue_id          uuid           NOT NULL REFERENCES venues(id) ON DELETE CASCADE
+supplier_id       uuid           NOT NULL REFERENCES suppliers(sup_id) ON DELETE RESTRICT
+invoice_date      date           NOT NULL
+date_ordered      date
+date_delivered    date
+delivery_number   varchar(100)
+customer_ref      varchar(100)
+subtotal          numeric(10,2)
+vat_total         numeric(10,2)
+total_amount      numeric(10,2)
+currency          varchar(3)     DEFAULT 'GBP'
+payment_status    varchar(50)    DEFAULT 'unpaid'
+import_method     varchar(50)                      -- 'ocr', 'csv', 'manual'
+import_metadata   jsonb                            -- OCR confidence, CSV mappings, etc.
+notes             text
+created_at        timestamp      DEFAULT CURRENT_TIMESTAMP
+updated_at        timestamp      DEFAULT CURRENT_TIMESTAMP
+
+CONSTRAINT unique_invoice_number_supplier UNIQUE(supplier_id, invoice_number)
+```
+
+**Purpose**: Track all supplier invoices for purchase data and variance reporting.
+
+#### INVOICE_LINE_ITEMS
+Individual line items from supplier invoices, linked to master products.
+
+```sql
+id                      serial         PRIMARY KEY
+invoice_id              uuid           NOT NULL REFERENCES invoices(id) ON DELETE CASCADE
+master_product_id       uuid           REFERENCES master_products(id)
+supplier_item_list_id   integer        REFERENCES supplier_item_list(id)
+line_number             integer
+product_code            varchar(100)                                      -- Raw supplier code
+product_name            varchar(255)   NOT NULL                           -- Raw supplier name
+product_description     text
+quantity                numeric(10,2)  NOT NULL
+unit_price              numeric(10,2)
+nett_price              numeric(10,2)
+vat_code                varchar(10)
+vat_rate                numeric(5,2)
+vat_amount              numeric(10,2)
+line_total              numeric(10,2)
+created_at              timestamp      DEFAULT CURRENT_TIMESTAMP
+updated_at              timestamp      DEFAULT CURRENT_TIMESTAMP
+```
+
+**Purpose**:
+- Stores raw supplier product data (product_code, product_name) for reference
+- Links to master_products via master_product_id for normalized reporting
+- Links to supplier_item_list for auto-matching on future imports
+- All variance calculations use master_product_id for consistency
+
+#### WASTAGE_RECORDS
+Tracks product wastage, breakages, and losses during stock periods.
+
+```sql
+id              uuid           PRIMARY KEY DEFAULT uuid_generate_v4()
+session_id      uuid           NOT NULL REFERENCES stock_sessions(id) ON DELETE CASCADE
+product_id      uuid           NOT NULL REFERENCES venue_products(id) ON DELETE RESTRICT
+venue_area_id   integer        REFERENCES venue_areas(id)
+quantity        numeric(10,2)  NOT NULL CHECK (quantity > 0)
+wastage_type    varchar(50)    NOT NULL  -- 'breakage', 'spillage', 'expired', 'other'
+reason          varchar(255)
+notes           text
+recorded_by     varchar(255)
+recorded_at     timestamp      DEFAULT CURRENT_TIMESTAMP
+created_at      timestamp      DEFAULT CURRENT_TIMESTAMP
+updated_at      timestamp      DEFAULT CURRENT_TIMESTAMP
+```
+
+**Purpose**:
+- Tracked separately from stock counts
+- Used in variance calculation: Opening + Purchases - Wastage - Sales = Expected Stock
+- Links to master_products via venue_products for reporting
+
 #### USER_PROFILES
 ```sql
 id                  uuid           PRIMARY KEY
@@ -378,16 +459,27 @@ notes               text
 venues (1) --> (many) venue_areas
 venues (1) --> (many) venue_products
 venues (1) --> (many) stock_sessions
+venues (1) --> (many) invoices
 
 venue_areas (1) --> (many) stock_entries
+venue_areas (1) --> (many) wastage_records
 
 stock_sessions (1) --> (many) stock_entries
+stock_sessions (1) --> (many) wastage_records
 
 venue_products (1) --> (many) stock_entries
+venue_products (1) --> (many) wastage_records
+
 master_products (1) --> (many) venue_products
 master_products (1) --> (many) supplier_item_list
+master_products (1) --> (many) invoice_line_items
 
 suppliers (1) --> (many) supplier_item_list
+suppliers (1) --> (many) invoices
+
+invoices (1) --> (many) invoice_line_items
+
+supplier_item_list (1) --> (many) invoice_line_items
 ```
 
 ### Key Constraints
@@ -435,21 +527,96 @@ suppliers (1) --> (many) supplier_item_list
 
 ---
 
-## Stocktaking Workflow
+## Complete Stocktaking & Variance Workflow
 
-### 1. Setup (One-Time)
-1. Create venue with contact details and billing info
-2. Add venue areas (Bar, Kitchen, Cellar, etc.) with drag-and-drop ordering
-3. Products auto-populate when you start counting (linked from master_products)
+### Overview
+The system tracks opening stock, purchases, sales, wastage, and closing stock to calculate variance and generate financial reports.
 
-### 2. Start New Session
-1. Dashboard → "New Stock Take"
-2. Select venue
-3. Enter stocktaker name
-4. Select area to count
-5. Click "Start"
+**Variance Formula**: Opening Stock + Purchases - Wastage - Sales = Expected Stock
+**Actual Variance**: Expected Stock - Actual Counted Stock
 
-### 3. Count Products
+### First-Time Venue Setup
+
+#### 1. User Profile Setup (One-Time)
+1. Open program
+2. Navigate to User Profile Settings
+3. Enter personal details (name, contact info, etc.)
+4. Save profile
+
+#### 2. Create Venue (One-Time)
+1. Dashboard → "Add New Venue"
+2. Enter venue details (name, address, contact, billing rate)
+3. Add venue areas (Bar, Kitchen, Cellar, Storage, etc.)
+4. Use drag-and-drop to set area display order
+
+#### 3. Import Opening Stock (First Stocktake Only)
+**Purpose**: Establish baseline for first variance report
+
+**Data Sources**:
+- EPOS system export
+- Previous stocktaking software export
+- Manual input from paper stocktake
+
+**Process**:
+1. System prompts: "Enter details of your last stocktake"
+2. User provides date of last stocktake
+3. System creates stock_session with:
+   - `status = 'completed'`
+   - `created_at = last_stocktake_date`
+   - `completed_at = last_stocktake_date`
+   - `updated_at = last_stocktake_date`
+   - `notes = 'First system count - Opening stock imported from [source]'`
+4. User imports product names + quantities (CSV/Manual)
+5. System creates stock_entries for each product with opening stock date
+
+#### 4. Match Products to Master Database
+**For each imported product**:
+
+1. **Fuzzy Match**: System searches master_products by name
+2. **If Match Found**:
+   - Create venue_products entry with master_product_id
+   - Link stock_entry to venue_products
+3. **If No Match**:
+   - Prompt user for manual confirmation
+   - User enters: brand, unit_size, unit_type, case_size, category
+   - System checks for duplicates in master_products
+   - If confirmed new: Create master_product
+   - Create venue_products entry with master_product_id
+   - Link stock_entry to venue_products
+
+**Result**: All opening stock linked to master_products via venue_products
+
+### Recurring Workflow (Every Stock Period)
+
+#### 5. Import Supplier Invoices
+**Purpose**: Track purchases for variance calculation
+
+**Import Methods**: OCR, CSV, or Manual input
+
+**Process**:
+1. User uploads invoice (PDF for OCR, CSV, or manual entry)
+2. System creates record in `invoices`:
+   - Extract: invoice_number, supplier_id, invoice_date, totals
+   - Set: import_method ('ocr', 'csv', 'manual')
+   - Store: import_metadata (OCR confidence scores, CSV mappings)
+3. For each line item:
+   - Store raw data: product_code, product_name (supplier's naming)
+   - Fuzzy match to master_products
+   - If match found:
+     - Set master_product_id
+     - Check/create supplier_item_list entry
+     - Set supplier_item_list_id
+   - If no match:
+     - Present to user for manual matching/creation
+     - User confirms or creates new master_product
+     - Create supplier_item_list entry
+     - Set both master_product_id and supplier_item_list_id
+
+**Learning System**: Future imports from same supplier auto-match via supplier_item_list
+
+#### 6. Conduct New Stocktake
+
+**Count Products in Each Area**:
 **For each product in the selected area:**
 
 1. **Find Product**:
@@ -480,25 +647,82 @@ suppliers (1) --> (many) supplier_item_list
    - Deletes from current session only
    - Product stays in venue_products for future sessions
 
-### 4. Switch Areas
+**Switch Between Areas**:
 1. Click "Edit Products" to enable drag-and-drop reordering
 2. Click "Select Area" dropdown
 3. Choose next area
-4. Repeat counting process
+4. Repeat counting process for each area
 
-### 5. Complete Session
-1. Review all counts
+**Complete Stocktake**:
+1. Review all counts across all areas
 2. Click "Complete Session"
-3. Session saved with timestamp
+3. Session saved with status = 'completed' and timestamp
 4. Appears in session history
 
-### 6. Reopen Session (if needed)
+#### 7. Import EPOS Sales Data
+**Purpose**: Track sales for variance calculation
+
+**Process**:
+1. Export sales data from EPOS system (CSV format)
+2. Import to `epos_sales_records` table
+3. System matches products by name to venue_products
+4. Links to master_products via venue_products.master_product_id
+
+**Data Stored**: product_id, quantity_sold, revenue, sale_date, transaction details
+
+#### 8. Record Wastage & Breakages
+**Purpose**: Track losses separately from counted stock
+
+**Process**:
+1. During or after stocktake, user records wastage
+2. For each wastage event:
+   - Select product (links to venue_products → master_products)
+   - Select area where wastage occurred
+   - Enter quantity
+   - Select wastage_type: 'breakage', 'spillage', 'expired', 'other'
+   - Enter reason and notes
+   - Enter recorded_by name
+3. Saved to `wastage_records` table linked to current session
+
+**Note**: Wastage tracked separately, not included in stock_entries
+
+#### 9. Generate Variance Report
+**Purpose**: Calculate expected vs actual stock and identify discrepancies
+
+**Calculation Process**:
+1. **Opening Stock**: Query previous session's stock_entries (grouped by master_product_id)
+2. **Purchases**: Query invoice_line_items for period (grouped by master_product_id)
+3. **Wastage**: Query wastage_records for period (grouped by master_product_id via venue_products)
+4. **Sales**: Query epos_sales_records for period (grouped by master_product_id via venue_products)
+5. **Expected Stock** = Opening + Purchases - Wastage - Sales
+6. **Actual Stock**: Current session's stock_entries (grouped by master_product_id)
+7. **Variance** = Expected - Actual
+
+**Report Output**:
+- Per-product variance (quantity and value)
+- Total variance for venue
+- Variance by category
+- Variance by area
+- Products with significant discrepancies flagged
+
+**Data Storage**: Generated on-demand from live data (no separate variance table yet)
+
+### Subsequent Stock Periods
+
+For returning stocktakes, steps 1-4 are skipped (already in system):
+- Step 3/4 data already exists (previous closing stock becomes opening stock)
+- Steps 5-9 are repeated for each new stock period
+
+### Session Management
+
+**Reopen Session** (if needed):
 1. Dashboard → Session History
 2. Find session → Click "Reopen"
 3. All products and areas load with previous counts
 4. Can modify counts and save again
+5. Click "Complete Session" again to update
 
-### 7. Key Behaviors
+**Key Behaviors**:
 - **Product Removal**: Only removes from current session's stock_entries, not from venue_products
 - **Product Re-addition**: Removed products won't reappear unless manually added again
 - **Session Reopen**: Shows all products that were in stock_entries when completed
@@ -612,7 +836,16 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 
 ## Recent Updates
 
-### October 10, 2025 - Product Management Enhancements
+### October 10, 2025 - Invoice & Wastage Tracking + Workflow Documentation
+- ✅ Created `invoices` table for supplier invoice tracking
+- ✅ Created `invoice_line_items` table with master_product_id linking
+- ✅ Created `wastage_records` table for breakage/spillage tracking
+- ✅ Added import_method and import_metadata to invoices (OCR/CSV/Manual)
+- ✅ Documented complete variance calculation workflow (9 steps)
+- ✅ Updated table relationships with new tables
+- ✅ Expanded README with detailed first-time setup and recurring workflow
+
+### October 10, 2025 (Earlier) - Product Management Enhancements
 - ✅ Fixed product details display (unit_size, unit_type, case_size)
 - ✅ Added smart unit conversion (ml → cl → L)
 - ✅ Implemented product removal from sessions (✕ button)
@@ -638,13 +871,26 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 - [ ] Check Cases + Units input functionality
 - [ ] Test reopening completed stocktakes
 
+### 🎯 Next Development Phase - Invoice & Variance System
+- [ ] Opening stock import UI (Step 3)
+- [ ] Product matching UI for opening stock (Step 4)
+- [ ] Invoice upload UI (OCR/CSV/Manual) (Step 5)
+- [ ] Invoice line item matching to master_products
+- [ ] Supplier item list auto-matching logic
+- [ ] Wastage recording UI (Step 8)
+- [ ] Variance report generation (Step 9)
+- [ ] Variance report UI (per-product, by category, by area)
+- [ ] API endpoints for invoices CRUD
+- [ ] API endpoints for invoice line items
+- [ ] API endpoints for wastage records
+
 ### 🎯 Future Enhancements
 - [ ] Photo upload for products
 - [ ] Advanced reporting and analytics
-- [ ] Invoice processing (OCR)
-- [ ] EPOS sales analysis and variance reporting
+- [ ] Invoice OCR training and improvement
 - [ ] Product usage tracking and alerts
 - [ ] Multi-venue comparison reports
+- [ ] Data archiving strategy (after 4 months)
 
 ### 🚀 After Beta Testing
 - [ ] Update version numbers in all files to v2.1.0
