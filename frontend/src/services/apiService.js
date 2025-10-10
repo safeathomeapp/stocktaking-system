@@ -525,6 +525,38 @@ export const apiService = {
     }
   },
 
+  // Suppliers
+  getSuppliers: async () => {
+    try {
+      const response = await api.get('/api/suppliers');
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get suppliers error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // Invoice Import Preferences
+  getSupplierInvoicePreferences: async (supplierId) => {
+    try {
+      const response = await api.get(`/api/suppliers/${supplierId}/invoice-preferences`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get supplier invoice preferences error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  saveSupplierInvoicePreferences: async (supplierId, preferences) => {
+    try {
+      const response = await api.put(`/api/suppliers/${supplierId}/invoice-preferences`, preferences);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Save supplier invoice preferences error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
 };
 
 export default apiService;

@@ -1485,12 +1485,27 @@ const supplierMappingService = new SupplierMappingService(pool);
 app.get('/api/suppliers', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT s.*, COUNT(spm.id) as mapped_products_count
+      SELECT
+        s.sup_id,
+        s.sup_name,
+        s.sup_contact_person,
+        s.sup_email,
+        s.sup_phone,
+        s.sup_address,
+        s.sup_website,
+        s.sup_account_number,
+        s.sup_payment_terms,
+        s.sup_delivery_days,
+        s.sup_minimum_order,
+        s.sup_active,
+        s.sup_created_at,
+        s.sup_updated_at,
+        COUNT(sil.id) as item_count
       FROM suppliers s
-      LEFT JOIN supplier_product_mappings spm ON s.id = spm.supplier_id
-      WHERE s.active = true
-      GROUP BY s.id
-      ORDER BY s.name
+      LEFT JOIN supplier_item_list sil ON s.sup_id = sil.supplier_id
+      WHERE s.sup_active = true
+      GROUP BY s.sup_id
+      ORDER BY s.sup_name
     `);
 
     res.json(result.rows);
@@ -1679,6 +1694,195 @@ app.get('/api/suppliers/:id/stats', async (req, res) => {
   } catch (error) {
     console.error('Error fetching stats:', error);
     res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// =============================================
+// SUPPLIER INVOICE PREFERENCES ENDPOINTS
+// Column mapping preferences for invoice imports per supplier
+// =============================================
+
+// Get supplier invoice preferences
+app.get('/api/suppliers/:supplierId/invoice-preferences', async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+
+    const result = await pool.query(
+      `SELECT * FROM supplier_invoice_preferences WHERE supplier_id = $1`,
+      [supplierId]
+    );
+
+    if (result.rows.length === 0) {
+      // Return default preferences if none exist
+      return res.json({
+        success: true,
+        data: {
+          preferences: {
+            invoice_number_column: -1,
+            invoice_date_column: -1,
+            delivery_number_column: -1,
+            date_ordered_column: -1,
+            date_delivered_column: -1,
+            customer_ref_column: -1,
+            subtotal_column: -1,
+            vat_total_column: -1,
+            total_amount_column: -1,
+            product_code_column: -1,
+            product_name_column: 0,
+            product_description_column: -1,
+            quantity_column: -1,
+            unit_price_column: -1,
+            nett_price_column: -1,
+            vat_code_column: -1,
+            vat_rate_column: -1,
+            vat_amount_column: -1,
+            line_total_column: -1,
+            import_method: 'csv',
+            date_format: 'DD/MM/YYYY',
+            currency: 'GBP'
+          }
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        preferences: result.rows[0]
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching supplier invoice preferences:', error);
+    res.status(500).json({ error: 'Failed to fetch supplier invoice preferences' });
+  }
+});
+
+// Save supplier invoice preferences
+app.put('/api/suppliers/:supplierId/invoice-preferences', async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+    const {
+      invoice_number_column,
+      invoice_date_column,
+      delivery_number_column,
+      date_ordered_column,
+      date_delivered_column,
+      customer_ref_column,
+      subtotal_column,
+      vat_total_column,
+      total_amount_column,
+      product_code_column,
+      product_name_column,
+      product_description_column,
+      quantity_column,
+      unit_price_column,
+      nett_price_column,
+      vat_code_column,
+      vat_rate_column,
+      vat_amount_column,
+      line_total_column,
+      import_method,
+      date_format,
+      currency,
+      updated_by
+    } = req.body;
+
+    // Upsert preferences
+    const result = await pool.query(
+      `INSERT INTO supplier_invoice_preferences (
+        supplier_id,
+        invoice_number_column,
+        invoice_date_column,
+        delivery_number_column,
+        date_ordered_column,
+        date_delivered_column,
+        customer_ref_column,
+        subtotal_column,
+        vat_total_column,
+        total_amount_column,
+        product_code_column,
+        product_name_column,
+        product_description_column,
+        quantity_column,
+        unit_price_column,
+        nett_price_column,
+        vat_code_column,
+        vat_rate_column,
+        vat_amount_column,
+        line_total_column,
+        import_method,
+        date_format,
+        currency,
+        updated_by,
+        last_updated
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP)
+      ON CONFLICT (supplier_id)
+      DO UPDATE SET
+        invoice_number_column = $2,
+        invoice_date_column = $3,
+        delivery_number_column = $4,
+        date_ordered_column = $5,
+        date_delivered_column = $6,
+        customer_ref_column = $7,
+        subtotal_column = $8,
+        vat_total_column = $9,
+        total_amount_column = $10,
+        product_code_column = $11,
+        product_name_column = $12,
+        product_description_column = $13,
+        quantity_column = $14,
+        unit_price_column = $15,
+        nett_price_column = $16,
+        vat_code_column = $17,
+        vat_rate_column = $18,
+        vat_amount_column = $19,
+        line_total_column = $20,
+        import_method = $21,
+        date_format = $22,
+        currency = $23,
+        updated_by = $24,
+        last_updated = CURRENT_TIMESTAMP
+      RETURNING *`,
+      [
+        supplierId,
+        invoice_number_column,
+        invoice_date_column,
+        delivery_number_column,
+        date_ordered_column,
+        date_delivered_column,
+        customer_ref_column,
+        subtotal_column,
+        vat_total_column,
+        total_amount_column,
+        product_code_column,
+        product_name_column,
+        product_description_column,
+        quantity_column,
+        unit_price_column,
+        nett_price_column,
+        vat_code_column,
+        vat_rate_column,
+        vat_amount_column,
+        line_total_column,
+        import_method || 'csv',
+        date_format || 'DD/MM/YYYY',
+        currency || 'GBP',
+        updated_by || 'user'
+      ]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        preferences: result.rows[0]
+      },
+      message: 'Supplier invoice preferences saved successfully'
+    });
+
+  } catch (error) {
+    console.error('Error saving supplier invoice preferences:', error);
+    res.status(500).json({ error: 'Failed to save supplier invoice preferences' });
   }
 });
 
