@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const multer = require('multer');
 const pool = require('./src/database');
 require('dotenv').config();
 
@@ -9,6 +10,21 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3005;
+
+// Configure multer for file uploads (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf' || file.mimetype === 'text/csv') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF and CSV files are allowed'));
+    }
+  }
+});
 
 // Middleware
 app.use(helmet());
@@ -1883,6 +1899,49 @@ app.put('/api/suppliers/:supplierId/invoice-preferences', async (req, res) => {
   } catch (error) {
     console.error('Error saving supplier invoice preferences:', error);
     res.status(500).json({ error: 'Failed to save supplier invoice preferences' });
+  }
+});
+
+// =============================================
+// INVOICE PDF/OCR PROCESSING ENDPOINTS
+// =============================================
+
+// Import OCR utility
+const { extractTextFromScannedPDF, parseOCRInvoiceText } = require('./utils/ocrParser');
+
+// Upload and process invoice PDF with OCR
+app.post('/api/invoices/upload-pdf', upload.single('pdf'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+
+    console.log('Processing PDF:', req.file.originalname);
+
+    // Extract text from scanned PDF using OCR
+    const extracted = await extractTextFromScannedPDF(req.file.buffer);
+
+    // Parse the extracted text
+    const parsed = parseOCRInvoiceText(extracted.text);
+
+    res.json({
+      success: true,
+      data: {
+        filename: req.file.originalname,
+        pageCount: extracted.pageCount,
+        text: extracted.text,
+        header: parsed.header,
+        items: parsed.items,
+        lines: parsed.lines
+      }
+    });
+
+  } catch (error) {
+    console.error('Error processing PDF:', error);
+    res.status(500).json({
+      error: 'Failed to process PDF',
+      message: error.message
+    });
   }
 });
 

@@ -557,6 +557,31 @@ export const apiService = {
     }
   },
 
+  // Invoice PDF Upload
+  uploadInvoicePDF: async (pdfFile, onProgress) => {
+    try {
+      const formData = new FormData();
+      formData.append('pdf', pdfFile);
+
+      const response = await api.post('/api/invoices/upload-pdf', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          if (onProgress) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentCompleted);
+          }
+        }
+      });
+
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Upload invoice PDF error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
 };
 
 export default apiService;
