@@ -399,14 +399,14 @@ const InvoiceImport = () => {
     }
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const files = e.target.files;
     if (files.length > 0) {
       handleFile(files[0]);
     }
   };
 
-  const handleFile = (file) => {
+  const handleFile = async (file) => {
     setError(null);
 
     // Validate file type
