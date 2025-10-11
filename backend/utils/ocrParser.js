@@ -34,10 +34,13 @@ async function extractTextFromScannedPDF(pdfBuffer) {
 
     for (let i = 1; i <= pageCount; i++) {
       try {
+        console.log(`Converting page ${i}...`);
         const result = await pdf2pic(i, true); // true for base64 output
+        console.log(`Page ${i} converted successfully`);
         pngPages.push(result);
       } catch (err) {
         // Stop when we reach a page that doesn't exist
+        console.log(`Error converting page ${i}:`, err.message);
         break;
       }
     }
