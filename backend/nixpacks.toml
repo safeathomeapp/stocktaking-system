@@ -8,5 +8,11 @@ nixPkgs = [
   "libpng",
   "pixman",
   "pkg-config",
-  "python3"
+  "python3",
+  "poppler_utils",
+  "freetype",
+  "fontconfig",
+  "libffi",
+  "glib",
+  "librsvg"
 ]
