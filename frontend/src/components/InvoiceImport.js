@@ -461,8 +461,46 @@ const InvoiceImport = () => {
       };
       reader.readAsText(file);
     } else if (file.name.endsWith('.pdf')) {
-      // TODO: Implement PDF OCR extraction
-      setError('PDF import is coming soon. Please use CSV for now.');
+      // Process PDF with OCR
+      setIsUploading(true);
+      setError(null);
+
+      try {
+        const result = await apiService.uploadInvoicePDF(file, (progress) => {
+          console.log(`Upload progress: ${progress}%`);
+        });
+
+        if (result.success && result.data?.data) {
+          const { header, items, text } = result.data.data;
+
+          // Convert OCR results to CSV-like format
+          const headers = ['Product Code', 'Description', 'Quantity', 'Unit Price', 'Total Price'];
+          const rows = items.map(item => [
+            item.productCode || '',
+            item.description || '',
+            item.quantity || '',
+            item.unitPrice || '',
+            item.totalPrice || ''
+          ]);
+
+          setCsvData([headers, ...rows]);
+          setUploadSuccess({
+            total: items.length,
+            message: `✅ Extracted ${items.length} items from PDF`
+          });
+
+          // Display extracted header info
+          if (header && Object.keys(header).length > 0) {
+            console.log('Invoice Header:', header);
+          }
+        } else {
+          setError(result.error || 'Failed to process PDF');
+        }
+      } catch (err) {
+        setError('Error processing PDF: ' + err.message);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
