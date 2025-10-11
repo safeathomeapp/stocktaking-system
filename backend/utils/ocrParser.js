@@ -35,7 +35,7 @@ async function extractTextFromScannedPDF(pdfBuffer) {
     for (let i = 1; i <= pageCount; i++) {
       try {
         console.log(`Converting page ${i}...`);
-        const result = await pdf2pic(i, true); // true for base64 output
+        const result = await pdf2pic(i, { responseType: "base64" });
         console.log(`Page ${i} converted successfully`);
         pngPages.push(result);
       } catch (err) {
