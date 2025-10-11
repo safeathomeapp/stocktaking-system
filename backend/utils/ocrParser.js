@@ -34,7 +34,7 @@ async function extractTextFromScannedPDF(pdfBuffer) {
 
     for (let i = 1; i <= pageCount; i++) {
       try {
-        const result = await pdf2pic(i, { responseType: "base64" });
+        const result = await pdf2pic(i, true); // true for base64 output
         pngPages.push(result);
       } catch (err) {
         // Stop when we reach a page that doesn't exist
@@ -54,9 +54,9 @@ async function extractTextFromScannedPDF(pdfBuffer) {
     for (let i = 0; i < pngPages.length; i++) {
       console.log(`Processing page ${i + 1}/${pngPages.length}...`);
 
-      // pdf2pic returns base64 in the format "data:image/png;base64,..."
-      const imageData = pngPages[i].base64;
-      const { data: { text } } = await worker.recognize(imageData);
+      // pdf2pic returns object with base64 property
+      const imageBuffer = Buffer.from(pngPages[i].base64, 'base64');
+      const { data: { text } } = await worker.recognize(imageBuffer);
 
       pages.push({
         pageNum: i + 1,
