@@ -1,7 +1,8 @@
 const { createWorker } = require('tesseract.js');
-const { pdfToPng } = require('pdf-to-png-converter');
+const { fromBuffer } = require('pdf2pic');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 /**
  * Extract text from scanned PDF using OCR
@@ -10,14 +11,36 @@ const path = require('path');
  */
 async function extractTextFromScannedPDF(pdfBuffer) {
   let worker;
+  const tempFiles = [];
+
   try {
-    // Convert PDF to PNG images
+    // Convert PDF to PNG images using pdf2pic
     console.log('Converting PDF to images...');
-    const pngPages = await pdfToPng(pdfBuffer, {
-      disableFontFace: false,
-      useSystemFonts: false,
-      viewportScale: 2.0, // Higher scale for better OCR accuracy
-    });
+
+    const options = {
+      density: 200,           // DPI for better OCR accuracy
+      saveFilename: "page",
+      savePath: os.tmpdir(),  // Use system temp directory
+      format: "png",
+      width: 2000,            // Higher resolution for better OCR
+      height: 2000
+    };
+
+    const pdf2pic = fromBuffer(pdfBuffer, options);
+
+    // Get page count by trying to convert all pages
+    const pageCount = 10; // Start with reasonable max
+    const pngPages = [];
+
+    for (let i = 1; i <= pageCount; i++) {
+      try {
+        const result = await pdf2pic(i, { responseType: "base64" });
+        pngPages.push(result);
+      } catch (err) {
+        // Stop when we reach a page that doesn't exist
+        break;
+      }
+    }
 
     console.log(`Converted ${pngPages.length} pages to images`);
 
@@ -31,7 +54,9 @@ async function extractTextFromScannedPDF(pdfBuffer) {
     for (let i = 0; i < pngPages.length; i++) {
       console.log(`Processing page ${i + 1}/${pngPages.length}...`);
 
-      const { data: { text } } = await worker.recognize(pngPages[i].content);
+      // pdf2pic returns base64 in the format "data:image/png;base64,..."
+      const imageData = pngPages[i].base64;
+      const { data: { text } } = await worker.recognize(imageData);
 
       pages.push({
         pageNum: i + 1,

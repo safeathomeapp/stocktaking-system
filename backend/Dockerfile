@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     python3 \
     poppler-utils \
+    graphicsmagick \
     tesseract-ocr \
     tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
