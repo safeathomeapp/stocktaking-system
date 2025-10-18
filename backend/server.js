@@ -531,8 +531,8 @@ app.post('/api/venues/:id/products', async (req, res) => {
   } catch (error) {
     console.error('Error creating venue product:', error);
     if (error.code === '23505') {
-      // Unique constraint violation
-      res.status(409).json({ error: 'This product is already linked to this venue' });
+      // Unique constraint violation (venue_id, master_product_id, area_id)
+      res.status(409).json({ error: 'This product is already linked to this area in this venue' });
     } else {
       res.status(500).json({ error: error.message || 'Failed to create product' });
     }
