@@ -315,8 +315,8 @@ const EditAreasButton = styled.button`
   padding: ${props => props.theme.spacing.sm};
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: 6px;
-  background: ${props => props.editMode ? props.theme.colors.primary : props.theme.colors.surface};
-  color: ${props => props.editMode ? 'white' : props.theme.colors.textSecondary};
+  background: ${props => props.$editMode ? props.theme.colors.primary : props.theme.colors.surface};
+  color: ${props => props.$editMode ? 'white' : props.theme.colors.textSecondary};
   cursor: pointer;
   margin-right: ${props => props.theme.spacing.sm};
   min-height: 36px;
@@ -334,16 +334,16 @@ const DraggableAreaTab = styled.div`
   display: flex;
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
-  cursor: ${props => props.editMode ? 'grab' : 'pointer'};
-  opacity: ${props => props.isDragging ? 0.5 : 1};
+  cursor: ${props => props.$editMode ? 'grab' : 'pointer'};
+  opacity: ${props => props.$isDragging ? 0.5 : 1};
 
   &:active {
-    cursor: ${props => props.editMode ? 'grabbing' : 'pointer'};
+    cursor: ${props => props.$editMode ? 'grabbing' : 'pointer'};
   }
 `;
 
 const AreaDragHandle = styled.div`
-  display: ${props => props.editMode ? 'flex' : 'none'};
+  display: ${props => props.$editMode ? 'flex' : 'none'};
   flex-direction: column;
   gap: 2px;
   padding: ${props => props.theme.spacing.xs};
@@ -360,9 +360,9 @@ const AreaTab = styled.button`
   gap: ${props => props.theme.spacing.xs};
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
   border-radius: 6px;
-  border: 1px solid ${props => props.active ? props.theme.colors.primary : props.theme.colors.border};
-  background: ${props => props.active ? props.theme.colors.primary : props.theme.colors.surface};
-  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  border: 1px solid ${props => props.$active ? props.theme.colors.primary : props.theme.colors.border};
+  background: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.surface};
+  color: ${props => props.$active ? 'white' : props.theme.colors.text};
   font-weight: 500;
   font-size: 0.875rem;
   min-height: 36px;
@@ -568,9 +568,9 @@ const DraggableItem = styled.div`
   background: ${props => props.theme.colors.background};
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: 6px;
-  cursor: ${props => props.editMode ? (props.isDragging ? 'grabbing' : 'grab') : 'default'};
+  cursor: ${props => props.$editMode ? (props.$isDragging ? 'grabbing' : 'grab') : 'default'};
   transition: all 0.2s ease;
-  opacity: ${props => props.isDragging ? 0.5 : 1};
+  opacity: ${props => props.$isDragging ? 0.5 : 1};
   min-height: 64px;
 
   &:hover {
@@ -580,7 +580,7 @@ const DraggableItem = styled.div`
 `;
 
 const DragHandle = styled.div`
-  display: ${props => props.editMode ? 'flex' : 'none'};
+  display: ${props => props.$editMode ? 'flex' : 'none'};
   flex-direction: column;
   gap: 2px;
   cursor: grab;
@@ -597,7 +597,7 @@ const DragHandle = styled.div`
 `;
 
 const RemoveButton = styled.button`
-  display: ${props => props.editMode ? 'flex' : 'none'};
+  display: ${props => props.$editMode ? 'flex' : 'none'};
   align-items: center;
   justify-content: center;
   width: 32px;
@@ -1898,7 +1898,7 @@ const StockTaking = () => {
       <AreaCarousel>
         <AreaScrollContainer>
           <EditAreasButton
-            editMode={editAreasMode}
+            $editMode={editAreasMode}
             onClick={() => {
               const wasInEditMode = editAreasMode;
               setEditAreasMode(!editAreasMode);
@@ -1943,22 +1943,22 @@ const StockTaking = () => {
           {updatedAreas.map(area => (
             <DraggableAreaTab
               key={area.id}
-              editMode={editAreasMode}
-              isDragging={draggedArea === area.id}
+              $editMode={editAreasMode}
+              $isDragging={draggedArea === area.id}
               draggable={editAreasMode}
               onDragStart={(e) => handleAreaDragStart(e, area.id)}
               onDragOver={handleAreaDragOver}
               onDrop={(e) => handleAreaDrop(e, area.id)}
               onDragEnd={handleAreaDragEnd}
             >
-              <AreaDragHandle editMode={editAreasMode}>
+              <AreaDragHandle $editMode={editAreasMode}>
                 <DragDot />
                 <DragDot />
                 <DragDot />
               </AreaDragHandle>
 
               <AreaTab
-                active={currentArea === area.id}
+                $active={currentArea === area.id}
                 onClick={() => handleAreaChange(area.id)}
               >
                 {area.name}
@@ -2006,7 +2006,7 @@ const StockTaking = () => {
             <SearchSection>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <EditAreasButton
-                  editMode={editProductsMode}
+                  $editMode={editProductsMode}
                   onClick={() => setEditProductsMode(!editProductsMode)}
                   title={editProductsMode ? "Exit product edit mode" : "Edit product order"}
                 >
@@ -2054,14 +2054,14 @@ const StockTaking = () => {
                 key={item.id}
                 data-product-id={item.id}
                 draggable={editProductsMode}
-                editMode={editProductsMode}
-                isDragging={draggedItem === item.id}
+                $editMode={editProductsMode}
+                $isDragging={draggedItem === item.id}
                 onDragStart={(e) => handleDragStart(e, item.id)}
                 onDragOver={(e) => handleDragOver(e, item.id)}
                 onDragEnd={handleDragEnd}
                 onDrop={(e) => handleDrop(e, item.id)}
               >
-                <DragHandle editMode={editProductsMode}>
+                <DragHandle $editMode={editProductsMode}>
                   <DragDot />
                   <DragDot />
                   <DragDot />
@@ -2072,7 +2072,7 @@ const StockTaking = () => {
                     <ProductName>
                       <span>{item.venue_name || item.name}</span>
                       <RemoveButton
-                        editMode={editProductsMode}
+                        $editMode={editProductsMode}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRemoveProduct(item.id);
