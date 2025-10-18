@@ -2348,7 +2348,7 @@ app.get('/api/user/summary', async (req, res) => {
 // Get all supplier items (with optional filtering)
 app.get('/api/supplier-items', async (req, res) => {
   try {
-    const { supplier_id, master_product_id, active } = req.query;
+    const { supplier_id, master_product_id, active, search } = req.query;
 
     let query = `
       SELECT
@@ -2383,13 +2383,24 @@ app.get('/api/supplier-items', async (req, res) => {
       paramCount++;
     }
 
+    // Add search functionality for product name or SKU
+    if (search && search.trim()) {
+      query += ` AND (
+        LOWER(sil.supplier_name) LIKE LOWER($${paramCount}) OR
+        LOWER(sil.supplier_sku) LIKE LOWER($${paramCount}) OR
+        LOWER(sil.supplier_description) LIKE LOWER($${paramCount})
+      )`;
+      params.push(`%${search.trim()}%`);
+      paramCount++;
+    }
+
     query += ` ORDER BY sil.supplier_name, sil.created_at DESC`;
 
     const result = await pool.query(query, params);
 
     res.json({
       success: true,
-      data: result.rows,
+      items: result.rows,
       count: result.rows.length
     });
   } catch (error) {

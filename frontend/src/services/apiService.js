@@ -582,6 +582,34 @@ export const apiService = {
     }
   },
 
+  // Supplier Items - Search items for a supplier
+  getSupplierItems: async (supplierId, searchTerm = '') => {
+    try {
+      const params = new URLSearchParams();
+      params.append('supplier_id', supplierId);
+      if (searchTerm && searchTerm.trim()) {
+        params.append('search', searchTerm.trim());
+      }
+
+      const response = await api.get(`/api/supplier-items?${params}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get supplier items error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // Manual Invoice Creation
+  createManualInvoice: async (invoiceData) => {
+    try {
+      const response = await api.post('/api/invoices', invoiceData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Create manual invoice error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
 };
 
 export default apiService;
