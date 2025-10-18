@@ -290,7 +290,13 @@ const VenueManagement = () => {
       const response = await apiService.createVenue(venueData);
 
       if (response.success) {
-        setSuccess('Venue created successfully! Default areas have been added automatically.');
+        setSuccess('Venue created successfully! Redirecting to dashboard...');
+
+        // Get the newly created venue ID
+        const newVenueId = response.data.venue.id;
+
+        // Save the new venue as the selected venue in localStorage
+        localStorage.setItem('selectedVenue', newVenueId);
 
         // Reset form
         setFormData({
@@ -312,7 +318,7 @@ const VenueManagement = () => {
         // Redirect to dashboard after a short delay
         setTimeout(() => {
           navigate('/');
-        }, 2000);
+        }, 1500);
       } else {
         setError('Failed to create venue: ' + response.error);
       }
