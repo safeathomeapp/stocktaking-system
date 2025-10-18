@@ -612,6 +612,15 @@ const Dashboard = () => {
         </Button>
 
         <Button
+          onClick={() => navigate(`/invoice-manual/${selectedVenue}`)}
+          variant="outline"
+          size="lg"
+          disabled={!selectedVenue}
+        >
+          Manual Invoice Entry
+        </Button>
+
+        <Button
           onClick={() => navigate(`/epos-csv-input/${selectedVenue}`)}
           variant="outline"
           size="lg"
