@@ -259,7 +259,7 @@ const ManualInvoiceEntry = () => {
   const { venueId } = useParams();
 
   // State
-  const [venues, setVenues] = useState([]);
+  const [venueName, setVenueName] = useState('');
   const [suppliers, setSuppliers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -284,19 +284,29 @@ const ManualInvoiceEntry = () => {
   // Line items
   const [lineItems, setLineItems] = useState([]);
 
-  // Load venues and suppliers
+  // Load venue and suppliers
   useEffect(() => {
     loadInitialData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venueId]);
 
   const loadInitialData = async () => {
     try {
       setLoading(true);
 
-      // Load venues
-      const venuesResult = await apiService.getVenues();
-      if (venuesResult.success && venuesResult.data.venues) {
-        setVenues(venuesResult.data.venues);
+      // Verify venue ID is provided
+      if (!venueId) {
+        setError('No venue selected. Please select a venue from the dashboard.');
+        setLoading(false);
+        return;
+      }
+
+      // Load venue details
+      const venueResult = await apiService.getVenueById(venueId);
+      if (venueResult.success && venueResult.data.venue) {
+        setVenueName(venueResult.data.venue.name);
+      } else {
+        setError('Failed to load venue details');
       }
 
       // Load suppliers
@@ -401,8 +411,8 @@ const ManualInvoiceEntry = () => {
       setLoading(true);
 
       // Validate
-      if (!invoiceData.venue_id || !invoiceData.supplier_id || !invoiceData.invoice_date) {
-        setError('Please fill in all required fields (Venue, Supplier, Invoice Date)');
+      if (!invoiceData.supplier_id || !invoiceData.invoice_date) {
+        setError('Please fill in all required fields (Supplier, Invoice Date)');
         setLoading(false);
         return;
       }
@@ -428,10 +438,10 @@ const ManualInvoiceEntry = () => {
       const result = await apiService.createManualInvoice(payload);
 
       if (result.success) {
-        setSuccess('Invoice created successfully!');
+        setSuccess('Invoice created successfully! Redirecting to dashboard...');
         setTimeout(() => {
-          navigate(`/venue/${invoiceData.venue_id}`);
-        }, 2000);
+          navigate('/');
+        }, 1500);
       } else {
         setError(result.error || 'Failed to create invoice');
       }
@@ -462,19 +472,13 @@ const ManualInvoiceEntry = () => {
         <SectionTitle>Invoice Details</SectionTitle>
         <FormGrid>
           <FormGroup>
-            <Label>Venue *</Label>
-            <Select
-              value={invoiceData.venue_id}
-              onChange={(e) => handleInputChange('venue_id', e.target.value)}
-              disabled={!!venueId}
-            >
-              <option value="">Select venue...</option>
-              {venues.map(venue => (
-                <option key={venue.venue_id} value={venue.venue_id}>
-                  {venue.venue_name}
-                </option>
-              ))}
-            </Select>
+            <Label>Venue</Label>
+            <Input
+              type="text"
+              value={venueName}
+              disabled
+              placeholder="Loading venue..."
+            />
           </FormGroup>
 
           <FormGroup>
