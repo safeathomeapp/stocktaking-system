@@ -52,7 +52,7 @@ const FormGrid = styled.div`
   gap: ${props => props.theme.spacing.lg};
 
   @media (min-width: ${props => props.theme.breakpoints.tablet}) {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 `;
 
@@ -276,9 +276,7 @@ const ManualInvoiceEntry = () => {
     invoice_date: new Date().toISOString().split('T')[0],
     date_ordered: '',
     date_delivered: '',
-    delivery_number: '',
-    customer_ref: '',
-    notes: ''
+    delivery_number: ''
   });
 
   // Line items
@@ -469,18 +467,8 @@ const ManualInvoiceEntry = () => {
 
       {/* Invoice Header */}
       <FormSection>
-        <SectionTitle>Invoice Details</SectionTitle>
+        <SectionTitle>Invoice Details for {venueName || 'Loading...'}</SectionTitle>
         <FormGrid>
-          <FormGroup>
-            <Label>Venue</Label>
-            <Input
-              type="text"
-              value={venueName}
-              disabled
-              placeholder="Loading venue..."
-            />
-          </FormGroup>
-
           <FormGroup>
             <Label>Supplier *</Label>
             <Select
@@ -542,26 +530,7 @@ const ManualInvoiceEntry = () => {
               placeholder="DEL-001"
             />
           </FormGroup>
-
-          <FormGroup>
-            <Label>Customer Reference</Label>
-            <Input
-              type="text"
-              value={invoiceData.customer_ref}
-              onChange={(e) => handleInputChange('customer_ref', e.target.value)}
-            />
-          </FormGroup>
         </FormGrid>
-
-        <FormGroup style={{ marginTop: '1.5rem' }}>
-          <Label>Notes</Label>
-          <Input
-            type="text"
-            value={invoiceData.notes}
-            onChange={(e) => handleInputChange('notes', e.target.value)}
-            placeholder="Additional notes..."
-          />
-        </FormGroup>
       </FormSection>
 
       {/* Line Items */}
