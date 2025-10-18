@@ -468,14 +468,7 @@ app.post('/api/venues/:id/products', async (req, res) => {
     const venueId = req.params.id;
     const {
       name,
-      brand,
-      category,
-      subcategory,
-      unit_type,
-      unit_size,
-      case_size,
       area_id,
-      barcode,
       master_product_id
     } = req.body;
 
@@ -484,42 +477,65 @@ app.post('/api/venues/:id/products', async (req, res) => {
       return res.status(400).json({ error: 'Product name is required' });
     }
 
+    if (!master_product_id) {
+      return res.status(400).json({ error: 'Master product ID is required' });
+    }
+
     // Verify venue exists
     const venueCheck = await pool.query('SELECT id FROM venues WHERE id = $1', [venueId]);
     if (venueCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Venue not found' });
     }
 
-    // Create the venue product
+    // Verify master product exists
+    const masterCheck = await pool.query('SELECT id FROM master_products WHERE id = $1', [master_product_id]);
+    if (masterCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Master product not found' });
+    }
+
+    // Create the venue product (linkage table only)
     const result = await pool.query(
-      `INSERT INTO venue_products (
-        venue_id, name, brand, category, subcategory,
-        unit_type, unit_size, case_size, area_id, barcode, master_product_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO venue_products (venue_id, master_product_id, area_id, name)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [
-        venueId,
-        name,
-        brand || null,
-        category || null,
-        subcategory || null,
-        unit_type || null,
-        unit_size || null,
-        case_size || null,
-        area_id || null,
-        barcode || null,
-        master_product_id || null
-      ]
+      [venueId, master_product_id, area_id || null, name]
+    );
+
+    // Get the full product details by joining with master_products
+    const fullProduct = await pool.query(
+      `SELECT
+        vp.id,
+        vp.venue_id,
+        vp.area_id,
+        vp.name as venue_name,
+        vp.master_product_id,
+        mp.name,
+        mp.brand,
+        mp.unit_type,
+        mp.unit_size,
+        mp.category,
+        mp.subcategory,
+        mp.barcode,
+        mp.case_size
+      FROM venue_products vp
+      LEFT JOIN master_products mp ON vp.master_product_id = mp.id
+      WHERE vp.id = $1`,
+      [result.rows[0].id]
     );
 
     res.status(201).json({
       message: 'Product created successfully',
-      product: result.rows[0]
+      product: fullProduct.rows[0]
     });
 
   } catch (error) {
     console.error('Error creating venue product:', error);
-    res.status(500).json({ error: 'Failed to create product' });
+    if (error.code === '23505') {
+      // Unique constraint violation
+      res.status(409).json({ error: 'This product is already linked to this venue' });
+    } else {
+      res.status(500).json({ error: error.message || 'Failed to create product' });
+    }
   }
 });
 
@@ -1942,6 +1958,203 @@ app.post('/api/invoices/upload-pdf', upload.single('pdf'), async (req, res) => {
       error: 'Failed to process PDF',
       message: error.message
     });
+  }
+});
+
+// Search supplier items by supplier and search term
+app.get('/api/supplier-items', async (req, res) => {
+  try {
+    const { supplier_id, search } = req.query;
+
+    if (!supplier_id) {
+      return res.status(400).json({ error: 'supplier_id is required' });
+    }
+
+    let query = `
+      SELECT
+        sil.id,
+        sil.supplier_id,
+        sil.master_product_id,
+        sil.supplier_sku,
+        sil.supplier_name,
+        sil.supplier_description,
+        sil.supplier_brand,
+        sil.supplier_category,
+        sil.supplier_size,
+        sil.supplier_barcode,
+        sil.unit_cost,
+        sil.case_cost,
+        sil.pack_size,
+        sil.case_size,
+        sil.minimum_order,
+        sil.active
+      FROM supplier_item_list sil
+      WHERE sil.supplier_id = $1
+        AND sil.active = true
+    `;
+
+    const params = [supplier_id];
+
+    // Add search filter if provided
+    if (search && search.trim()) {
+      query += `
+        AND (
+          sil.supplier_sku ILIKE $2
+          OR sil.supplier_name ILIKE $2
+          OR sil.supplier_description ILIKE $2
+        )
+      `;
+      params.push(`%${search.trim()}%`);
+    }
+
+    query += ` ORDER BY sil.supplier_name LIMIT 100`;
+
+    const result = await pool.query(query, params);
+
+    res.json({
+      success: true,
+      items: result.rows,
+      count: result.rows.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching supplier items:', error);
+    res.status(500).json({ error: 'Failed to fetch supplier items' });
+  }
+});
+
+// Create manual invoice with line items
+app.post('/api/invoices', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const {
+      invoice_number,
+      venue_id,
+      supplier_id,
+      invoice_date,
+      date_ordered,
+      date_delivered,
+      delivery_number,
+      customer_ref,
+      subtotal,
+      vat_total,
+      total_amount,
+      currency = 'GBP',
+      payment_status = 'pending',
+      notes,
+      line_items // Array of line items
+    } = req.body;
+
+    // Validate required fields
+    if (!venue_id || !supplier_id || !invoice_date || !line_items || !Array.isArray(line_items) || line_items.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Missing required fields: venue_id, supplier_id, invoice_date, and line_items are required'
+      });
+    }
+
+    // Generate invoice ID
+    const { v4: uuidv4 } = require('uuid');
+    const invoiceId = uuidv4();
+
+    // Insert invoice
+    const invoiceInsert = await client.query(`
+      INSERT INTO invoices (
+        id, invoice_number, venue_id, supplier_id,
+        invoice_date, date_ordered, date_delivered,
+        delivery_number, customer_ref,
+        subtotal, vat_total, total_amount, currency,
+        payment_status, import_method, notes,
+        created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
+      RETURNING *
+    `, [
+      invoiceId,
+      invoice_number,
+      venue_id,
+      supplier_id,
+      invoice_date,
+      date_ordered,
+      date_delivered,
+      delivery_number,
+      customer_ref,
+      subtotal,
+      vat_total,
+      total_amount,
+      currency,
+      payment_status,
+      'manual',
+      notes
+    ]);
+
+    // Insert line items
+    const lineItemInserts = [];
+    for (let i = 0; i < line_items.length; i++) {
+      const item = line_items[i];
+
+      const lineItemResult = await client.query(`
+        INSERT INTO invoice_line_items (
+          invoice_id,
+          master_product_id,
+          supplier_item_list_id,
+          line_number,
+          product_code,
+          product_name,
+          product_description,
+          quantity,
+          unit_price,
+          nett_price,
+          vat_code,
+          vat_rate,
+          vat_amount,
+          line_total,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+        RETURNING *
+      `, [
+        invoiceId,
+        item.master_product_id || null,
+        item.supplier_item_list_id || null,
+        i + 1,
+        item.product_code || '',
+        item.product_name || '',
+        item.product_description || '',
+        item.quantity || 0,
+        item.unit_price || 0,
+        item.nett_price || item.unit_price || 0,
+        item.vat_code || 'S',
+        item.vat_rate || 20,
+        item.vat_amount || 0,
+        item.line_total || 0
+      ]);
+
+      lineItemInserts.push(lineItemResult.rows[0]);
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: {
+        invoice: invoiceInsert.rows[0],
+        line_items: lineItemInserts
+      },
+      message: 'Invoice created successfully'
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creating invoice:', error);
+    res.status(500).json({
+      error: 'Failed to create invoice',
+      message: error.message
+    });
+  } finally {
+    client.release();
   }
 });
 
