@@ -4,6 +4,42 @@
 
 ---
 
+# ⚠️ CRITICAL: HYBRID ARCHITECTURE ⚠️
+
+**System Architecture:**
+- **Railway Backend**: Database operations (invoices, venues, sessions, etc.)
+- **Localhost Backend**: PDF parsing ONLY (has pdf-parse library installed)
+
+**API Configuration:**
+
+```javascript
+// frontend/src/config/api.js - Database operations
+const API_BASE_URL = 'https://stocktaking-api-production.up.railway.app';
+
+// frontend/src/components/SupplierInvoiceReview.js - PDF parsing only
+const PDF_PARSE_URL = 'http://localhost:3005/api/invoices/parse-supplier-pdf';
+```
+
+**Why This Architecture:**
+- Railway has the PostgreSQL database with live data
+- Localhost has pdf-parse library for invoice PDF processing
+- Frontend sends PDF parsing to localhost, everything else to Railway
+
+**Required for Invoice Imports:**
+1. **Start local backend**: `cd backend && npm start` (runs on port 3005)
+2. **Frontend auto-connects**: PDF parsing → localhost, database → Railway
+
+**When Deploying Backend Changes:**
+1. Edit backend code locally
+2. Test PDF parsing locally (localhost:3005)
+3. Commit to GitHub
+4. Deploy to Railway: `railway up --service stocktaking-api --detach`
+5. Railway deployment handles database operations only
+
+**DO NOT change API_BASE_URL to localhost - it will break database access!**
+
+---
+
 ## System Architecture & Design Principles
 
 ### Master Products - Single Source of Truth
@@ -300,7 +336,9 @@ sup_updated_at        timestamp     DEFAULT CURRENT_TIMESTAMP
 ```
 
 #### SUPPLIER_ITEM_LIST
-Maps supplier-specific product names and SKUs to master products for invoice OCR matching.
+**Lean mapping table** - maps supplier SKUs to master products for invoice matching.
+
+**Purpose**: This is a bridging/lookup table that helps match supplier invoice items to master products.
 
 ```sql
 id                     serial         PRIMARY KEY
@@ -308,23 +346,11 @@ supplier_id            uuid          NOT NULL REFERENCES suppliers(sup_id)
 master_product_id      uuid          REFERENCES master_products(id)
 supplier_sku           varchar(100)  NOT NULL
 supplier_name          varchar(255)  NOT NULL
-supplier_description   text
-supplier_brand         varchar(100)
-supplier_category      varchar(100)
-supplier_size          varchar(50)
-supplier_barcode       varchar(100)
-unit_cost              numeric(10,2)
-case_cost              numeric(10,2)
-pack_size              integer       DEFAULT 1
-case_size              integer
-minimum_order          integer       DEFAULT 1
+supplier_description   text          -- Optional, helps with fuzzy matching
 auto_matched           boolean       DEFAULT false
 verified               boolean       DEFAULT false
 confidence_score       numeric(5,2)  DEFAULT 0
 match_notes            text
-last_cost_update       timestamp
-last_ordered           timestamp
-order_frequency_days   integer
 active                 boolean       DEFAULT true
 created_at             timestamp     DEFAULT CURRENT_TIMESTAMP
 updated_at             timestamp     DEFAULT CURRENT_TIMESTAMP
@@ -332,6 +358,13 @@ created_by             varchar(100)
 
 CONSTRAINT unique_supplier_sku UNIQUE(supplier_id, supplier_sku)
 ```
+
+**Key Points:**
+- **Minimal data** - only stores SKU and name mapping
+- **NO pricing** - stored in `invoice_line_items`
+- **NO product specs** - stored in `master_products` (case_size, unit_size, brand, etc.)
+- **Purpose**: Fast lookup from "supplier SKU + name" → master_product_id
+- Matching metadata (`auto_matched`, `confidence_score`) for quality tracking
 
 #### INVOICES
 Tracks supplier invoices with import method (OCR/CSV/Manual).
@@ -591,28 +624,209 @@ The system tracks opening stock, purchases, sales, wastage, and closing stock to
 #### 5. Import Supplier Invoices
 **Purpose**: Track purchases for variance calculation
 
-**Import Methods**: OCR, CSV, or Manual input
+**Import Methods**: PDF OCR, CSV, or Manual input
 
-**Process**:
-1. User uploads invoice (PDF for OCR, CSV, or manual entry)
-2. System creates record in `invoices`:
-   - Extract: invoice_number, supplier_id, invoice_date, totals
-   - Set: import_method ('ocr', 'csv', 'manual')
-   - Store: import_metadata (OCR confidence scores, CSV mappings)
-3. For each line item:
-   - Store raw data: product_code, product_name (supplier's naming)
-   - Fuzzy match to master_products
-   - If match found:
-     - Set master_product_id
-     - Check/create supplier_item_list entry
-     - Set supplier_item_list_id
-   - If no match:
-     - Present to user for manual matching/creation
-     - User confirms or creates new master_product
-     - Create supplier_item_list entry
-     - Set both master_product_id and supplier_item_list_id
+---
 
-**Learning System**: Future imports from same supplier auto-match via supplier_item_list
+### Invoice Processing Architecture
+
+**3-Table Design:**
+
+```
+┌─────────────────────┐
+│ invoice_line_items  │ ← Transaction records (what was purchased)
+│  - Raw supplier data│
+│  - Pricing data     │
+└──────┬──────────────┘
+       │ Links to ↓
+┌──────▼──────────────┐
+│ supplier_item_list  │ ← Mapping table (how to find it)
+│  - SKU → Product    │
+│  - Naming variations│
+└──────┬──────────────┘
+       │ Links to ↓
+┌──────▼──────────────┐
+│ master_products     │ ← Product catalog (what it is)
+│  - Specifications   │
+│  - Case size, brand │
+└─────────────────────┘
+```
+
+**Data Flow:**
+1. **invoice_line_items** = Financial/transactional (stores actual purchase with pricing)
+2. **supplier_item_list** = Operational lookup (maps supplier SKU → master product)
+3. **master_products** = Product reference (canonical product specifications)
+
+---
+
+### Invoice Processing Workflow (Multi-Step Wizard)
+
+**Step 1: Upload & Parse PDF**
+1. User uploads supplier invoice PDF
+2. System parses PDF locally (using pdf-parse):
+   - Extract supplier name
+   - Extract line items (SKU, product name, pack size, unit size, quantity, price)
+3. Display review table with:
+   - ☑ Checkbox for each line (include/exclude)
+   - 📝 Editable pack_size field
+   - 📝 Editable unit_size field
+   - Product name, SKU, unit cost, case size (from PDF)
+4. User reviews/edits/selects items
+5. User clicks "Continue to Invoice Entry" →
+
+**Step 2: Create Invoice & Line Items**
+1. System creates record in `invoices` table:
+   ```sql
+   INSERT INTO invoices (
+     invoice_number, supplier_id, venue_id, invoice_date,
+     total_amount, import_method
+   ) VALUES (...)
+   ```
+2. For each selected line item from Step 1:
+   ```sql
+   INSERT INTO invoice_line_items (
+     invoice_id,
+     product_code,      -- Raw SKU from PDF
+     product_name,      -- Raw name from PDF
+     quantity,
+     unit_price,
+     line_total,
+     supplier_item_list_id,  -- NULL initially
+     master_product_id       -- NULL initially
+   ) VALUES (...)
+   ```
+3. Invoice and line items saved (transaction complete) →
+
+**Step 3: Match to Supplier Items**
+For each `invoice_line_items` record:
+
+1. **Search supplier_item_list**:
+   ```sql
+   SELECT id, master_product_id
+   FROM supplier_item_list
+   WHERE supplier_id = ? AND supplier_sku = ?
+   ```
+
+2. **If Match Found**:
+   ```sql
+   UPDATE invoice_line_items
+   SET supplier_item_list_id = ?
+   WHERE id = ?
+   ```
+   - Display: ✓ "Matched to existing supplier item"
+   - Status: 🟢 Ready for master product matching
+
+3. **If No Match**:
+   - Auto-create new supplier_item_list entry:
+   ```sql
+   INSERT INTO supplier_item_list (
+     supplier_id,
+     supplier_sku,
+     supplier_name,
+     master_product_id  -- NULL (to be matched in Step 4)
+   ) VALUES (?, ?, ?, NULL)
+   RETURNING id
+   ```
+   - Update invoice line item with new supplier_item_list_id
+   - Display: ⚠️ "New supplier item created"
+   - Status: 🟡 Needs master product matching →
+
+**Step 4: Match to Master Products (Manual Review)**
+For each line item that needs master product linking:
+
+1. **Fuzzy Search master_products**:
+   ```sql
+   SELECT id, name, brand, unit_size, case_size, category,
+          similarity(name, ?) as score
+   FROM master_products
+   WHERE similarity(name, ?) > 0.3
+   ORDER BY score DESC
+   LIMIT 5
+   ```
+
+2. **Display Suggestions**:
+   ```
+   Product from Invoice: "Heineken Lager 24x500ml"
+
+   Suggested Matches:
+   ○ Heineken Lager • Bottle • 500ml • Case of 24    [85% match]
+   ○ Heineken Premium • Bottle • 500ml • Case of 12   [72% match]
+   ○ [Create New Master Product]
+   ```
+
+3. **User Selects Match**:
+   - **Option A**: Select existing master product →
+     ```sql
+     UPDATE supplier_item_list
+     SET master_product_id = ?,
+         auto_matched = false,
+         verified = true,
+         confidence_score = ?
+     WHERE id = ?
+
+     UPDATE invoice_line_items
+     SET master_product_id = ?
+     WHERE id = ?
+     ```
+
+   - **Option B**: Create new master product →
+     - User provides: name, brand, category, unit_size, unit_type, case_size
+     - System validates no duplicates exist
+     - Creates new `master_products` entry
+     - Links supplier_item_list and invoice_line_items to new master product
+
+4. **Result**:
+   - `invoice_line_items.supplier_item_list_id` → linked
+   - `invoice_line_items.master_product_id` → linked
+   - `supplier_item_list.master_product_id` → linked
+   - Status: 🟢 Fully linked
+
+**Step 5: Complete Import**
+1. Show summary:
+   - Invoice total
+   - X line items processed
+   - Y matched automatically
+   - Z created as new products
+2. User confirms
+3. Invoice processing complete! →
+
+---
+
+### Future Invoice Learning
+
+**Next invoice from same supplier:**
+1. Upload PDF (Step 1)
+2. Create invoice & line items (Step 2)
+3. **Auto-match via supplier_item_list** (Step 3):
+   - System finds existing supplier_item_list entries by SKU
+   - Auto-populates `supplier_item_list_id` AND `master_product_id`
+   - Status: 🟢 Automatically matched
+4. Only show manual review (Step 4) for **new products**
+5. Faster processing each time!
+
+---
+
+### Key Benefits
+
+**Separation of Concerns:**
+- `invoice_line_items` = What was purchased (never changes)
+- `supplier_item_list` = How to find it (improves over time)
+- `master_products` = What it is (single source of truth)
+
+**Historical Accuracy:**
+- Invoices preserve raw supplier data
+- Can re-match later if needed
+- Pricing history maintained
+
+**Matching Quality:**
+- Manual review ensures accuracy
+- System learns from user decisions
+- Confidence scores track match quality
+
+**Database Efficiency:**
+- No redundant product specs in supplier_item_list
+- Pricing only in invoice_line_items (changes with each invoice)
+- Product specs only in master_products (change rarely)
 
 #### 6. Conduct New Stocktake
 
@@ -853,6 +1067,16 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 
 ## Recent Updates
 
+### October 19, 2025 - Invoice Processing Architecture Documentation
+- ✅ Documented complete 3-table invoice architecture (invoice_line_items → supplier_item_list → master_products)
+- ✅ Cleaned up supplier_item_list schema (removed redundant fields)
+- ✅ Documented 5-step invoice processing workflow (multi-step wizard approach)
+- ✅ Clarified data separation: pricing in invoice_line_items, specs in master_products, mapping in supplier_item_list
+- ✅ Added invoice learning system documentation (auto-matching via supplier_item_list)
+- ✅ Created migration script to cleanup supplier_item_list table
+- ✅ Implemented Step 1: PDF parsing UI with editable fields and checkboxes
+- ✅ Updated README with architectural diagrams and detailed workflow
+
 ### October 10, 2025 - Invoice & Wastage Tracking + Workflow Documentation
 - ✅ Created `invoices` table for supplier invoice tracking
 - ✅ Created `invoice_line_items` table with master_product_id linking
@@ -898,12 +1122,37 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 - [ ] Fuzzy match to master_products
 - [ ] Create opening stock session (status=completed, historical date)
 
-#### Invoice Processing (Step 5)
-- [ ] Invoice upload UI (OCR/CSV/Manual)
-- [ ] Invoice line item matching to master_products
-- [ ] Supplier item list auto-matching logic
-- [ ] API endpoints for invoices CRUD
-- [ ] API endpoints for invoice line items
+#### Invoice Processing (Step 5) - Multi-Step Wizard
+**Step 1: PDF Upload & Review**
+- [x] PDF parsing endpoint (no timeout issues!)
+- [x] Extract supplier name and product details
+- [x] React UI with editable table (checkboxes, pack_size, unit_size)
+- [x] Drag & drop file upload
+- [ ] Add invoice metadata fields (invoice_number, invoice_date, venue selection)
+
+**Step 2: Create Invoice & Line Items**
+- [ ] API: POST /api/invoices - create invoice header
+- [ ] API: POST /api/invoices/:id/line-items - create line items from reviewed data
+- [ ] Store raw supplier data (product_code, product_name, pricing)
+- [ ] Set supplier_item_list_id and master_product_id to NULL initially
+
+**Step 3: Match to Supplier Items**
+- [ ] API: GET /api/supplier-items/match - find existing supplier items by SKU
+- [ ] Auto-create new supplier_item_list entries for unmatched items
+- [ ] Update invoice_line_items with supplier_item_list_id
+- [ ] UI: Show matched vs new supplier items
+
+**Step 4: Match to Master Products (Manual Review)**
+- [ ] API: POST /api/master-products/fuzzy-search - find similar master products
+- [ ] UI: Show suggested matches with confidence scores
+- [ ] UI: Allow user to select match or create new master product
+- [ ] Update supplier_item_list.master_product_id
+- [ ] Update invoice_line_items.master_product_id
+- [ ] Track matching metadata (auto_matched, verified, confidence_score)
+
+**Step 5: Complete Import**
+- [ ] Summary screen showing import results
+- [ ] Confirmation and navigation back to dashboard
 
 #### Wastage & Variance (Steps 8-9)
 - [ ] Wastage recording UI
@@ -950,4 +1199,4 @@ When providing prompts for new features:
 ---
 
 **Version**: 2.0.1
-**Last Updated**: October 10, 2025
+**Last Updated**: October 19, 2025

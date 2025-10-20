@@ -610,6 +610,68 @@ export const apiService = {
     }
   },
 
+  // Supplier Invoice PDF Upload
+  uploadSupplierProducts: async (supplierName, products) => {
+    try {
+      const response = await api.post('/api/invoices/upload-supplier-products', {
+        supplierName,
+        products
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Upload supplier products error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // ===================================
+  // Multi-Step Invoice Workflow
+  // ===================================
+
+  // Step 2: Create invoice with line items
+  createInvoice: async (invoiceData) => {
+    try {
+      const response = await api.post('/api/invoices', invoiceData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Create invoice error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // Step 3: Match supplier items
+  matchSupplierItems: async (invoiceId) => {
+    try {
+      const response = await api.post(`/api/invoices/${invoiceId}/match-supplier-items`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Match supplier items error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // Step 4: Fuzzy match master products
+  fuzzyMatchMasterProduct: async (matchData) => {
+    try {
+      const response = await api.post('/api/master-products/fuzzy-match', matchData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Fuzzy match master product error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  // Step 4: Link master product to line item
+  linkMasterProduct: async (lineItemId, linkData) => {
+    try {
+      const response = await api.put(`/api/invoice-line-items/${lineItemId}/link-master-product`, linkData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Link master product error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
 };
 
 export default apiService;

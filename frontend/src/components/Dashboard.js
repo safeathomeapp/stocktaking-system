@@ -621,6 +621,15 @@ const Dashboard = () => {
         </Button>
 
         <Button
+          onClick={() => navigate(`/invoice-review`, { state: { venueId: selectedVenue } })}
+          variant="outline"
+          size="lg"
+          disabled={!selectedVenue}
+        >
+          Supplier Invoice PDF
+        </Button>
+
+        <Button
           onClick={() => navigate(`/epos-csv-input/${selectedVenue}`)}
           variant="outline"
           size="lg"

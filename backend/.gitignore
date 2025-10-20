@@ -1,0 +1,19 @@
+# OCR training data (only needed for local PDF parsing)
+eng.traineddata
+
+# Test scripts (only needed for local development)
+test-*.js
+debug-*.js
+check-*.js
+read-*.js
+verify-*.js
+
+# Environment
+.env
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*

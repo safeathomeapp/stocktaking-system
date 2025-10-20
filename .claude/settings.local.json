@@ -32,7 +32,16 @@
       "Bash(git rebase:*)",
       "Bash(git pull:*)",
       "Bash(find:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "WebSearch",
+      "Read(//c/Users/kevth/Downloads/Stocktake/**)",
+      "Read(//c/Users/kevth/Downloads/Invoices/**)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm uninstall:*)",
+      "Bash(python:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Read(//c/Users/kevth/Downloads/**)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

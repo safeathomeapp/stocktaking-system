@@ -13,6 +13,7 @@ import Settings from './components/Settings';
 import InvoiceInput from './components/InvoiceInput';
 import InvoiceImport from './components/InvoiceImport';
 import ManualInvoiceEntry from './components/ManualInvoiceEntry';
+import SupplierInvoiceReview from './components/SupplierInvoiceReview';
 import EposCsvInput from './components/EposCsvInput';
 import AreaSetup from './components/AreaSetup';
 
@@ -32,6 +33,7 @@ function App() {
             <Route path="/invoice-input" element={<InvoiceInput />} />
             <Route path="/invoice-import/:venueId?" element={<InvoiceImport />} />
             <Route path="/invoice-manual/:venueId?" element={<ManualInvoiceEntry />} />
+            <Route path="/invoice-review" element={<SupplierInvoiceReview />} />
             <Route path="/epos-csv-input/:venueId?" element={<EposCsvInput />} />
             <Route path="/area-setup/:venueId" element={<AreaSetup />} />
           </Routes>
