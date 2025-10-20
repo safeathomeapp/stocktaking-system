@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import apiService from '../services/apiService';
 import { formatDate } from '../utils/helpers';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [activeSessions, setActiveSessions] = useState([]);
   const [stats, setStats] = useState({
     totalVenues: 0,
@@ -13,6 +14,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [healthStatus, setHealthStatus] = useState(null);
+  const [redirectMessage, setRedirectMessage] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -21,12 +23,37 @@ const Dashboard = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       // Check API health
       const healthResult = await apiService.checkHealth();
       setHealthStatus(healthResult.success ? 'healthy' : 'unhealthy');
 
+      // STEP 1: Check for user profile (onboarding requirement)
+      const userResult = await apiService.getUserProfile();
+      if (!userResult.success || !userResult.profile) {
+        setRedirectMessage('No user profile found. Redirecting to user setup...');
+        setTimeout(() => navigate('/settings'), 2000);
+        setLoading(false);
+        return;
+      }
+
+      // STEP 2: Check for venues (onboarding requirement)
+      const venuesResult = await apiService.getVenues();
+      if (venuesResult.success) {
+        const venues = venuesResult.data || [];
+        setStats(prev => ({ ...prev, totalVenues: venues.length }));
+
+        // If no venues exist, redirect to venue creation
+        if (venues.length === 0) {
+          setRedirectMessage('No venues found. Redirecting to venue setup...');
+          setTimeout(() => navigate('/venue/new'), 2000);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Continue with normal dashboard data loading
       // Load active sessions
       const sessionsResult = await apiService.getSessions('in_progress');
       if (sessionsResult.success) {
@@ -35,19 +62,12 @@ const Dashboard = () => {
         setStats(prev => ({ ...prev, activeSessions: sessions.length }));
       }
 
-      // Load venue count
-      const venuesResult = await apiService.getVenues();
-      if (venuesResult.success) {
-        const venues = venuesResult.data || [];
-        setStats(prev => ({ ...prev, totalVenues: venues.length }));
-      }
-
       // Load completed sessions today (simplified - just get completed sessions)
       const completedResult = await apiService.getSessions('completed');
       if (completedResult.success) {
         const completed = completedResult.data.sessions || [];
         const today = new Date().toDateString();
-        const completedToday = completed.filter(session => 
+        const completedToday = completed.filter(session =>
           new Date(session.completed_at).toDateString() === today
         );
         setStats(prev => ({ ...prev, completedToday: completedToday.length }));
@@ -60,6 +80,48 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  // Show redirect message if onboarding is needed
+  if (redirectMessage) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '3rem',
+        minHeight: '50vh'
+      }}>
+        <div style={{
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffc107',
+          borderRadius: '8px',
+          padding: '2rem',
+          maxWidth: '500px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👋</div>
+          <h2 style={{ marginTop: 0, marginBottom: '1rem', color: '#856404' }}>
+            Welcome to Stock Taking System
+          </h2>
+          <p style={{ color: '#856404', marginBottom: '1.5rem' }}>
+            {redirectMessage}
+          </p>
+          <div style={{ fontSize: '2rem' }}>
+            <div className="spinner" style={{
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #ffc107',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto'
+            }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

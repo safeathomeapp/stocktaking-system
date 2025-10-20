@@ -257,6 +257,7 @@ const Dashboard = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [redirectMessage, setRedirectMessage] = useState(null);
 
   const navigate = useNavigate();
 
@@ -268,10 +269,32 @@ const Dashboard = () => {
   }, [selectedVenue]);
 
   useEffect(() => {
-    fetchVenues();
-    fetchSessions();
-    fetchUserProfile();
-  }, []);
+    // Onboarding flow: Check user profile first, then venues
+    const checkOnboarding = async () => {
+      // STEP 1: Check for user profile
+      const userResponse = await apiService.getUserProfile();
+      if (!userResponse.success || !userResponse.profile) {
+        setRedirectMessage('No user profile found. Redirecting to user setup...');
+        setTimeout(() => navigate('/settings'), 2000);
+        return;
+      }
+
+      // STEP 2: Check for venues
+      const venuesResponse = await apiService.getVenues();
+      if (venuesResponse.success && venuesResponse.data.length === 0) {
+        setRedirectMessage('No venues found. Redirecting to venue setup...');
+        setTimeout(() => navigate('/venue/new'), 2000);
+        return;
+      }
+
+      // All checks passed - load normal dashboard data
+      fetchVenues();
+      fetchSessions();
+      fetchUserProfile();
+    };
+
+    checkOnboarding();
+  }, [navigate]);
 
   useEffect(() => {
     filterSessions();
@@ -460,6 +483,48 @@ const Dashboard = () => {
     e.stopPropagation(); // Prevent card click
     navigate(`/stock-taking/${session.id}`);
   };
+
+  // Show redirect message if onboarding is needed
+  if (redirectMessage) {
+    return (
+      <DashboardContainer>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '60vh'
+        }}>
+          <div style={{
+            backgroundColor: '#fff3cd',
+            border: '2px solid #ffc107',
+            borderRadius: '12px',
+            padding: '3rem',
+            maxWidth: '500px',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>👋</div>
+            <h2 style={{ marginTop: 0, marginBottom: '1rem', color: '#856404', fontSize: '1.5rem' }}>
+              Welcome to Stock Taking System
+            </h2>
+            <p style={{ color: '#856404', marginBottom: '2rem', fontSize: '1.1rem' }}>
+              {redirectMessage}
+            </p>
+            <div style={{
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #ffc107',
+              borderRadius: '50%',
+              width: '50px',
+              height: '50px',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto'
+            }} />
+          </div>
+        </div>
+      </DashboardContainer>
+    );
+  }
 
   return (
     <DashboardContainer>

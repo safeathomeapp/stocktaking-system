@@ -1,0 +1,12 @@
+Archive Log - Mon Oct 20 19:44:38 GMTST 2025
+================================
+
+MOVED: frontend/src/pages/Dashboard.js → frontend/src/_archived/pages/Dashboard.js
+MOVED: frontend/src/pages/SessionHistory.js → frontend/src/_archived/pages/SessionHistory.js
+MOVED: frontend/src/pages/StockTaking.js → frontend/src/_archived/pages/StockTaking.js
+MOVED: frontend/src/pages/VenueSelection.js → frontend/src/_archived/pages/VenueSelection.js
+MOVED: frontend/src/services/api.js → frontend/src/_archived/services/api.js
+MOVED: frontend/src/styles/components/Card.js → frontend/src/_archived/styles/components/Card.js
+MOVED: frontend/src/styles/components/Form.js → frontend/src/_archived/styles/components/Form.js
+MOVED: frontend/src/styles/components/Layout.js → frontend/src/_archived/styles/components/Layout.js
+MOVED: frontend/src/components/Navigation.js → frontend/src/_archived/components/Navigation.js

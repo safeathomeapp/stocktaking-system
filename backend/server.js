@@ -3035,14 +3035,24 @@ app.put('/api/user/profile', async (req, res) => {
   try {
     const profileData = req.body;
 
-    // Get the current active user ID
+    // Get the current active user ID (or create if none exists)
     const currentUser = await pool.query('SELECT id FROM user_profiles WHERE active = true LIMIT 1');
 
-    if (currentUser.rows.length === 0) {
-      return res.status(404).json({ error: 'No active user profile found' });
-    }
+    let userId;
+    let isNewProfile = false;
 
-    const userId = currentUser.rows[0].id;
+    if (currentUser.rows.length === 0) {
+      // No profile exists - create a new one
+      const newUser = await pool.query(`
+        INSERT INTO user_profiles (first_name, last_name, active, profile_complete)
+        VALUES ('', '', true, false)
+        RETURNING id
+      `);
+      userId = newUser.rows[0].id;
+      isNewProfile = true;
+    } else {
+      userId = currentUser.rows[0].id;
+    }
 
     // Build dynamic update query based on provided fields
     const allowedFields = [
@@ -3099,7 +3109,7 @@ app.put('/api/user/profile', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'User profile updated successfully',
+      message: isNewProfile ? 'User profile created successfully' : 'User profile updated successfully',
       profile: result.rows[0]
     });
 

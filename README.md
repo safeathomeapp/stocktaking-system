@@ -4,39 +4,41 @@
 
 ---
 
-# ⚠️ CRITICAL: HYBRID ARCHITECTURE ⚠️
+# 💻 LOCAL DEVELOPMENT ARCHITECTURE
 
 **System Architecture:**
-- **Railway Backend**: Database operations (invoices, venues, sessions, etc.)
-- **Localhost Backend**: PDF parsing ONLY (has pdf-parse library installed)
+- **Fully self-contained localhost application**
+- **PostgreSQL 17** - Local database (no cloud dependencies)
+- **Node.js Backend** - REST API on port 3005
+- **React Frontend** - Development server on port 3000
 
 **API Configuration:**
 
 ```javascript
-// frontend/src/config/api.js - Database operations
-const API_BASE_URL = 'https://stocktaking-api-production.up.railway.app';
+// frontend/src/config/api.js
+const API_BASE_URL = 'http://localhost:3005';
 
-// frontend/src/components/SupplierInvoiceReview.js - PDF parsing only
-const PDF_PARSE_URL = 'http://localhost:3005/api/invoices/parse-supplier-pdf';
+// All operations (database + PDF parsing) run locally
 ```
 
 **Why This Architecture:**
-- Railway has the PostgreSQL database with live data
-- Localhost has pdf-parse library for invoice PDF processing
-- Frontend sends PDF parsing to localhost, everything else to Railway
+- ✅ **No internet required** - develop completely offline
+- ✅ **Fast performance** - no network latency
+- ✅ **Safe testing** - experiment without affecting production data
+- ✅ **Full control** - own your data, reset anytime
+- ✅ **Simple setup** - just PostgreSQL + Node.js
 
-**Required for Invoice Imports:**
-1. **Start local backend**: `cd backend && npm start` (runs on port 3005)
-2. **Frontend auto-connects**: PDF parsing → localhost, database → Railway
+**Getting Started:**
+1. **Install PostgreSQL 17** (one-time setup)
+2. **Create database**: `stocktaking_local`
+3. **Start backend**: `cd backend && npm start` (runs on port 3005)
+4. **Start frontend**: `cd frontend && npm start` (runs on port 3000)
+5. **Open browser**: http://localhost:3000
 
-**When Deploying Backend Changes:**
-1. Edit backend code locally
-2. Test PDF parsing locally (localhost:3005)
-3. Commit to GitHub
-4. Deploy to Railway: `railway up --service stocktaking-api --detach`
-5. Railway deployment handles database operations only
-
-**DO NOT change API_BASE_URL to localhost - it will break database access!**
+**Database Setup:**
+- Database automatically created with schema on first run
+- No password required (trust authentication for localhost)
+- All 15 tables created from `backend/schema.sql`
 
 ---
 
@@ -80,62 +82,216 @@ Display uses: JOIN venue_products → master_products
 
 ---
 
+## Project Structure & Cleanup
+
+### Current Active Structure (v2.0.1 - October 2025)
+
+```
+stocktaking-system/
+├── backend/
+│   ├── src/
+│   │   └── database.js          # PostgreSQL connection pool
+│   ├── server.js                # Main API server (port 3005)
+│   ├── schema.sql               # Complete database schema (15 tables)
+│   └── .env                     # Local database configuration
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/          # ✅ ALL active React components
+│   │   │   ├── Dashboard.js
+│   │   │   ├── VenueManagement.js
+│   │   │   ├── Settings.js
+│   │   │   ├── StockTaking.js
+│   │   │   ├── SessionHistory.js
+│   │   │   ├── AreaSetup.js
+│   │   │   ├── Analysis.js
+│   │   │   ├── InvoiceInput.js
+│   │   │   ├── InvoiceImport.js
+│   │   │   ├── ManualInvoiceEntry.js
+│   │   │   ├── SupplierInvoiceReview.js
+│   │   │   ├── EposCsvInput.js
+│   │   │   ├── InvoiceImportSummary.js
+│   │   │   └── MasterProductMatcher.js
+│   │   │
+│   │   ├── services/
+│   │   │   └── apiService.js    # ✅ Active API service
+│   │   │
+│   │   ├── styles/
+│   │   │   ├── components/
+│   │   │   │   └── Button.js    # ✅ Only active styled component
+│   │   │   ├── GlobalStyles.js
+│   │   │   └── theme/
+│   │   │
+│   │   ├── config/
+│   │   │   └── api.js           # API URL configuration
+│   │   │
+│   │   ├── utils/
+│   │   │   └── helpers.js       # Utility functions
+│   │   │
+│   │   └── _archived/           # 🗂️ Archived unused files (see below)
+│   │
+│   └── App.js                   # Main app component (routes)
+│
+└── archive-unused-files.sh      # Cleanup script
+└── restore-archived-files.sh    # Restore script (if needed)
+└── CLEANUP_REPORT.md            # Detailed cleanup documentation
+```
+
+### Recently Archived Files (October 2025)
+
+**9 unused files moved to `frontend/src/_archived/` to reduce codebase complexity:**
+
+**Duplicate Pages (replaced by components/):**
+- ❌ `pages/Dashboard.js` → replaced by `components/Dashboard.js`
+- ❌ `pages/SessionHistory.js` → replaced by `components/SessionHistory.js`
+- ❌ `pages/StockTaking.js` → replaced by `components/StockTaking.js`
+- ❌ `pages/VenueSelection.js` → deprecated entirely
+
+**Unused Services:**
+- ❌ `services/api.js` → replaced by `apiService.js`
+
+**Unused Styled Components:**
+- ❌ `styles/components/Card.js` → not imported anywhere
+- ❌ `styles/components/Form.js` → not imported anywhere
+- ❌ `styles/components/Layout.js` → not imported anywhere
+
+**Why Archive Instead of Delete?**
+- Files safely stored in `_archived/` directory
+- Can be restored if needed with `./restore-archived-files.sh`
+- Verified 0 imports across codebase before archiving
+- See `CLEANUP_REPORT.md` for full analysis and methodology
+
+**Impact:**
+- ✅ Reduced code complexity and confusion
+- ✅ Clearer project structure
+- ✅ No breaking changes (verified compilation success)
+- ✅ All routes and features still work
+
+---
+
 ## Quick Start
 
 ### Prerequisites
-- Node.js 16+
-- PostgreSQL (Railway-hosted)
+- **Node.js 16+** - [Download here](https://nodejs.org/)
+- **PostgreSQL 17** - [Download for Windows](https://www.postgresql.org/download/windows/)
 
-### Local Development
+### First-Time Setup
 
+**1. Install PostgreSQL 17:**
 ```bash
-# Frontend (port 3000)
-cd frontend && npm install && npm start
+# Download and run the PostgreSQL 17 installer
+# During installation, remember your postgres password (or use trust auth for localhost)
+```
 
-# Backend (port 3005)
-cd backend && npm install && npm start
+**2. Configure PostgreSQL for Localhost (Optional - Passwordless):**
+```bash
+# Edit: C:/Program Files/PostgreSQL/17/data/pg_hba.conf
+# Change all "scram-sha-256" to "trust" for localhost connections
+# Restart PostgreSQL service via Windows Services (services.msc)
+```
+
+**3. Create Database:**
+```bash
+# Using psql (no password needed if trust auth configured)
+"C:/Program Files/PostgreSQL/17/bin/psql.exe" -U postgres -c "CREATE DATABASE stocktaking_local;"
+```
+
+**4. Apply Database Schema:**
+```bash
+# Run the schema SQL file
+"C:/Program Files/PostgreSQL/17/bin/psql.exe" -U postgres -d stocktaking_local -f backend/schema.sql
+```
+
+**5. Configure Backend:**
+```bash
+# Edit backend/.env (already configured for localhost)
+DATABASE_URL=postgresql://postgres:@localhost:5432/stocktaking_local
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=stocktaking_local
+DB_USER=postgres
+DB_PASS=
+```
+
+**6. Install Dependencies:**
+```bash
+# Backend
+cd backend && npm install
+
+# Frontend
+cd frontend && npm install
+```
+
+### Running the Application
+
+**Start Backend:**
+```bash
+cd backend
+npm start
+# Server runs on http://localhost:3005
+```
+
+**Start Frontend (in a new terminal):**
+```bash
+cd frontend
+npm start
+# App opens at http://localhost:3000
+```
+
+**Verify Everything Works:**
+```bash
+# Test backend health
+curl http://localhost:3005/api/health
+# Should return: {"status":"healthy","database":"connected",...}
+
+# Test frontend
+# Open browser: http://localhost:3000
 ```
 
 ---
 
-## Railway Deployment
+## Development Workflow
 
-### Deployment Process
-
-After committing changes to git:
-
+### Daily Development
 ```bash
-# 1. Commit and push to GitHub
-git add .
-git commit -m "your message"
-git push
+# 1. Start PostgreSQL (if not running)
+# Check Windows Services - postgresql-x64-17 should be "Running"
 
-# 2. Force Railway deployment
-railway up --service stocktaking-api --detach
+# 2. Start backend
+cd backend && npm start
 
-# 3. Wait for deployment (approx 60 seconds)
-sleep 60
+# 3. Start frontend (new terminal)
+cd frontend && npm start
 
-# 4. Verify deployment
-curl -s "https://stocktaking-api-production.up.railway.app/api/health"
+# 4. Develop! Changes auto-reload
 ```
 
-**Important Notes:**
-- Railway deployments **must be forced manually** using `railway up --service stocktaking-api --detach`
-- Deployment takes approximately 60 seconds
-- Always verify the health endpoint shows the correct version after deployment
+### Database Management
+```bash
+# View all databases
+psql -U postgres -l
 
-### Environment Variables (Railway)
-- `DATABASE_URL` - PostgreSQL connection string (auto-configured)
-- `PORT` - Application port (auto-configured)
+# Connect to stocktaking database
+psql -U postgres -d stocktaking_local
+
+# View all tables
+\dt
+
+# View venues
+SELECT * FROM venues;
+
+# Reset database (careful!)
+DROP DATABASE stocktaking_local;
+CREATE DATABASE stocktaking_local;
+psql -U postgres -d stocktaking_local -f backend/schema.sql
+```
 
 ---
 
 ## API Endpoints
 
-**Base URLs:**
-- Production: `https://stocktaking-api-production.up.railway.app`
-- Local: `http://localhost:3005`
+**Base URL:**
+- All environments: `http://localhost:3005`
 
 ### Health Check
 - `GET /api/health` - Check API health and version
@@ -1067,6 +1223,24 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 
 ## Recent Updates
 
+### October 20, 2025 - **MAJOR: Full Migration to Localhost Architecture**
+- ✅ **Removed Railway dependency** - system now fully self-contained
+- ✅ **Local PostgreSQL 17 setup** - complete database schema installed locally
+- ✅ **Trust authentication configured** - no password required for localhost
+- ✅ **Frontend API updated** - all requests now go to localhost:3005
+- ✅ **Backend configured** - uses local PostgreSQL via explicit connection params
+- ✅ **Complete README rewrite** - updated for localhost-only architecture
+- ✅ **Database schema file created** - `backend/schema.sql` with all 15 tables
+- ✅ **Development workflow simplified** - no cloud dependencies, fully offline capable
+- ✅ **Environment files updated** - Railway configs archived/commented out
+
+**Benefits of This Migration:**
+- ⚡ Faster development (no network latency)
+- 🔒 Complete data ownership and privacy
+- 💰 Zero cloud hosting costs
+- 🌐 Offline development capability
+- 🛡️ Safe experimentation without production risks
+
 ### October 19, 2025 - Invoice Processing Architecture Documentation
 - ✅ Documented complete 3-table invoice architecture (invoice_line_items → supplier_item_list → master_products)
 - ✅ Cleaned up supplier_item_list schema (removed redundant fields)
@@ -1188,15 +1362,27 @@ When providing prompts for new features:
 3. **Clarify persistence** requirements (e.g., "session-only" vs "permanent")
 4. **Reference this README** for architectural principles before implementing
 
-### Deployment Checklist
-1. Test locally (frontend on :3000, backend on :3005)
-2. Commit changes to git with descriptive message
-3. Push to GitHub
-4. Force Railway deployment: `railway up --service stocktaking-api --detach`
-5. Wait 60 seconds for deployment
-6. Verify: `curl -s "https://stocktaking-api-production.up.railway.app/api/health"`
+### Development Checklist
+1. **Start PostgreSQL** - Ensure service is running (check Windows Services)
+2. **Start Backend** - `cd backend && npm start` (port 3005)
+3. **Start Frontend** - `cd frontend && npm start` (port 3000)
+4. **Test locally** - Verify both frontend and backend are working
+5. **Make changes** - Code changes auto-reload
+6. **Test database** - Use psql to inspect data if needed
+7. **Commit changes** - `git add . && git commit -m "description"`
+8. **Push to GitHub** - `git push` (for version control and backup)
+
+### Optional: Backup Your Database
+```bash
+# Export database to SQL file
+pg_dump -U postgres stocktaking_local > backup_$(date +%Y%m%d).sql
+
+# Restore from backup
+psql -U postgres stocktaking_local < backup_20251020.sql
+```
 
 ---
 
-**Version**: 2.0.1
-**Last Updated**: October 19, 2025
+**Version**: 2.0.1 (Localhost Edition)
+**Last Updated**: October 20, 2025
+**Architecture**: Fully self-contained localhost application (no cloud dependencies)

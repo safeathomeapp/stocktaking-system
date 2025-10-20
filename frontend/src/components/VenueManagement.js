@@ -204,13 +204,43 @@ const ErrorMessage = styled.div`
   font-weight: 500;
 `;
 
-const SuccessMessage = styled.div`
-  background: #10B981;
-  color: white;
-  padding: ${props => props.theme.spacing.md};
-  border-radius: 8px;
+const SuccessModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const SuccessModalContent = styled.div`
+  background: white;
+  padding: ${props => props.theme.spacing.xl};
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+`;
+
+const SuccessIcon = styled.div`
+  font-size: 4rem;
   margin-bottom: ${props => props.theme.spacing.md};
-  font-weight: 500;
+`;
+
+const SuccessTitle = styled.h3`
+  color: #10B981;
+  font-size: 1.5rem;
+  margin-bottom: ${props => props.theme.spacing.md};
+`;
+
+const SuccessText = styled.p`
+  color: ${props => props.theme.colors.text};
+  margin-bottom: ${props => props.theme.spacing.md};
 `;
 
 const LoadingSpinner = styled.div`
@@ -290,7 +320,7 @@ const VenueManagement = () => {
       const response = await apiService.createVenue(venueData);
 
       if (response.success) {
-        setSuccess('Venue created successfully! Redirecting to dashboard...');
+        setSuccess('Venue created successfully! Redirecting to area setup...');
 
         // Get the newly created venue ID
         const newVenueId = response.data.venue.id;
@@ -315,9 +345,9 @@ const VenueManagement = () => {
           billing_notes: ''
         });
 
-        // Redirect to dashboard after a short delay
+        // Redirect to area setup after a short delay
         setTimeout(() => {
-          navigate('/');
+          navigate(`/area-setup/${newVenueId}`);
         }, 1500);
       } else {
         setError('Failed to create venue: ' + response.error);
@@ -350,7 +380,6 @@ const VenueManagement = () => {
         <FormTitle>Venue Information</FormTitle>
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
-        {success && <SuccessMessage>{success}</SuccessMessage>}
 
         <form onSubmit={handleSubmit}>
           <FormGrid>
@@ -543,6 +572,17 @@ const VenueManagement = () => {
           </ButtonGroup>
         </form>
       </FormSection>
+
+      {/* Success Modal */}
+      {success && (
+        <SuccessModal>
+          <SuccessModalContent>
+            <SuccessIcon>✓</SuccessIcon>
+            <SuccessTitle>Venue Created!</SuccessTitle>
+            <SuccessText>{success}</SuccessText>
+          </SuccessModalContent>
+        </SuccessModal>
+      )}
     </VenueContainer>
   );
 };

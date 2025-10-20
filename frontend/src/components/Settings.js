@@ -164,14 +164,43 @@ const LoadingSpinner = styled.div`
   }
 `;
 
-const SuccessMessage = styled.div`
-  background: ${props => props.theme.colors.success};
-  color: white;
-  padding: ${props => props.theme.spacing.md};
-  border-radius: 8px;
-  margin-bottom: ${props => props.theme.spacing.md};
-  font-weight: 500;
+const SuccessModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const SuccessModalContent = styled.div`
+  background: white;
+  padding: ${props => props.theme.spacing.xl};
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
   text-align: center;
+  max-width: 400px;
+  width: 90%;
+`;
+
+const SuccessIcon = styled.div`
+  font-size: 4rem;
+  margin-bottom: ${props => props.theme.spacing.md};
+`;
+
+const SuccessTitle = styled.h3`
+  color: ${props => props.theme.colors.success};
+  font-size: 1.5rem;
+  margin-bottom: ${props => props.theme.spacing.md};
+`;
+
+const SuccessText = styled.p`
+  color: ${props => props.theme.colors.text};
+  margin-bottom: ${props => props.theme.spacing.md};
 `;
 
 const ErrorMessage = styled.div`
@@ -337,16 +366,6 @@ const Settings = () => {
       </Header>
 
       <FormContainer>
-        {success && (
-          <SuccessMessage>
-            {success}
-            {countdown !== null && countdown > 0 && (
-              <div style={{ marginTop: '8px', fontSize: '0.9em' }}>
-                Redirecting to dashboard in {countdown} seconds...
-              </div>
-            )}
-          </SuccessMessage>
-        )}
         {error && <ErrorMessage>{error}</ErrorMessage>}
 
         <form onSubmit={handleSubmit}>
@@ -691,6 +710,22 @@ const Settings = () => {
           </ButtonGroup>
         </form>
       </FormContainer>
+
+      {/* Success Modal */}
+      {success && (
+        <SuccessModal>
+          <SuccessModalContent>
+            <SuccessIcon>✓</SuccessIcon>
+            <SuccessTitle>Profile Saved!</SuccessTitle>
+            <SuccessText>{success}</SuccessText>
+            {countdown !== null && countdown > 0 && (
+              <SuccessText>
+                Redirecting to dashboard in {countdown} seconds...
+              </SuccessText>
+            )}
+          </SuccessModalContent>
+        </SuccessModal>
+      )}
     </SettingsContainer>
   );
 };

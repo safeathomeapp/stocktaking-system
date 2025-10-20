@@ -340,8 +340,7 @@ function SupplierInvoiceReview() {
       const formData = new FormData();
       formData.append('pdf', file);
 
-      // PDF parsing runs on localhost backend (has pdf-parse library)
-      // All other API calls use Railway (has database)
+      // PDF parsing runs on localhost backend (has pdf-parse library and PostgreSQL database)
       const response = await fetch('http://localhost:3005/api/invoices/parse-supplier-pdf', {
         method: 'POST',
         body: formData

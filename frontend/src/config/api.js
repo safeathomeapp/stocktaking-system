@@ -1,7 +1,11 @@
 // API Configuration for Stock Taking System
+// Local development setup - all operations use localhost PostgreSQL
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://stocktaking-api-production.up.railway.app'
-  : 'https://stocktaking-api-production.up.railway.app'; // ALWAYS use Railway - DO NOT change to localhost!
+  ? 'http://localhost:3005'  // Production also uses localhost (no Railway dependency)
+  : 'http://localhost:3005'; // Development uses localhost
+
+// Railway configuration (archived - no longer in use)
+// const RAILWAY_URL = 'https://stocktaking-api-production.up.railway.app';
 
 export const API_ENDPOINTS = {
   // System

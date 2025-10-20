@@ -1,0 +1,21 @@
+# Exclude large files from Railway deployment
+backend/eng.traineddata
+backend/test-*.js
+backend/debug-*.js
+backend/check-*.js
+backend/read-*.js
+backend/verify-*.js
+
+# Exclude sample data
+invoices/
+master_products_comprehensive.csv
+MASTER_PRODUCTS_CATALOG.md
+
+# Frontend (not needed on backend deployment)
+frontend/
+
+# Development files
+.git/
+node_modules/
+.env
+*.log
