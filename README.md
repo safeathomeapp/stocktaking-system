@@ -42,6 +42,55 @@ const API_BASE_URL = 'http://localhost:3005';
 
 ---
 
+## ⚡ QUICK STARTUP CHECKLIST (Claude Code - Do This First!)
+
+**Expected State:** Both servers running + PostgreSQL connected
+
+### 30-Second Verification
+```bash
+# Terminal 1: Start Backend (if not running)
+cd backend && npm start
+# Expected output: "Server running on port 3005"
+
+# Terminal 2: Start Frontend (if not running)
+cd frontend && npm start
+# Expected output: "You can now view frontend in the browser. Local: http://localhost:3000"
+```
+
+### ✅ System Ready When You See:
+- **Backend**: `Server running on port 3005` + `Master Products API ready`
+- **Frontend**: `Compiled successfully!` + `Local: http://localhost:3000`
+- **Database**: PostgreSQL running (automatic - Windows Service)
+- **Browser**: Navigate to `http://localhost:3000`
+
+### 🚀 If Something is Missing:
+
+**PostgreSQL not running?**
+- Windows Services → search "postgresql-x64-17" → Restart if stopped
+
+**Backend crashed/missing?**
+```bash
+cd backend && npm start
+```
+
+**Frontend crashed/missing?**
+```bash
+cd frontend && npm start
+```
+
+**Database connection error?**
+```bash
+# Test database connection
+"C:/Program Files/PostgreSQL/17/bin/psql.exe" -U postgres -d stocktaking_local -c "SELECT COUNT(*) FROM venues;"
+```
+
+**Still broken?**
+- Check backend `.env` file has: `DB_HOST=localhost`, `DB_PORT=5432`, `DB_NAME=stocktaking_local`
+- Check frontend `src/config/api.js` has: `API_BASE_URL = 'http://localhost:3005'`
+- Restart everything: Kill all `node.exe` processes, then start backend + frontend fresh
+
+---
+
 ## System Architecture & Design Principles
 
 ### Master Products - Single Source of Truth
@@ -1222,6 +1271,13 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 ---
 
 ## Recent Updates
+
+### October 20, 2025 (Later) - **Quick Startup Checklist for Claude Code**
+- ✅ **Added quick startup guide** to reduce token waste on setup verification
+- ✅ **30-second verification procedure** - check expected outputs from backend/frontend
+- ✅ **Troubleshooting section** - quick fixes for common issues
+- ✅ **No more full diagnostics** - just verify servers are running next time
+- ✅ **PostgreSQL automatic** - Windows Service runs on startup
 
 ### October 20, 2025 - **MAJOR: Full Migration to Localhost Architecture**
 - ✅ **Removed Railway dependency** - system now fully self-contained
