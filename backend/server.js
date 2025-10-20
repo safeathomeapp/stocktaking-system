@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const multer = require('multer');
 const pool = require('./src/database');
+const { PDFParse } = require('pdf-parse');
 require('dotenv').config();
 
 // Updated with county field support
@@ -1958,6 +1959,835 @@ app.post('/api/invoices/upload-pdf', upload.single('pdf'), async (req, res) => {
       error: 'Failed to process PDF',
       message: error.message
     });
+  }
+});
+
+// =============================================
+// SUPPLIER INVOICE PDF PARSING
+// =============================================
+
+// Helper function to parse supplier invoice PDF
+async function parseSupplierInvoicePDF(buffer) {
+  let parser;
+  try {
+    parser = new PDFParse({ data: buffer });
+    const pdfData = await parser.getText();
+    const text = pdfData.text;
+
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+    // === HEADER EXTRACTION ===
+
+    // Extract supplier name (usually near the top)
+    let supplierName = null;
+    for (let i = 0; i < Math.min(20, lines.length); i++) {
+      const line = lines[i];
+      if (line.match(/limited|ltd|plc|uk|suppliers?|booker/i) && line.length > 5 && line.length < 80) {
+        supplierName = line;
+        break;
+      }
+    }
+
+    // Extract invoice number (INVOICE NUMBER followed by 7 digits)
+    let invoiceNumber = null;
+    for (let i = 0; i < Math.min(30, lines.length); i++) {
+      const line = lines[i];
+      // Look for "INVOICE NUMBER" or "INVOICE NO" followed by 7 digits
+      const invoiceMatch = line.match(/INVOICE\s+(?:NUMBER|NO)[:\s]*(\d{7})/i);
+      if (invoiceMatch) {
+        invoiceNumber = invoiceMatch[1];
+        console.log('Found invoice number:', invoiceNumber);
+        break;
+      }
+    }
+
+    // Extract invoice date (look for date patterns near invoice number)
+    let invoiceDate = null;
+    for (let i = 0; i < Math.min(30, lines.length); i++) {
+      const line = lines[i];
+      // Look for various date formats: DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY, DD-MM-YY
+      const dateMatch = line.match(/(?:DATE|DATED?)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i) ||
+                       line.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
+
+      if (dateMatch) {
+        const dateParts = dateMatch[1].split(/[\/\-]/);
+        // Assume DD/MM/YYYY or DD/MM/YY format (UK standard)
+        if (dateParts.length === 3) {
+          const day = dateParts[0].padStart(2, '0');
+          const month = dateParts[1].padStart(2, '0');
+          let year = dateParts[2];
+
+          // Handle 2-digit years (YY)
+          if (year.length === 2) {
+            const currentYear = new Date().getFullYear();
+            const currentCentury = Math.floor(currentYear / 100) * 100;
+            const twoDigitYear = parseInt(year);
+
+            // Assume 20xx for years 00-30, 19xx for years 31-99
+            if (twoDigitYear <= 30) {
+              year = (currentCentury + twoDigitYear).toString();
+            } else {
+              year = (currentCentury - 100 + twoDigitYear).toString();
+            }
+          }
+
+          invoiceDate = `${year}-${month}-${day}`; // Convert to YYYY-MM-DD
+          console.log('Found invoice date:', invoiceDate);
+          break;
+        }
+      }
+    }
+
+    // Extract customer account number
+    let customerNumber = null;
+    for (let i = 0; i < Math.min(30, lines.length); i++) {
+      const line = lines[i];
+      // Look for "ACCOUNT" or "CUSTOMER" followed by number
+      const accountMatch = line.match(/(?:ACCOUNT|CUSTOMER|A\/C)(?:\s+(?:NUMBER|NO|NUM|#))?[:\s]*(\d{5,10})/i);
+      if (accountMatch) {
+        customerNumber = accountMatch[1];
+        console.log('Found customer number:', customerNumber);
+        break;
+      }
+    }
+
+    // Extract delivery number if present
+    let deliveryNumber = null;
+    for (let i = 0; i < Math.min(30, lines.length); i++) {
+      const line = lines[i];
+      const deliveryMatch = line.match(/DELIVERY\s+(?:NUMBER|NO|NOTE)[:\s]*(\d+)/i);
+      if (deliveryMatch) {
+        deliveryNumber = deliveryMatch[1];
+        console.log('Found delivery number:', deliveryNumber);
+        break;
+      }
+    }
+
+    // === PRODUCT EXTRACTION (BOOKER-SPECIFIC) ===
+    const products = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // BOOKER SPECIFIC: Only parse lines starting with 6-digit numeric
+      const startsWithSixDigits = /^\d{6}/.test(line);
+
+      if (!startsWithSixDigits) {
+        continue; // Skip lines that don't start with 6 digits (headers, etc.)
+      }
+
+      // Look for lines with price patterns (e.g., "£12.50" or "12.50")
+      const priceMatch = line.match(/£?(\d+\.\d{2})/g);
+
+      if (priceMatch && line.length > 10) {
+        // Extract the 6-digit SKU from the start
+        const sku = line.substring(0, 6);
+
+        // The rest of the line after SKU contains product info
+        const remainder = line.substring(6).trim();
+
+        // Booker format uses tabs to separate fields
+        // Format: ProductName [tab] Pack Size [tab] Qty [tab] Price [tab] Total [tab] VAT
+        // BUT: Some product names contain tabs, so we need to find the pack/size field intelligently
+        const tabParts = remainder.split(/\t+/);
+
+        let packSize = '';
+        let unitSize = '';
+        let packSizeFieldIndex = -1;
+
+        // Find which tab field contains the pack/size pattern "number space unit"
+        // This handles cases where product name itself has tabs (e.g., "CLE 2 [tab] Ply Blue Centrefeed")
+        for (let i = 0; i < tabParts.length; i++) {
+          const field = tabParts[i].trim();
+          // Expanded units: ml, g, cl, l, kg, s (sheets/pieces), pk (pack), cm
+          const packAndSizeMatch = field.match(/^(\d+)\s+([\d.]+(?:ml|g|cl|l|kg|s|pk|cm))/i);
+
+          if (packAndSizeMatch) {
+            packSize = packAndSizeMatch[1]; // e.g., "1", "24"
+            unitSize = packAndSizeMatch[2]; // e.g., "330ml", "10s", "125s", "6pk"
+            packSizeFieldIndex = i;
+            break;
+          }
+        }
+
+        // Product name is everything before the pack/size field
+        let productName = '';
+        if (packSizeFieldIndex > 0) {
+          productName = tabParts.slice(0, packSizeFieldIndex).join(' ').trim();
+        } else if (tabParts.length > 0) {
+          productName = tabParts[0].trim();
+        }
+
+        // If no pack/size found via tabs, try fallback patterns
+        if (!packSize && !unitSize) {
+          // Try "24x330ml" format
+          const xFormatMatch = remainder.match(/(\d+)\s*x\s*([\d.]+(?:ml|g|cl|l|kg|s|pk|cm))/i);
+          if (xFormatMatch) {
+            packSize = xFormatMatch[1];
+            unitSize = xFormatMatch[2];
+            productName = productName.replace(/\d+\s*x\s*[\d.]+(?:ml|g|cl|l|kg|s|pk|cm)/i, '').trim();
+          } else {
+            // Try to find just a size anywhere
+            const sizeOnlyMatch = remainder.match(/([\d.]+(?:ml|g|cl|l|kg|s|pk|cm))/i);
+            if (sizeOnlyMatch) {
+              unitSize = sizeOnlyMatch[1];
+              packSize = '1';
+            }
+          }
+        }
+
+        // Extract prices
+        const prices = priceMatch.map(p => parseFloat(p.replace('£', '')));
+        const unitPrice = prices[0] || 0;
+
+        // Quantity is the field after pack/size field
+        let quantity = 1;
+        if (packSizeFieldIndex >= 0 && tabParts.length > packSizeFieldIndex + 1) {
+          const qtyField = tabParts[packSizeFieldIndex + 1].trim();
+          const qtyNum = parseInt(qtyField);
+          if (!isNaN(qtyNum)) {
+            quantity = qtyNum;
+          }
+        } else {
+          // Fallback: look for number before prices
+          const qtyMatch = remainder.match(/\s+(\d+)\s+£?[\d.]+/);
+          if (qtyMatch) {
+            quantity = parseInt(qtyMatch[1]);
+          }
+        }
+
+        // Clean product name - remove any size info that leaked in
+        productName = productName.replace(/\d+\s*x\s*[\d.]+(?:ml|g|cl|l|kg|s|pk|cm)/i, '').trim();
+        productName = productName.replace(/\s+\d+(?:ml|g|cl|l|kg|s|pk|cm)\b/i, '').trim();
+
+        if (productName.length > 2) {
+          products.push({
+            sku: sku,
+            name: productName,
+            description: productName,
+            unitSize: unitSize,
+            packSize: packSize,
+            unitCost: unitPrice,
+            caseSize: quantity,
+            selected: true // Default to selected
+          });
+        }
+      }
+    }
+
+    console.log(`Parsed ${products.length} products from invoice`);
+
+    return {
+      supplierName: supplierName || 'Unknown Supplier',
+      invoiceNumber: invoiceNumber,
+      invoiceDate: invoiceDate,
+      customerNumber: customerNumber,
+      deliveryNumber: deliveryNumber,
+      products: products,
+      totalPages: pdfData.total || 1
+    };
+
+  } finally {
+    if (parser) {
+      await parser.destroy();
+    }
+  }
+}
+
+// Parse supplier invoice PDF without saving
+app.post('/api/invoices/parse-supplier-pdf', upload.single('pdf'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+
+    console.log('Parsing supplier invoice PDF:', req.file.originalname);
+
+    const parsedData = await parseSupplierInvoicePDF(req.file.buffer);
+
+    res.json({
+      success: true,
+      data: {
+        filename: req.file.originalname,
+        supplier: parsedData.supplierName,
+        invoiceNumber: parsedData.invoiceNumber,
+        invoiceDate: parsedData.invoiceDate,
+        customerNumber: parsedData.customerNumber,
+        deliveryNumber: parsedData.deliveryNumber,
+        products: parsedData.products,
+        totalPages: parsedData.totalPages,
+        totalProducts: parsedData.products.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error parsing supplier PDF:', error);
+    res.status(500).json({
+      error: 'Failed to parse PDF',
+      message: error.message
+    });
+  }
+});
+
+// Upload selected supplier products
+app.post('/api/invoices/upload-supplier-products', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { supplierName, products } = req.body;
+
+    if (!supplierName || !products || !Array.isArray(products)) {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+
+    await client.query('BEGIN');
+
+    // Find or create supplier
+    let supplierId;
+    const existingSupplier = await client.query(
+      'SELECT sup_id FROM suppliers WHERE sup_name ILIKE $1',
+      [supplierName]
+    );
+
+    if (existingSupplier.rows.length > 0) {
+      supplierId = existingSupplier.rows[0].sup_id;
+    } else {
+      const newSupplier = await client.query(
+        `INSERT INTO suppliers (sup_name, sup_active)
+         VALUES ($1, true)
+         RETURNING sup_id`,
+        [supplierName]
+      );
+      supplierId = newSupplier.rows[0].sup_id;
+    }
+
+    // Insert products
+    let addedCount = 0;
+    let skippedCount = 0;
+    const addedProducts = [];
+
+    for (const product of products) {
+      // Check if product already exists
+      const existing = await client.query(
+        `SELECT id FROM supplier_item_list
+         WHERE supplier_id = $1 AND supplier_sku = $2`,
+        [supplierId, product.sku]
+      );
+
+      if (existing.rows.length > 0) {
+        skippedCount++;
+        continue;
+      }
+
+      // Insert new product
+      const result = await client.query(
+        `INSERT INTO supplier_item_list (
+          supplier_id, supplier_sku, supplier_name, supplier_description,
+          supplier_size, unit_cost, case_size, pack_size, active
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+        RETURNING *`,
+        [
+          supplierId,
+          product.sku,
+          product.name,
+          product.description || product.name,
+          product.unitSize || '',
+          product.unitCost,
+          product.caseSize || 1,
+          product.packSize || ''
+        ]
+      );
+
+      addedProducts.push(result.rows[0]);
+      addedCount++;
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: {
+        supplierId: supplierId,
+        addedCount: addedCount,
+        skippedCount: skippedCount,
+        products: addedProducts
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error uploading supplier products:', error);
+    res.status(500).json({
+      error: 'Failed to upload products',
+      message: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// =============================================
+// STEP 2: CREATE INVOICE & LINE ITEMS
+// =============================================
+
+// Create invoice header with line items
+app.post('/api/invoices', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const {
+      supplierName,
+      supplierContact,
+      venueId,
+      invoiceNumber,
+      invoiceDate,
+      totalAmount,
+      customerNumber,    // NEW: Customer account number
+      deliveryNumber,    // NEW: Delivery note number
+      lineItems          // Array of products from Step 1
+    } = req.body;
+
+    if (!supplierName || !venueId || !lineItems || lineItems.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    await client.query('BEGIN');
+
+    // Find or create supplier
+    let supplierId;
+    const existingSupplier = await client.query(
+      'SELECT sup_id FROM suppliers WHERE sup_name ILIKE $1',
+      [supplierName]
+    );
+
+    if (existingSupplier.rows.length > 0) {
+      supplierId = existingSupplier.rows[0].sup_id;
+
+      // Update supplier account number if provided and not already set
+      if (customerNumber) {
+        await client.query(
+          `UPDATE suppliers
+           SET sup_account_number = $1, sup_updated_at = CURRENT_TIMESTAMP
+           WHERE sup_id = $2 AND (sup_account_number IS NULL OR sup_account_number = '')`,
+          [customerNumber, supplierId]
+        );
+      }
+    } else {
+      const newSupplier = await client.query(
+        `INSERT INTO suppliers (sup_name, sup_contact_person, sup_account_number, sup_active)
+         VALUES ($1, $2, $3, true)
+         RETURNING sup_id`,
+        [supplierName, supplierContact || null, customerNumber || null]
+      );
+      supplierId = newSupplier.rows[0].sup_id;
+    }
+
+    // Create invoice header with additional fields
+    const invoiceResult = await client.query(
+      `INSERT INTO invoices (
+        invoice_number,
+        venue_id,
+        supplier_id,
+        invoice_date,
+        total_amount,
+        customer_ref,
+        delivery_number,
+        import_method,
+        created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pdf', CURRENT_TIMESTAMP)
+      RETURNING *`,
+      [
+        invoiceNumber || `INV-${Date.now()}`,
+        venueId,
+        supplierId,
+        invoiceDate || new Date().toISOString().split('T')[0],
+        totalAmount || 0,
+        customerNumber || null,
+        deliveryNumber || null
+      ]
+    );
+
+    const invoice = invoiceResult.rows[0];
+
+    // Create line items
+    const createdLineItems = [];
+    for (let i = 0; i < lineItems.length; i++) {
+      const item = lineItems[i];
+
+      const lineItemResult = await client.query(
+        `INSERT INTO invoice_line_items (
+          invoice_id,
+          line_number,
+          product_code,
+          product_name,
+          product_description,
+          quantity,
+          unit_price,
+          line_total,
+          supplier_item_list_id,
+          master_product_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, NULL)
+        RETURNING *`,
+        [
+          invoice.id,
+          i + 1,
+          item.sku || null,
+          item.name,
+          item.description || null,
+          item.caseSize || 1,
+          item.unitCost || 0,
+          (item.caseSize || 1) * (item.unitCost || 0)
+        ]
+      );
+
+      createdLineItems.push({
+        ...lineItemResult.rows[0],
+        packSize: item.packSize,
+        unitSize: item.unitSize
+      });
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: {
+        invoice: invoice,
+        lineItems: createdLineItems,
+        supplierId: supplierId
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creating invoice:', error);
+    res.status(500).json({
+      error: 'Failed to create invoice',
+      message: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// =============================================
+// STEP 3: MATCH INVOICE ITEMS TO SUPPLIER ITEMS
+// =============================================
+
+// Match invoice line items to supplier_item_list and auto-create missing entries
+app.post('/api/invoices/:invoiceId/match-supplier-items', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { invoiceId } = req.params;
+
+    await client.query('BEGIN');
+
+    // Get invoice with supplier info
+    const invoiceResult = await client.query(
+      'SELECT id, supplier_id FROM invoices WHERE id = $1',
+      [invoiceId]
+    );
+
+    if (invoiceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const invoice = invoiceResult.rows[0];
+
+    // Get all line items for this invoice
+    const lineItemsResult = await client.query(
+      'SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY line_number',
+      [invoiceId]
+    );
+
+    const matchResults = {
+      matched: [],
+      created: [],
+      failed: []
+    };
+
+    // Process each line item
+    for (const lineItem of lineItemsResult.rows) {
+      try {
+        // Try to find existing supplier item by SKU
+        let supplierItemId = null;
+        let masterProductId = null;
+
+        if (lineItem.product_code) {
+          const existingItem = await client.query(
+            `SELECT id, master_product_id
+             FROM supplier_item_list
+             WHERE supplier_id = $1 AND supplier_sku = $2`,
+            [invoice.supplier_id, lineItem.product_code]
+          );
+
+          if (existingItem.rows.length > 0) {
+            // Match found!
+            supplierItemId = existingItem.rows[0].id;
+            masterProductId = existingItem.rows[0].master_product_id;
+
+            // Update line item with links
+            await client.query(
+              `UPDATE invoice_line_items
+               SET supplier_item_list_id = $1, master_product_id = $2
+               WHERE id = $3`,
+              [supplierItemId, masterProductId, lineItem.id]
+            );
+
+            matchResults.matched.push({
+              lineItemId: lineItem.id,
+              productName: lineItem.product_name,
+              supplierItemId: supplierItemId,
+              masterProductId: masterProductId,
+              status: 'matched'
+            });
+
+            continue;
+          }
+        }
+
+        // No match found - create new supplier_item_list entry
+        const newItemResult = await client.query(
+          `INSERT INTO supplier_item_list (
+            supplier_id,
+            supplier_sku,
+            supplier_name,
+            supplier_description,
+            master_product_id,
+            auto_matched,
+            active
+          ) VALUES ($1, $2, $3, $4, NULL, false, true)
+          RETURNING id`,
+          [
+            invoice.supplier_id,
+            lineItem.product_code || `AUTO-${lineItem.id}`,
+            lineItem.product_name,
+            lineItem.product_description
+          ]
+        );
+
+        supplierItemId = newItemResult.rows[0].id;
+
+        // Update line item with supplier_item_list_id
+        await client.query(
+          `UPDATE invoice_line_items
+           SET supplier_item_list_id = $1
+           WHERE id = $2`,
+          [supplierItemId, lineItem.id]
+        );
+
+        matchResults.created.push({
+          lineItemId: lineItem.id,
+          productName: lineItem.product_name,
+          supplierItemId: supplierItemId,
+          status: 'created'
+        });
+
+      } catch (itemError) {
+        console.error('Error processing line item:', lineItem.id, itemError);
+        matchResults.failed.push({
+          lineItemId: lineItem.id,
+          productName: lineItem.product_name,
+          error: itemError.message
+        });
+      }
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: {
+        invoiceId: invoiceId,
+        totalItems: lineItemsResult.rows.length,
+        matched: matchResults.matched.length,
+        created: matchResults.created.length,
+        failed: matchResults.failed.length,
+        results: matchResults
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error matching supplier items:', error);
+    res.status(500).json({
+      error: 'Failed to match supplier items',
+      message: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ===================================
+// STEP 4: Master Product Fuzzy Matching
+// ===================================
+
+// Fuzzy search master products to find potential matches
+app.post('/api/master-products/fuzzy-match', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { productName, productDescription, limit = 5 } = req.body;
+
+    if (!productName) {
+      return res.status(400).json({ error: 'productName is required' });
+    }
+
+    // Enable pg_trgm extension for fuzzy matching if not already enabled
+    await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+
+    // Search using trigram similarity
+    // similarity() returns a value between 0 and 1 (higher = better match)
+    const searchQuery = `
+      SELECT
+        id,
+        product_name,
+        brand,
+        category,
+        unit_size,
+        unit_type,
+        case_size,
+        barcode,
+        is_composite,
+        active,
+        similarity(product_name, $1) as name_similarity,
+        CASE
+          WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2)
+          ELSE 0
+        END as description_similarity,
+        (similarity(product_name, $1) * 0.8 +
+         CASE WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2) * 0.2 ELSE 0 END
+        ) as total_score
+      FROM master_products
+      WHERE active = true
+        AND (
+          similarity(product_name, $1) > 0.15
+          OR product_name ILIKE $3
+        )
+      ORDER BY total_score DESC, name_similarity DESC
+      LIMIT $4
+    `;
+
+    const result = await client.query(searchQuery, [
+      productName,
+      productDescription || null,
+      `%${productName.substring(0, 20)}%`, // Fallback ILIKE match
+      limit
+    ]);
+
+    // Format results with percentage scores
+    const matches = result.rows.map(row => ({
+      id: row.id,
+      productName: row.product_name,
+      brand: row.brand,
+      category: row.category,
+      unitSize: row.unit_size,
+      unitType: row.unit_type,
+      caseSize: row.case_size,
+      barcode: row.barcode,
+      isComposite: row.is_composite,
+      active: row.active,
+      confidenceScore: Math.round(row.total_score * 100), // Convert to percentage
+      nameSimilarity: Math.round(row.name_similarity * 100),
+      descriptionSimilarity: Math.round(row.description_similarity * 100)
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        searchTerm: productName,
+        matches: matches,
+        totalFound: matches.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error performing fuzzy match:', error);
+    res.status(500).json({
+      error: 'Failed to perform fuzzy match',
+      message: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Link an invoice line item to a master product
+app.put('/api/invoice-line-items/:id/link-master-product', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { id } = req.params;
+    const { masterProductId, confidenceScore, verified = true } = req.body;
+
+    if (!masterProductId) {
+      return res.status(400).json({ error: 'masterProductId is required' });
+    }
+
+    await client.query('BEGIN');
+
+    // Get the line item with its supplier_item_list_id
+    const lineItemResult = await client.query(
+      'SELECT id, supplier_item_list_id FROM invoice_line_items WHERE id = $1',
+      [id]
+    );
+
+    if (lineItemResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice line item not found' });
+    }
+
+    const lineItem = lineItemResult.rows[0];
+
+    // Update the line item with master_product_id
+    await client.query(
+      'UPDATE invoice_line_items SET master_product_id = $1 WHERE id = $2',
+      [masterProductId, id]
+    );
+
+    // Update the supplier_item_list entry with master_product_id and matching metadata
+    if (lineItem.supplier_item_list_id) {
+      await client.query(
+        `UPDATE supplier_item_list
+         SET master_product_id = $1,
+             verified = $2,
+             confidence_score = $3,
+             auto_matched = $4,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $5`,
+        [
+          masterProductId,
+          verified,
+          confidenceScore || null,
+          confidenceScore >= 80, // Consider auto-matched if confidence >= 80%
+          lineItem.supplier_item_list_id
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      data: {
+        lineItemId: id,
+        masterProductId: masterProductId,
+        supplierItemListId: lineItem.supplier_item_list_id,
+        verified: verified,
+        confidenceScore: confidenceScore
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error linking master product:', error);
+    res.status(500).json({
+      error: 'Failed to link master product',
+      message: error.message
+    });
+  } finally {
+    client.release();
   }
 });
 
