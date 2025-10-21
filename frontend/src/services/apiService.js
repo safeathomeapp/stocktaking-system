@@ -229,71 +229,13 @@ export const apiService = {
     try {
       const response = await api.post('/api/master-products/search', {
         query: query.trim(),
-        sessionId,
-        venueId,
-        maxResults,
-        minConfidence
+        limit: maxResults,  // Backend expects 'limit', not 'maxResults'
+        min_score: minConfidence / 100  // Convert percentage to 0-1 scale
       });
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Voice search error:', error);
-
-      // TEMPORARY: Mock response for testing voice recognition UI
-      if (query.toLowerCase().includes('beck')) {
-        return {
-          success: true,
-          data: {
-            suggestions: [
-              {
-                id: 'mock-1',
-                name: "Beck's Lager",
-                brand: "Beck's",
-                category: "Beer",
-                size: "275ml",
-                confidence: 75,
-                logId: 'mock-log-1'
-              },
-              {
-                id: 'mock-2',
-                name: "Beck's Blue",
-                brand: "Beck's",
-                category: "Beer",
-                size: "275ml",
-                confidence: 79,
-                logId: 'mock-log-2'
-              }
-            ]
-          }
-        };
-      } else if (query.toLowerCase().includes('wine') || query.toLowerCase().includes('chardonnay')) {
-        return {
-          success: true,
-          data: {
-            suggestions: [
-              {
-                id: 'mock-3',
-                name: "House Chardonnay",
-                brand: "House Wine",
-                category: "Wine",
-                size: "750ml",
-                confidence: 92,
-                logId: 'mock-log-3'
-              },
-              {
-                id: 'mock-4',
-                name: "Kendall Jackson Chardonnay",
-                brand: "Kendall Jackson",
-                category: "Wine",
-                size: "750ml",
-                confidence: 87,
-                logId: 'mock-log-4'
-              }
-            ]
-          }
-        };
-      }
-
-      return { success: false, error: error.message, suggestions: [] };
+      console.error('Master product search error:', error);
+      return { success: false, error: error.message };
     }
   },
 
