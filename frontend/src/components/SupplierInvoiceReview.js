@@ -337,6 +337,44 @@ const DialogButton = styled.button`
   }
 `;
 
+const TestingTools = styled.div`
+  background: ${props => props.theme.colors.surface};
+  border: 1px solid #ff9800;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const TestingLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  color: ${props => props.theme.colors.text};
+  font-size: 0.9rem;
+
+  input {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const TestingNote = styled.span`
+  color: #ff9800;
+  font-size: 0.85rem;
+  margin-left: auto;
+  font-weight: 500;
+`;
+
 function SupplierInvoiceReview() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -373,6 +411,9 @@ function SupplierInvoiceReview() {
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [duplicateInvoiceInfo, setDuplicateInvoiceInfo] = useState(null);
   const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
+
+  // Feature flag for testing - can be toggled to disable duplicate check
+  const [duplicateCheckEnabled, setDuplicateCheckEnabled] = useState(true);
 
   // Load venue name on mount
   useEffect(() => {
@@ -653,21 +694,25 @@ function SupplierInvoiceReview() {
 
       console.log('Invoice data:', invoiceData);
 
-      // Check for duplicate invoice before creating
-      setLoadingMessage('Checking for duplicate invoice...');
-      const duplicateCheck = await apiService.checkDuplicateInvoice(supplierId, invoiceNumber);
-      console.log('Duplicate check result:', duplicateCheck);
+      // Check for duplicate invoice before creating (if enabled)
+      if (duplicateCheckEnabled) {
+        setLoadingMessage('Checking for duplicate invoice...');
+        const duplicateCheck = await apiService.checkDuplicateInvoice(supplierId, invoiceNumber);
+        console.log('Duplicate check result:', duplicateCheck);
 
-      if (duplicateCheck.success && duplicateCheck.data.duplicate) {
-        // Show warning dialog
-        setDuplicateInvoiceInfo(duplicateCheck.data.existingInvoice);
-        setPendingInvoiceData(invoiceData);
-        setShowDuplicateWarning(true);
-        setLoading(false);
-        return;
+        if (duplicateCheck.success && duplicateCheck.data.duplicate) {
+          // Show warning dialog
+          setDuplicateInvoiceInfo(duplicateCheck.data.existingInvoice);
+          setPendingInvoiceData(invoiceData);
+          setShowDuplicateWarning(true);
+          setLoading(false);
+          return;
+        }
+      } else {
+        console.log('Duplicate check disabled for testing');
       }
 
-      // No duplicate, proceed with creation
+      // No duplicate (or check disabled), proceed with creation
       await proceedWithInvoiceCreation(invoiceData);
     } catch (err) {
       console.error('Error creating invoice:', err);
@@ -1068,6 +1113,19 @@ function SupplierInvoiceReview() {
           {currentStep === 5 && 'Step 4: Review and confirm import'}
         </Subtitle>
       </Header>
+
+      {/* Testing Tools - Toggle duplicate check */}
+      <TestingTools>
+        <TestingLabel>
+          <input
+            type="checkbox"
+            checked={duplicateCheckEnabled}
+            onChange={(e) => setDuplicateCheckEnabled(e.target.checked)}
+          />
+          Enable Duplicate Invoice Check
+        </TestingLabel>
+        <TestingNote>Testing Mode</TestingNote>
+      </TestingTools>
 
       {renderStep()}
 
