@@ -23,7 +23,16 @@
       "Bash(curl:*)",
       "Bash(python3:*)",
       "Bash(git add:*)",
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d invoices\")"
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d invoices\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT name, brand, category, unit_type, unit_size, case_size, COUNT(*) as count FROM master_products WHERE active = true GROUP BY name, brand, category, unit_type, unit_size, case_size HAVING COUNT(*) > 1 ORDER BY count DESC;\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT supplier_id, supplier_sku, COUNT(*) as count, COUNT(DISTINCT master_product_id) as master_count FROM supplier_item_list WHERE active = true GROUP BY supplier_id, supplier_sku HAVING COUNT(*) > 1 ORDER BY count DESC;\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT COUNT(*) as orphaned_records FROM supplier_item_list sil WHERE sil.active = true AND sil.master_product_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM master_products mp WHERE mp.id = sil.master_product_id AND mp.active = true);\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT ''master_products'' as table_name, COUNT(*) as active_count, COUNT(CASE WHEN created_by_id IS NOT NULL THEN 1 END) as with_creator FROM master_products WHERE active = true UNION ALL SELECT ''supplier_item_list'' as table_name, COUNT(*) as active_count, COUNT(CASE WHEN verified = true THEN 1 END) as verified_count FROM supplier_item_list WHERE active = true;\")",
+      "Bash(node test_fuzzy_matching.js:*)",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT COUNT(*) as venue_count FROM venues; SELECT COUNT(*) as supplier_count FROM suppliers; SELECT COUNT(*) as invoice_count FROM invoices;\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT id, invoice_number, venue_id, supplier_id, created_at FROM invoices LIMIT 3;\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT COUNT(*) as line_item_count FROM invoice_line_items WHERE invoice_id = ''119a961d-b3db-4681-abeb-5b0d328a5765'';\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT id, supplier_name, auto_matched, confidence_score, master_product_id FROM supplier_item_list WHERE id IN (28, 56, 29) LIMIT 5;\")"
     ],
     "deny": [],
     "ask": []

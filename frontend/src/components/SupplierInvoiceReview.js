@@ -565,7 +565,9 @@ function SupplierInvoiceReview() {
         console.log('Match supplier items response:', matchResponse);
 
         if (matchResponse.success) {
-          setSupplierMatchResults(matchResponse.data);
+          // Extract match data - handle both wrapped and unwrapped responses
+          const matchData = matchResponse.data.data ? matchResponse.data.data : matchResponse.data;
+          setSupplierMatchResults(matchData);
           setUnmatchedLineItems(lineItems);
           // Stay on current step to show matching results
         } else {

@@ -2355,7 +2355,51 @@ app.post('/api/invoices/:invoiceId/match-supplier-items', async (req, res) => {
           }
         }
 
-        // No match found - create new supplier_item_list entry
+        // No supplier SKU match found - try Tier 2: Fuzzy match against master_products
+        const searchTerm = lineItem.product_name.trim();
+
+        const fuzzyMatchResult = await client.query(
+          `SELECT
+            id,
+            name,
+            similarity(name, $1) as name_similarity,
+            CASE
+              -- TIER 1: Exact prefix match (score 100+)
+              WHEN LOWER(name) LIKE LOWER($2) || '%' THEN 100 + similarity(name, $1) * 0.1
+
+              -- TIER 2: Word start match (score 80+)
+              WHEN LOWER(name) ~ ('(^|[^a-z0-9])' || LOWER($2)) THEN 80 + similarity(name, $1) * 0.1
+
+              -- TIER 3: High similarity fuzzy match (50%+, score 60+)
+              WHEN similarity(name, $1) > 0.50 THEN 60 + similarity(name, $1) * 10
+
+              -- TIER 4: Moderate similarity fuzzy match (35%+, score 40+)
+              WHEN similarity(name, $1) > 0.35 THEN 40 + similarity(name, $1) * 10
+
+              ELSE 0
+            END as relevance_score
+           FROM master_products
+           WHERE active = true
+             AND (
+               similarity(name, $1) > 0.35
+               OR LOWER(name) LIKE LOWER($2) || '%'
+               OR LOWER(name) ~ ('(^|[^a-z0-9])' || LOWER($2))
+             )
+           ORDER BY relevance_score DESC, name_similarity DESC
+           LIMIT 1`,
+          [searchTerm, searchTerm]
+        );
+
+        // Determine if we found a good fuzzy match (score >= 60)
+        const bestMatch = fuzzyMatchResult.rows.length > 0 ? fuzzyMatchResult.rows[0] : null;
+        const confidenceScore = bestMatch ? bestMatch.relevance_score : 0;
+        const isAutoMatched = bestMatch && confidenceScore >= 60;
+
+        if (isAutoMatched) {
+          masterProductId = bestMatch.id;
+        }
+
+        // Create new supplier_item_list entry (with or without master_product_id)
         const newItemResult = await client.query(
           `INSERT INTO supplier_item_list (
             supplier_id,
@@ -2364,33 +2408,53 @@ app.post('/api/invoices/:invoiceId/match-supplier-items', async (req, res) => {
             supplier_description,
             master_product_id,
             auto_matched,
+            confidence_score,
             active
-          ) VALUES ($1, $2, $3, $4, NULL, false, true)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)
           RETURNING id`,
           [
             invoice.supplier_id,
             lineItem.product_code || `AUTO-${lineItem.id}`,
             lineItem.product_name,
-            lineItem.product_description
+            lineItem.product_description,
+            masterProductId,
+            isAutoMatched,
+            confidenceScore
           ]
         );
 
         supplierItemId = newItemResult.rows[0].id;
 
-        // Update line item with supplier_item_list_id
+        // Update line item with links
         await client.query(
           `UPDATE invoice_line_items
-           SET supplier_item_list_id = $1
-           WHERE id = $2`,
-          [supplierItemId, lineItem.id]
+           SET supplier_item_list_id = $1, master_product_id = $2
+           WHERE id = $3`,
+          [supplierItemId, masterProductId, lineItem.id]
         );
 
-        matchResults.created.push({
-          lineItemId: lineItem.id,
-          productName: lineItem.product_name,
-          supplierItemId: supplierItemId,
-          status: 'created'
-        });
+        // Categorize result
+        if (isAutoMatched) {
+          matchResults.created.push({
+            lineItemId: lineItem.id,
+            productName: lineItem.product_name,
+            supplierItemId: supplierItemId,
+            masterProductId: masterProductId,
+            matchedTo: bestMatch.name,
+            confidenceScore: Math.round(confidenceScore),
+            status: 'created'
+          });
+        } else {
+          matchResults.failed.push({
+            lineItemId: lineItem.id,
+            productName: lineItem.product_name,
+            supplierItemId: supplierItemId,
+            masterProductId: null,
+            bestGuess: bestMatch ? bestMatch.name : null,
+            confidenceScore: bestMatch ? Math.round(confidenceScore) : 0,
+            status: 'needs_master_match'
+          });
+        }
 
       } catch (itemError) {
         console.error('Error processing line item:', lineItem.id, itemError);
