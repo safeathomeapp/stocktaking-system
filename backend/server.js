@@ -694,16 +694,21 @@ app.get('/api/sessions/:id', async (req, res) => {
 
     // Get session with venue details and entry count
     const result = await pool.query(
-      `SELECT 
+      `SELECT
          s.*,
          v.name as venue_name,
-         v.address as venue_address,
+         v.address_line_1,
+         v.address_line_2,
+         v.city,
+         v.county,
+         v.postcode,
+         v.country,
          COUNT(se.id) as entry_count
        FROM stock_sessions s
        JOIN venues v ON s.venue_id = v.id
        LEFT JOIN stock_entries se ON s.id = se.session_id
        WHERE s.id = $1
-       GROUP BY s.id, v.name, v.address`,
+       GROUP BY s.id, v.name, v.address_line_1, v.address_line_2, v.city, v.county, v.postcode, v.country`,
       [id]
     );
 
@@ -2638,33 +2643,53 @@ app.post('/api/master-products/fuzzy-match', async (req, res) => {
     // Enable pg_trgm extension for fuzzy matching if not already enabled
     await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
 
-    // Search using trigram similarity
-    // similarity() returns a value between 0 and 1 (higher = better match)
+    // Smart Hybrid Fuzzy Matching with Multi-Tier Ranking
+    // Tier 1: Exact prefix match (product name starts with search term)
+    // Tier 2: Word start match (any word in product name starts with search term)
+    // Tier 3: High similarity fuzzy match (50%+)
+    // Tier 4: Fallback fuzzy match (35%+, for typos)
+
     const searchQuery = `
       SELECT
         id,
-        product_name,
+        name as product_name,
         brand,
         category,
         unit_size,
         unit_type,
         case_size,
         barcode,
-        is_composite,
         active,
-        similarity(product_name, $1) as name_similarity,
+        similarity(name, $1) as name_similarity,
         CASE
           WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2)
           ELSE 0
         END as description_similarity,
-        (similarity(product_name, $1) * 0.8 +
-         CASE WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2) * 0.2 ELSE 0 END
-        ) as total_score
+        -- Multi-tier scoring system
+        CASE
+          -- TIER 1: Exact prefix match (product name starts with search term) = Score 100+
+          WHEN LOWER(name) LIKE LOWER($3) || '%' THEN 100 + similarity(name, $1) * 0.1
+
+          -- TIER 2: Word start match (any word in product name starts with search term) = Score 80+
+          WHEN LOWER(name) ~ ('(^|[^a-z0-9])' || LOWER($3)) THEN 80 + similarity(name, $1) * 0.1
+
+          -- TIER 3: High similarity fuzzy match (50%+) = Score 60+
+          WHEN similarity(name, $1) > 0.50 THEN 60 + (similarity(name, $1) * 0.8 +
+            CASE WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2) * 0.2 ELSE 0 END) * 10
+
+          -- TIER 4: Moderate similarity fuzzy match (35%+) = Score 40+
+          WHEN similarity(name, $1) > 0.35 THEN 40 + (similarity(name, $1) * 0.8 +
+            CASE WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2) * 0.2 ELSE 0 END) * 10
+
+          ELSE 0
+        END as total_score
       FROM master_products
       WHERE active = true
         AND (
-          similarity(product_name, $1) > 0.15
-          OR product_name ILIKE $3
+          -- Include any match above 35% similarity threshold OR prefix/word match
+          similarity(name, $1) > 0.35
+          OR LOWER(name) LIKE LOWER($3) || '%'
+          OR LOWER(name) ~ ('(^|[^a-z0-9])' || LOWER($3))
         )
       ORDER BY total_score DESC, name_similarity DESC
       LIMIT $4
@@ -2673,7 +2698,7 @@ app.post('/api/master-products/fuzzy-match', async (req, res) => {
     const result = await client.query(searchQuery, [
       productName,
       productDescription || null,
-      `%${productName.substring(0, 20)}%`, // Fallback ILIKE match
+      productName,  // For LIKE and regex patterns (properly parameterized)
       limit
     ]);
 
