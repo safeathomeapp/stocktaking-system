@@ -2524,7 +2524,7 @@ app.get('/api/invoices/check-duplicate', async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, invoice_date, created_at, total_amount, status
+      `SELECT id, invoice_date, created_at, total_amount, payment_status
        FROM invoices
        WHERE supplier_id = $1 AND invoice_number = $2
        ORDER BY created_at DESC
