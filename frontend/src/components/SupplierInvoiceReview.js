@@ -506,13 +506,23 @@ function SupplierInvoiceReview() {
       console.log('Create invoice response:', response);
 
       if (response.success) {
-        setInvoiceId(response.data.invoice.id);
-        setSuccess(`Invoice #${response.data.invoice.id} created successfully!`);
+        // Extract invoice data - handle both wrapped and unwrapped responses
+        const invoiceData = response.data.data ? response.data.data : response.data;
+        const invoiceId = invoiceData.invoice?.id;
+        const lineItems = invoiceData.line_items || invoiceData.lineItems || [];
+
+        if (!invoiceId) {
+          setError('Invoice created but ID not found in response');
+          return;
+        }
+
+        setInvoiceId(invoiceId);
+        setSuccess(`Invoice #${invoiceId} created successfully!`);
 
         // Move to Step 3: Auto-match supplier items
         setLoadingMessage('Matching supplier items...');
 
-        const matchResponse = await apiService.matchSupplierItems(response.data.invoice.id);
+        const matchResponse = await apiService.matchSupplierItems(invoiceId);
         console.log('Match supplier items response:', matchResponse);
 
         if (matchResponse.success) {
@@ -521,7 +531,7 @@ function SupplierInvoiceReview() {
           // Get line items that need master product matching (those without master_product_id)
           // For now, we'll load all line items and filter client-side
           // TODO: Add backend endpoint to get unmatched line items
-          setUnmatchedLineItems(response.data.lineItems);
+          setUnmatchedLineItems(lineItems);
           // Stay on current step to show matching results
         } else {
           setError('Invoice created but matching failed: ' + (matchResponse.error || 'Unknown error'));
