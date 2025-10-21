@@ -503,7 +503,7 @@ name             varchar(255)  NOT NULL
 brand            varchar(100)
 category         varchar(100)
 subcategory      varchar(100)
-unit_type        varchar(50)   CHECK (unit_type IN ('bottle', 'can', 'keg', 'case', 'pack'))
+unit_type        varchar(50)   CHECK (unit_type IN ('bottle', 'can', 'keg', 'case', 'pack', 'cask', 'bag-in-box'))
 unit_size        integer                       -- Size in ml (e.g., 750 for 750ml bottle)
 case_size        integer                       -- Number of units per case
 barcode          varchar(100)
@@ -1271,6 +1271,20 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 ---
 
 ## Recent Updates
+
+### October 21, 2025 - **Critical: Master Products Database Import & Schema Fix**
+- ✅ **Imported 570 master products** from `master_products_comprehensive.csv` to local database
+- ✅ **Fixed schema constraint** - Added 'cask' and 'bag-in-box' to unit_type CHECK constraint
+- ✅ **Products breakdown**: Spirits (269), Wines (124), Beers & Ales (83), Soft Drinks (67), Cider & Perry (27)
+- ✅ **Updated schema.sql** with corrected unit_type values
+- ⚠️ **Issue identified**: Previous migration from Railway didn't include master products data
+- ✅ **Solution**: Used PostgreSQL COPY command to import CSV directly
+- ✅ **Database verified**: All 570 products successfully imported and accessible
+
+**Why This Matters:**
+- Master products are the single source of truth for all product specifications
+- Without this data, the system cannot function (product search, stock-taking, etc.)
+- Now fully operational with complete UK drinks catalog
 
 ### October 20, 2025 (Later) - **Quick Startup Checklist for Claude Code**
 - ✅ **Added quick startup guide** to reduce token waste on setup verification
