@@ -8,7 +8,21 @@
       "Bash(git commit:*)",
       "Bash(find:*)",
       "Bash(node -e:*)",
-      "Bash(node -c:*)"
+      "Bash(node -c:*)",
+      "Bash(/c/Program Files/PostgreSQL/17/bin/psql.exe:*)",
+      "Bash(Stop-Process -Force)",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT column_name FROM information_schema.columns WHERE table_name=''master_products'' AND column_name LIKE ''%search%'';\")",
+      "Bash(awk:*)",
+      "Bash(xargs:*)",
+      "Bash(kill:*)",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\":*)",
+      "Bash(taskkill:*)",
+      "Bash(tasklist:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm start)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

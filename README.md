@@ -48,14 +48,20 @@ const API_BASE_URL = 'http://localhost:3005';
 
 ### 30-Second Verification
 ```bash
-# Terminal 1: Start Backend (if not running)
-cd backend && npm start
-# Expected output: "Server running on port 3005"
+# Terminal 1: Start Backend Development Server (if not running)
+cd backend && npm run dev
+# Expected output: "nodemon restarting due to changes" → "Server running on port 3005"
 
 # Terminal 2: Start Frontend (if not running)
 cd frontend && npm start
 # Expected output: "You can now view frontend in the browser. Local: http://localhost:3000"
 ```
+
+### ⚠️ IMPORTANT: Development Server Management
+- **DO NOT kill Node processes** - Let nodemon handle restarts
+- **File changes auto-reload** - Save files to trigger automatic restart
+- If backend server appears stuck, modify a backend file to trigger nodemon restart
+- Only stop the server if absolutely necessary by pressing `Ctrl+C` in the terminal
 
 ### ✅ System Ready When You See:
 - **Backend**: `Server running on port 3005` + `Master Products API ready`
@@ -87,7 +93,8 @@ cd frontend && npm start
 **Still broken?**
 - Check backend `.env` file has: `DB_HOST=localhost`, `DB_PORT=5432`, `DB_NAME=stocktaking_local`
 - Check frontend `src/config/api.js` has: `API_BASE_URL = 'http://localhost:3005'`
-- Restart everything: Kill all `node.exe` processes, then start backend + frontend fresh
+- Stop the dev server with `Ctrl+C` in the terminal, then run `npm run dev` again
+- ⚠️ Do NOT use `taskkill` or `Stop-Process` - these disrupt nodemon's auto-restart behavior
 
 ---
 
@@ -273,11 +280,13 @@ cd frontend && npm install
 
 ### Running the Application
 
-**Start Backend:**
+**Start Backend (Development):**
 ```bash
 cd backend
-npm start
+npm run dev
+# Uses nodemon to auto-restart on file changes
 # Server runs on http://localhost:3005
+# Watch for: "nodemon restarting due to changes"
 ```
 
 **Start Frontend (in a new terminal):**
@@ -285,6 +294,7 @@ npm start
 cd frontend
 npm start
 # App opens at http://localhost:3000
+# Auto-refreshes on file changes
 ```
 
 **Verify Everything Works:**
@@ -306,13 +316,17 @@ curl http://localhost:3005/api/health
 # 1. Start PostgreSQL (if not running)
 # Check Windows Services - postgresql-x64-17 should be "Running"
 
-# 2. Start backend
-cd backend && npm start
+# 2. Start backend with nodemon (auto-restart on changes)
+cd backend && npm run dev
+# Nodemon monitors backend files and auto-restarts on save
 
 # 3. Start frontend (new terminal)
 cd frontend && npm start
+# React dev server auto-refreshes on save
 
-# 4. Develop! Changes auto-reload
+# 4. Develop! Changes auto-reload via nodemon and React
+# DO NOT kill Node processes - let nodemon handle restarts
+# File changes = automatic restart (no manual intervention needed)
 ```
 
 ### Database Management
@@ -1272,6 +1286,21 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 
 ## Recent Updates
 
+### October 21, 2025 - **IMPORTANT: Development Workflow Update - Use `npm run dev` with Nodemon**
+- ✅ **Switched backend development command** from `npm start` to `npm run dev`
+- ✅ **Nodemon auto-restart** - Backend now auto-restarts when files change
+- ✅ **No process killing** - Removed requirement to manually kill `node.exe` processes
+- ✅ **Updated README** - Clarified development workflow and server management
+- ⚠️ **Critical**: Do NOT use `taskkill` or `Stop-Process` during development
+- 💡 **Why**: Killing processes disrupts nodemon's file watchers and auto-restart mechanism
+- 📝 **Better approach**: Let nodemon handle restarts, use `Ctrl+C` in terminal if manual stop needed
+
+**Development Workflow:**
+1. Run `npm run dev` in backend terminal (stays running)
+2. Run `npm start` in frontend terminal (stays running)
+3. Edit files - changes auto-reload via nodemon and React dev server
+4. No process management needed - just code and save
+
 ### October 21, 2025 - **Critical: Master Products Database Import & Schema Fix**
 - ✅ **Imported 570 master products** from `master_products_comprehensive.csv` to local database
 - ✅ **Fixed schema constraint** - Added 'cask' and 'bag-in-box' to unit_type CHECK constraint
@@ -1431,13 +1460,16 @@ When providing prompts for new features:
 2. **Specify simplicity** when desired (e.g., "just delete from stock_entries")
 3. **Clarify persistence** requirements (e.g., "session-only" vs "permanent")
 4. **Reference this README** for architectural principles before implementing
+5. **Development server**: Always use `npm run dev` for backend (NOT `npm start`)
+6. **Server management**: Let nodemon handle restarts - never kill Node processes
+7. **File changes**: Save files to trigger automatic backend restart via nodemon
 
 ### Development Checklist
 1. **Start PostgreSQL** - Ensure service is running (check Windows Services)
-2. **Start Backend** - `cd backend && npm start` (port 3005)
+2. **Start Backend** - `cd backend && npm run dev` (port 3005, auto-restart on changes)
 3. **Start Frontend** - `cd frontend && npm start` (port 3000)
 4. **Test locally** - Verify both frontend and backend are working
-5. **Make changes** - Code changes auto-reload
+5. **Make changes** - Code changes auto-reload via nodemon and React dev server
 6. **Test database** - Use psql to inspect data if needed
 7. **Commit changes** - `git add . && git commit -m "description"`
 8. **Push to GitHub** - `git push` (for version control and backup)

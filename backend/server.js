@@ -631,7 +631,7 @@ app.post('/api/master-products/search', async (req, res) => {
         active,
         similarity(name, $1) as name_similarity,
         CASE
-          WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2)
+          WHEN $2::TEXT != '' THEN similarity(COALESCE(category, ''), $2::TEXT)
           ELSE 0
         END as description_similarity,
         -- Multi-tier scoring system
@@ -644,11 +644,11 @@ app.post('/api/master-products/search', async (req, res) => {
 
           -- TIER 3: High similarity fuzzy match (50%+, score 60+)
           WHEN similarity(name, $1) > 0.50 THEN 60 + (similarity(name, $1) * 0.8 +
-            CASE WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2) * 0.2 ELSE 0 END) * 10
+            CASE WHEN $2::TEXT != '' THEN similarity(COALESCE(category, ''), $2::TEXT) * 0.2 ELSE 0 END) * 10
 
           -- TIER 4: Moderate similarity fuzzy match (35%+, score 40+)
           WHEN similarity(name, $1) > 0.35 THEN 40 + (similarity(name, $1) * 0.8 +
-            CASE WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2) * 0.2 ELSE 0 END) * 10
+            CASE WHEN $2::TEXT != '' THEN similarity(COALESCE(category, ''), $2::TEXT) * 0.2 ELSE 0 END) * 10
 
           ELSE 0
         END as relevance_score
@@ -662,7 +662,7 @@ app.post('/api/master-products/search', async (req, res) => {
          )
        ORDER BY relevance_score DESC, name_similarity DESC
        LIMIT $4`,
-      [searchTerm, null, searchTerm, limit]
+      [searchTerm, '', searchTerm, limit]
     );
 
     res.json({
