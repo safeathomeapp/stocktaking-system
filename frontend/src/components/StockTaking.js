@@ -1271,33 +1271,30 @@ const StockTaking = () => {
     }
   };
 
-  // Fuzzy search for product suggestions
-  const fuzzySearch = (query, items) => {
-    if (!query) return [];
-
-    const queryLower = query.toLowerCase();
-    return items.filter(product => {
-      // Search in product name and brand
-      const searchText = `${product.name} ${product.brand || ''}`.toLowerCase();
-      // Simple fuzzy logic: check if all characters in query exist in order
-      let queryIndex = 0;
-      for (let i = 0; i < searchText.length && queryIndex < queryLower.length; i++) {
-        if (searchText[i] === queryLower[queryIndex]) {
-          queryIndex++;
-        }
-      }
-      return queryIndex === queryLower.length;
-    }).slice(0, 10);
-  };
-
-  // Handle product name input change with fuzzy search
-  const handleProductNameChange = (value) => {
+  // Handle product name input change with server-side smart hybrid search
+  const handleProductNameChange = async (value) => {
     setNewProductName(value);
 
     if (value.length > 1) {
-      const suggestions = fuzzySearch(value, productDatabase);
-      setProductSuggestions(suggestions);
-      setShowSuggestions(suggestions.length > 0);
+      try {
+        // Call backend API with smart hybrid matching
+        const response = await apiService.searchMasterProducts(
+          value,
+          sessionId,
+          currentVenue?.id,
+          10 // Return top 10 results
+        );
+
+        if (response.success && response.data.results) {
+          setProductSuggestions(response.data.results);
+          setShowSuggestions(response.data.results.length > 0);
+        } else {
+          setShowSuggestions(false);
+        }
+      } catch (error) {
+        console.error('Error searching products:', error);
+        setShowSuggestions(false);
+      }
     } else {
       setShowSuggestions(false);
     }

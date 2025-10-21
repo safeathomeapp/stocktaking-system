@@ -616,6 +616,7 @@ app.get('/api/master-products/categories/summary', async (req, res) => {
 
 // Search master products (for voice recognition, etc.)
 app.post('/api/master-products/search', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { query: searchQuery, limit = 20, min_score = 0.1 } = req.body;
 
@@ -623,27 +624,86 @@ app.post('/api/master-products/search', async (req, res) => {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
-    // Use PostgreSQL full-text search
-    const result = await pool.query(
-      `SELECT *,
-              ts_rank(search_vector, plainto_tsquery('english', $1)) as relevance_score
+    // Enable pg_trgm extension for fuzzy matching if not already enabled
+    await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+
+    // Smart Hybrid Search with Multi-Tier Ranking (same logic as fuzzy-match)
+    // This is the PRIMARY search endpoint used by the frontend
+    const searchTerm = searchQuery.trim();
+
+    const result = await client.query(
+      `SELECT
+        id,
+        name as product_name,
+        brand,
+        category,
+        subcategory,
+        unit_size,
+        unit_type,
+        case_size,
+        barcode,
+        ean_code,
+        upc_code,
+        active,
+        similarity(name, $1) as name_similarity,
+        CASE
+          WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2)
+          ELSE 0
+        END as description_similarity,
+        -- Multi-tier scoring system
+        CASE
+          -- TIER 1: Exact prefix match (score 100+)
+          WHEN LOWER(name) LIKE LOWER($3) || '%' THEN 100 + similarity(name, $1) * 0.1
+
+          -- TIER 2: Word start match (score 80+)
+          WHEN LOWER(name) ~ ('(^|[^a-z0-9])' || LOWER($3)) THEN 80 + similarity(name, $1) * 0.1
+
+          -- TIER 3: High similarity fuzzy match (50%+, score 60+)
+          WHEN similarity(name, $1) > 0.50 THEN 60 + (similarity(name, $1) * 0.8 +
+            CASE WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2) * 0.2 ELSE 0 END) * 10
+
+          -- TIER 4: Moderate similarity fuzzy match (35%+, score 40+)
+          WHEN similarity(name, $1) > 0.35 THEN 40 + (similarity(name, $1) * 0.8 +
+            CASE WHEN $2 IS NOT NULL THEN similarity(COALESCE(category, ''), $2) * 0.2 ELSE 0 END) * 10
+
+          ELSE 0
+        END as relevance_score
        FROM master_products
-       WHERE search_vector @@ plainto_tsquery('english', $1)
-          AND active = true
-          AND ts_rank(search_vector, plainto_tsquery('english', $1)) > $2
-       ORDER BY relevance_score DESC, name
-       LIMIT $3`,
-      [searchQuery.trim(), min_score, limit]
+       WHERE active = true
+         AND (
+           -- Include any match above 35% similarity threshold OR prefix/word match
+           similarity(name, $1) > 0.35
+           OR LOWER(name) LIKE LOWER($3) || '%'
+           OR LOWER(name) ~ ('(^|[^a-z0-9])' || LOWER($3))
+         )
+       ORDER BY relevance_score DESC, name_similarity DESC
+       LIMIT $4`,
+      [searchTerm, null, searchTerm, limit]
     );
 
     res.json({
       query: searchQuery,
-      results: result.rows,
+      results: result.rows.map(row => ({
+        id: row.id,
+        name: row.product_name,
+        product_name: row.product_name,
+        brand: row.brand,
+        category: row.category,
+        subcategory: row.subcategory,
+        unit_size: row.unit_size,      // Frontend expects snake_case
+        unit_type: row.unit_type,       // Frontend expects snake_case
+        case_size: row.case_size,       // Frontend expects snake_case
+        barcode: row.barcode,
+        active: row.active,
+        confidenceScore: Math.round(row.relevance_score * 10) // Convert to 0-100% scale
+      })),
       count: result.rows.length
     });
   } catch (error) {
     console.error('Error searching master products:', error);
-    res.status(500).json({ error: 'Failed to search master products' });
+    res.status(500).json({ error: 'Failed to search master products', message: error.message });
+  } finally {
+    client.release();
   }
 });
 
