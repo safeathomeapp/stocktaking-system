@@ -918,6 +918,7 @@ function SupplierInvoiceReview() {
                       const matchedItems = supplierMatchResults.results?.matched || [];
                       const createdItems = supplierMatchResults.results?.created || [];
                       const failedItems = supplierMatchResults.results?.failed || [];
+                      const totalItems = matchedItems.length + createdItems.length + failedItems.length;
                       const itemsWithMasterProduct = matchedItems.filter(item => item.masterProductId).length;
                       const itemsNeedingMasterMatch = matchedItems.filter(item => !item.masterProductId).length + createdItems.length;
 
@@ -928,7 +929,7 @@ function SupplierInvoiceReview() {
                           {/* Summary Stats */}
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
                             <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: '6px', textAlign: 'center' }}>
-                              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#007bff' }}>{supplierMatchResults.totalItems}</div>
+                              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#007bff' }}>{totalItems}</div>
                               <div style={{ fontSize: '0.9rem', color: '#666' }}>Total Items</div>
                             </div>
                             <div style={{ background: '#d4edda', padding: '1rem', borderRadius: '6px', textAlign: 'center' }}>
@@ -940,7 +941,7 @@ function SupplierInvoiceReview() {
                               <div style={{ fontSize: '0.9rem', color: '#666' }}>Need Master Match</div>
                             </div>
                             <div style={{ background: '#f8d7da', padding: '1rem', borderRadius: '6px', textAlign: 'center' }}>
-                              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#dc3545' }}>{supplierMatchResults.failed || 0}</div>
+                              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#dc3545' }}>{failedItems.length}</div>
                               <div style={{ fontSize: '0.9rem', color: '#666' }}>Failed</div>
                             </div>
                           </div>
@@ -1066,10 +1067,35 @@ function SupplierInvoiceReview() {
 
       case 4:
         // Step 4: Master Product Matching
+        // Filter to only show items that failed to match (need manual review)
+        const itemsNeedingManualMatch = unmatchedLineItems.filter(item => {
+          // Check if this item is in the "failed" category from supplier matching
+          if (!supplierMatchResults || !supplierMatchResults.results) return true;
+
+          const failedItems = supplierMatchResults.results.failed || [];
+          return failedItems.some(failed => failed.lineItemId === item.id);
+        });
+
+        if (itemsNeedingManualMatch.length === 0) {
+          // All items matched successfully, skip to summary
+          return (
+            <>
+              <Message $type="success">
+                ✓ All products have been successfully matched! Moving to summary...
+              </Message>
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <PrimaryButton onClick={() => setCurrentStep(5)}>
+                  Continue to Summary →
+                </PrimaryButton>
+              </div>
+            </>
+          );
+        }
+
         return (
           <MasterProductMatcher
             invoiceId={invoiceId}
-            lineItems={unmatchedLineItems}
+            lineItems={itemsNeedingManualMatch}
             onComplete={handleMasterProductMatchComplete}
             onBack={() => setCurrentStep(2)}
           />
