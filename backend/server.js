@@ -2511,6 +2511,55 @@ app.put('/api/invoice-line-items/:id/link-master-product', async (req, res) => {
   }
 });
 
+// Check for duplicate invoices
+app.get('/api/invoices/check-duplicate', async (req, res) => {
+  try {
+    const { supplier_id, invoice_number } = req.query;
+
+    if (!supplier_id || !invoice_number) {
+      return res.status(400).json({
+        error: 'supplier_id and invoice_number are required',
+        duplicate: false
+      });
+    }
+
+    const result = await pool.query(
+      `SELECT id, invoice_date, created_at, total_amount, status
+       FROM invoices
+       WHERE supplier_id = $1 AND invoice_number = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [supplier_id, invoice_number]
+    );
+
+    if (result.rows.length > 0) {
+      const existingInvoice = result.rows[0];
+      return res.json({
+        duplicate: true,
+        existingInvoice: {
+          id: existingInvoice.id,
+          invoiceNumber: invoice_number,
+          invoiceDate: existingInvoice.invoice_date,
+          totalAmount: existingInvoice.total_amount,
+          createdAt: existingInvoice.created_at
+        }
+      });
+    } else {
+      return res.json({
+        duplicate: false,
+        existingInvoice: null
+      });
+    }
+  } catch (error) {
+    console.error('Error checking for duplicate invoices:', error);
+    res.status(500).json({
+      error: 'Failed to check for duplicate invoices',
+      message: error.message,
+      duplicate: false
+    });
+  }
+});
+
 // Create manual invoice with line items
 app.post('/api/invoices', async (req, res) => {
   const client = await pool.connect();

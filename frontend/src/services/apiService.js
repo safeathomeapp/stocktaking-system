@@ -624,6 +624,22 @@ export const apiService = {
     }
   },
 
+  // Check for duplicate invoices
+  checkDuplicateInvoice: async (supplierId, invoiceNumber) => {
+    try {
+      const response = await api.get('/api/invoices/check-duplicate', {
+        params: {
+          supplier_id: supplierId,
+          invoice_number: invoiceNumber
+        }
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Check duplicate invoice error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
 };
 
 export default apiService;

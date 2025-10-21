@@ -235,6 +235,108 @@ const Message = styled.div`
   border: 1px solid ${props => props.$type === 'error' ? '#fcc' : '#cfc'};
 `;
 
+const DialogBackdrop = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const DialogContent = styled.div`
+  background: ${props => props.theme.colors.surface};
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+`;
+
+const DialogTitle = styled.h2`
+  color: ${props => props.theme.colors.text};
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const WarningIcon = styled.span`
+  font-size: 1.5rem;
+  color: #ff9800;
+`;
+
+const DialogMessage = styled.p`
+  color: ${props => props.theme.colors.textSecondary};
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+`;
+
+const InvoiceInfo = styled.div`
+  background: ${props => props.theme.colors.background};
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid #ff9800;
+`;
+
+const InfoRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+
+  &:last-child {
+    border-top: 1px solid ${props => props.theme.colors.border};
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+    font-weight: 500;
+  }
+`;
+
+const DialogButtons = styled.div`
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+`;
+
+const DialogButton = styled.button`
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &.secondary {
+    background: ${props => props.theme.colors.border};
+    color: ${props => props.theme.colors.text};
+
+    &:hover {
+      background: ${props => props.theme.colors.surface};
+      border: 1px solid ${props => props.theme.colors.primary};
+    }
+  }
+
+  &.primary {
+    background: #ff9800;
+    color: white;
+
+    &:hover {
+      background: #f57c00;
+    }
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
 function SupplierInvoiceReview() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -266,6 +368,11 @@ function SupplierInvoiceReview() {
   // Step 4: Line items needing master product matching
   const [unmatchedLineItems, setUnmatchedLineItems] = useState([]);
   const [masterProductMatchResults, setMasterProductMatchResults] = useState(null);
+
+  // Duplicate invoice detection
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateInvoiceInfo, setDuplicateInvoiceInfo] = useState(null);
+  const [pendingInvoiceData, setPendingInvoiceData] = useState(null);
 
   // Load venue name on mount
   useEffect(() => {
@@ -390,6 +497,50 @@ function SupplierInvoiceReview() {
     ));
   };
 
+  // Proceed with invoice creation after duplicate check
+  const proceedWithInvoiceCreation = async (invoiceData) => {
+    try {
+      const response = await apiService.createInvoice(invoiceData);
+      console.log('Create invoice response:', response);
+
+      if (response.success) {
+        // Extract invoice data - handle both wrapped and unwrapped responses
+        const responseData = response.data.data ? response.data.data : response.data;
+        const invId = responseData.invoice?.id;
+        const lineItems = responseData.line_items || responseData.lineItems || [];
+
+        if (!invId) {
+          setError('Invoice created but ID not found in response');
+          return;
+        }
+
+        setInvoiceId(invId);
+        setSuccess(`Invoice #${invId} created successfully!`);
+
+        // Move to Step 3: Auto-match supplier items
+        setLoadingMessage('Matching supplier items...');
+
+        const matchResponse = await apiService.matchSupplierItems(invId);
+        console.log('Match supplier items response:', matchResponse);
+
+        if (matchResponse.success) {
+          setSupplierMatchResults(matchResponse.data);
+          setUnmatchedLineItems(lineItems);
+          // Stay on current step to show matching results
+        } else {
+          setError('Invoice created but matching failed: ' + (matchResponse.error || 'Unknown error'));
+        }
+      } else {
+        setError('Failed to create invoice: ' + (response.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Error creating invoice:', err);
+      setError(err.message || err.toString() || 'Failed to create invoice');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Step 2: Create invoice and line items
   const handleCreateInvoice = async () => {
     const selectedProducts = products.filter(p => p.selected);
@@ -502,43 +653,22 @@ function SupplierInvoiceReview() {
 
       console.log('Invoice data:', invoiceData);
 
-      const response = await apiService.createInvoice(invoiceData);
-      console.log('Create invoice response:', response);
+      // Check for duplicate invoice before creating
+      setLoadingMessage('Checking for duplicate invoice...');
+      const duplicateCheck = await apiService.checkDuplicateInvoice(supplierId, invoiceNumber);
+      console.log('Duplicate check result:', duplicateCheck);
 
-      if (response.success) {
-        // Extract invoice data - handle both wrapped and unwrapped responses
-        const invoiceData = response.data.data ? response.data.data : response.data;
-        const invoiceId = invoiceData.invoice?.id;
-        const lineItems = invoiceData.line_items || invoiceData.lineItems || [];
-
-        if (!invoiceId) {
-          setError('Invoice created but ID not found in response');
-          return;
-        }
-
-        setInvoiceId(invoiceId);
-        setSuccess(`Invoice #${invoiceId} created successfully!`);
-
-        // Move to Step 3: Auto-match supplier items
-        setLoadingMessage('Matching supplier items...');
-
-        const matchResponse = await apiService.matchSupplierItems(invoiceId);
-        console.log('Match supplier items response:', matchResponse);
-
-        if (matchResponse.success) {
-          setSupplierMatchResults(matchResponse.data);
-
-          // Get line items that need master product matching (those without master_product_id)
-          // For now, we'll load all line items and filter client-side
-          // TODO: Add backend endpoint to get unmatched line items
-          setUnmatchedLineItems(lineItems);
-          // Stay on current step to show matching results
-        } else {
-          setError('Invoice created but matching failed: ' + (matchResponse.error || 'Unknown error'));
-        }
-      } else {
-        setError('Failed to create invoice: ' + (response.error || 'Unknown error'));
+      if (duplicateCheck.success && duplicateCheck.data.duplicate) {
+        // Show warning dialog
+        setDuplicateInvoiceInfo(duplicateCheck.data.existingInvoice);
+        setPendingInvoiceData(invoiceData);
+        setShowDuplicateWarning(true);
+        setLoading(false);
+        return;
       }
+
+      // No duplicate, proceed with creation
+      await proceedWithInvoiceCreation(invoiceData);
     } catch (err) {
       console.error('Error creating invoice:', err);
       setError(err.message || err.toString() || 'Failed to create invoice');
@@ -940,6 +1070,66 @@ function SupplierInvoiceReview() {
       </Header>
 
       {renderStep()}
+
+      {/* Duplicate Invoice Warning Dialog */}
+      {showDuplicateWarning && duplicateInvoiceInfo && (
+        <DialogBackdrop onClick={() => setShowDuplicateWarning(false)}>
+          <DialogContent onClick={e => e.stopPropagation()}>
+            <DialogTitle>
+              <WarningIcon>⚠️</WarningIcon>
+              Duplicate Invoice Detected
+            </DialogTitle>
+
+            <DialogMessage>
+              An invoice with this number from this supplier has already been imported.
+              Do you want to import it again?
+            </DialogMessage>
+
+            <InvoiceInfo>
+              <InfoRow>
+                <span>Invoice Number:</span>
+                <strong>{duplicateInvoiceInfo.invoiceNumber}</strong>
+              </InfoRow>
+              <InfoRow>
+                <span>Invoice Date:</span>
+                <strong>{new Date(duplicateInvoiceInfo.invoiceDate).toLocaleDateString()}</strong>
+              </InfoRow>
+              <InfoRow>
+                <span>Amount:</span>
+                <strong>£{parseFloat(duplicateInvoiceInfo.totalAmount).toFixed(2)}</strong>
+              </InfoRow>
+              <InfoRow>
+                <span>Previously Imported:</span>
+                <strong>{new Date(duplicateInvoiceInfo.createdAt).toLocaleDateString()}</strong>
+              </InfoRow>
+            </InvoiceInfo>
+
+            <DialogButtons>
+              <DialogButton
+                className="secondary"
+                onClick={() => {
+                  setShowDuplicateWarning(false);
+                  setDuplicateInvoiceInfo(null);
+                  setPendingInvoiceData(null);
+                }}
+              >
+                Cancel
+              </DialogButton>
+              <DialogButton
+                className="primary"
+                onClick={async () => {
+                  setShowDuplicateWarning(false);
+                  setLoading(true);
+                  setLoadingMessage('Creating invoice...');
+                  await proceedWithInvoiceCreation(pendingInvoiceData);
+                }}
+              >
+                Import Anyway
+              </DialogButton>
+            </DialogButtons>
+          </DialogContent>
+        </DialogBackdrop>
+      )}
 
       {loading && (
         <LoadingOverlay>
