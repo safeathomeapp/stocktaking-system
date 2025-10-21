@@ -689,7 +689,9 @@ function SupplierInvoiceReview() {
         currency: 'GBP',
         payment_status: 'pending',
         import_method: 'pdf',
-        line_items: lineItems
+        line_items: lineItems,
+        // When duplicate check is disabled (testing mode), allow force creating duplicates
+        force_create: !duplicateCheckEnabled
       };
 
       console.log('Invoice data:', invoiceData);

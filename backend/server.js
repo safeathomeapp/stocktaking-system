@@ -2582,7 +2582,8 @@ app.post('/api/invoices', async (req, res) => {
       currency = 'GBP',
       payment_status = 'pending',
       notes,
-      line_items // Array of line items
+      line_items, // Array of line items
+      force_create = false // Allow creating duplicates (for testing)
     } = req.body;
 
     // Validate required fields
@@ -2596,6 +2597,15 @@ app.post('/api/invoices', async (req, res) => {
     // Generate invoice ID
     const { v4: uuidv4 } = require('uuid');
     const invoiceId = uuidv4();
+
+    // If force_create is true, delete any existing invoice with same supplier_id and invoice_number
+    if (force_create) {
+      await client.query(
+        `DELETE FROM invoices WHERE supplier_id = $1 AND invoice_number = $2`,
+        [supplier_id, invoice_number]
+      );
+      console.log(`Force creating invoice: deleted any existing invoice ${invoice_number} for supplier ${supplier_id}`);
+    }
 
     // Insert invoice
     const invoiceInsert = await client.query(`
@@ -2686,6 +2696,17 @@ app.post('/api/invoices', async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Error creating invoice:', error);
+
+    // Handle specific database errors
+    if (error.code === '23505' && error.constraint === 'unique_invoice_number_supplier') {
+      // Unique constraint violation - duplicate invoice
+      return res.status(409).json({
+        error: 'Duplicate invoice',
+        message: `An invoice with number "${invoice_number}" from this supplier already exists. Enable the duplicate check in testing mode to see details, or use a different invoice number.`,
+        code: 'DUPLICATE_INVOICE'
+      });
+    }
+
     res.status(500).json({
       error: 'Failed to create invoice',
       message: error.message
