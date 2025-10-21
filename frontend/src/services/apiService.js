@@ -478,6 +478,16 @@ export const apiService = {
     }
   },
 
+  createSupplier: async (supplierData) => {
+    try {
+      const response = await api.post('/api/suppliers', supplierData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Create supplier error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
   // Invoice Import Preferences
   getSupplierInvoicePreferences: async (supplierId) => {
     try {

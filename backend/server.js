@@ -1507,6 +1507,72 @@ app.get('/api/suppliers', async (req, res) => {
   }
 });
 
+// Create new supplier
+app.post('/api/suppliers', async (req, res) => {
+  try {
+    const {
+      sup_name,
+      sup_contact_person,
+      sup_email,
+      sup_phone,
+      sup_address,
+      sup_website,
+      sup_account_number,
+      sup_payment_terms,
+      sup_delivery_days,
+      sup_minimum_order
+    } = req.body;
+
+    if (!sup_name || sup_name.trim() === '') {
+      return res.status(400).json({ error: 'Supplier name is required' });
+    }
+
+    const { v4: uuidv4 } = require('uuid');
+    const supplierId = uuidv4();
+
+    const result = await pool.query(`
+      INSERT INTO suppliers (
+        sup_id,
+        sup_name,
+        sup_contact_person,
+        sup_email,
+        sup_phone,
+        sup_address,
+        sup_website,
+        sup_account_number,
+        sup_payment_terms,
+        sup_delivery_days,
+        sup_minimum_order,
+        sup_active,
+        sup_created_at,
+        sup_updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, NOW(), NOW())
+      RETURNING *
+    `, [
+      supplierId,
+      sup_name.trim(),
+      sup_contact_person || null,
+      sup_email || null,
+      sup_phone || null,
+      sup_address || null,
+      sup_website || null,
+      sup_account_number || null,
+      sup_payment_terms || null,
+      sup_delivery_days || null,
+      sup_minimum_order || null
+    ]);
+
+    res.status(201).json({
+      success: true,
+      data: result.rows[0],
+      message: 'Supplier created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating supplier:', error);
+    res.status(500).json({ error: 'Failed to create supplier', message: error.message });
+  }
+});
+
 // Get supplier by ID with mappings
 app.get('/api/suppliers/:id', async (req, res) => {
   try {

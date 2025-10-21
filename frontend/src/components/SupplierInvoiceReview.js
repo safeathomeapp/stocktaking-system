@@ -405,32 +405,99 @@ function SupplierInvoiceReview() {
     }
 
     setLoading(true);
-    setLoadingMessage('Creating invoice...');
+    setLoadingMessage('Looking up supplier...');
     setError(null);
 
     try {
       console.log('Creating invoice with venue ID:', venueId);
 
-      // Calculate total
-      const totalAmount = selectedProducts.reduce((sum, p) => sum + (p.unitCost * p.caseSize), 0);
+      // Step 1: Get supplier ID - either find existing or create new
+      let supplierId = null;
 
+      try {
+        const suppliersResponse = await apiService.getSuppliers();
+        if (suppliersResponse.success && Array.isArray(suppliersResponse.data)) {
+          // Try to find exact or partial match
+          const matchedSupplier = suppliersResponse.data.find(s =>
+            s.sup_name.toLowerCase().includes(supplierName.toLowerCase()) ||
+            supplierName.toLowerCase().includes(s.sup_name.toLowerCase())
+          );
+
+          if (matchedSupplier) {
+            supplierId = matchedSupplier.sup_id;
+            console.log('Found existing supplier:', supplierId);
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching suppliers:', err);
+      }
+
+      // If supplier not found, create a new one
+      if (!supplierId) {
+        console.log('Creating new supplier:', supplierName);
+        setLoadingMessage('Creating supplier...');
+
+        const createResponse = await apiService.createSupplier({
+          sup_name: supplierName,
+          sup_active: true
+        });
+
+        if (createResponse.success) {
+          supplierId = createResponse.data.sup_id || createResponse.data.data?.sup_id;
+          console.log('Created new supplier:', supplierId);
+        } else {
+          setError(`Failed to create supplier: ${createResponse.error}`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      setLoadingMessage('Creating invoice...');
+
+      // Calculate totals
+      const totalAmount = selectedProducts.reduce((sum, p) => {
+        const unitPrice = parseFloat(p.unitCost) || 0;
+        const quantity = parseFloat(p.caseSize) || 1;
+        return sum + (unitPrice * quantity);
+      }, 0);
+
+      // Format line items for backend - use snake_case
+      const lineItems = selectedProducts.map((p, index) => {
+        const unitPrice = parseFloat(p.unitCost) || 0;
+        const quantity = parseFloat(p.caseSize) || 1;
+        const lineTotal = unitPrice * quantity;
+        const vatAmount = lineTotal * 0.20; // 20% VAT
+        const nettPrice = lineTotal;
+
+        return {
+          product_code: p.sku || '',
+          product_name: p.name || '',
+          product_description: p.name || '',
+          quantity: quantity,
+          unit_price: unitPrice,
+          nett_price: nettPrice,
+          vat_code: 'S',
+          vat_rate: 20,
+          vat_amount: vatAmount,
+          line_total: lineTotal
+        };
+      });
+
+      // Format invoice data with snake_case for backend
       const invoiceData = {
-        supplierName: supplierName,
-        invoiceNumber: invoiceNumber,
-        invoiceDate: invoiceDate,
-        venueId: venueId,
-        totalAmount: totalAmount,
-        customerNumber: parsedData.customerNumber || null,
-        deliveryNumber: parsedData.deliveryNumber || null,
-        lineItems: selectedProducts.map(p => ({
-          sku: p.sku,
-          name: p.name,
-          description: p.name,
-          caseSize: p.caseSize || 1,
-          unitCost: p.unitCost || 0,
-          packSize: p.packSize,
-          unitSize: p.unitSize
-        }))
+        invoice_number: invoiceNumber,
+        venue_id: venueId,
+        supplier_id: supplierId,
+        invoice_date: invoiceDate,
+        customer_ref: parsedData?.customerNumber || null,
+        delivery_number: parsedData?.deliveryNumber || null,
+        total_amount: totalAmount,
+        subtotal: totalAmount / 1.20, // Remove VAT to get subtotal
+        vat_total: totalAmount - (totalAmount / 1.20),
+        currency: 'GBP',
+        payment_status: 'pending',
+        import_method: 'pdf',
+        line_items: lineItems
       };
 
       console.log('Invoice data:', invoiceData);
