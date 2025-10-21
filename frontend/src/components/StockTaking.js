@@ -1281,7 +1281,7 @@ const StockTaking = () => {
         const response = await apiService.searchMasterProducts(
           value,
           sessionId,
-          currentVenue?.id,
+          venueData?.id,
           10 // Return top 10 results
         );
 
