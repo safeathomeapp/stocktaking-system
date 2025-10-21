@@ -230,8 +230,6 @@ Master products serve as the single source of truth for:
 
 - [ ] Add barcode/EAN/UPC codes for scanning support
 - [ ] Include manufacturer/distributor information
-- [ ] Add cost price ranges for different suppliers
 - [ ] Implement product images for visual identification
 - [ ] Add seasonal/limited edition flagging
-- [ ] Include allergen information
-- [ ] Add ABV (alcohol by volume) for beverages
+

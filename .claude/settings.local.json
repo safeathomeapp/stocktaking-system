@@ -1,16 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"\\l\")",
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"CREATE DATABASE stocktaking_local;\")",
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -c \"\\l stocktaking_local\")",
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -f \"C:/Users/kevth/Desktop/Stocktake/stocktaking-system/backend/schema.sql\")",
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT COUNT(*) FROM user_profiles WHERE active = true;\")",
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"DELETE FROM user_profiles;\")",
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"DELETE FROM venues CASCADE;\")",
-      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT ''user_profiles'' as table_name, COUNT(*) as count FROM user_profiles UNION ALL SELECT ''venues'', COUNT(*) FROM venues UNION ALL SELECT ''venue_areas'', COUNT(*) FROM venue_areas UNION ALL SELECT ''stock_sessions'', COUNT(*) FROM stock_sessions;\")",
-      "Bash(chmod +x archive-unused-files.sh restore-archived-files.sh)",
-      "Bash(./archive-unused-files.sh)"
+      "Bash(node backend/migrations/import-master-products.js:*)",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -f \"C:/Users/kevth/Desktop/Stocktake/stocktaking-system/import_master_products.sql\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d master_products\")",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT name, brand, unit_type, unit_size, case_size FROM master_products LIMIT 10;\")",
+      "Bash(git commit:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
