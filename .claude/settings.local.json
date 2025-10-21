@@ -6,7 +6,9 @@
       "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d master_products\")",
       "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT name, brand, unit_type, unit_size, case_size FROM master_products LIMIT 10;\")",
       "Bash(git commit:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node -e:*)",
+      "Bash(node -c:*)"
     ],
     "deny": [],
     "ask": []
