@@ -1374,7 +1374,20 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 
 ## TODO: Next Session
 
-### 🧪 Beta Testing Required
+### 🚨 CRITICAL - TEST THIS FIRST (Session 2025-10-21)
+**Step 3 Fuzzy Matching Implementation - NEEDS TESTING**
+- [ ] **PRIORITY: Test fuzzy matching on new invoice (not seen before)**
+  - Upload new Booker Limited PDF at http://localhost:3000/invoice-review
+  - Expected: Items NOT in supplier_item_list should get Tier 2 fuzzy matched
+  - Verify: Some items in "created" category (not all in "matched")
+  - Check: supplier_item_list shows auto_matched=true, confidence_score > 0
+- [ ] Test with different supplier (not Booker)
+- [ ] Verify confidence score cutoff (60%) works correctly
+- [ ] Test items below 60% confidence go to "failed" (needs manual Step 4)
+- [ ] Check response wrapping - confirm UI dashboard displays stats correctly
+- **Documentation:** See `FUZZY_MATCHING_IMPLEMENTATION.md` for implementation details
+
+### 🧪 Beta Testing Required (Stock-Taking Workflow)
 - [ ] Test product removal and re-addition workflow
 - [ ] Verify smart unit display (ml/cl/L) for all product types
 - [ ] Test EPOS CSV import with real CSV files from different systems
@@ -1401,27 +1414,33 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 - [x] Extract supplier name and product details
 - [x] React UI with editable table (checkboxes, pack_size, unit_size)
 - [x] Drag & drop file upload
-- [ ] Add invoice metadata fields (invoice_number, invoice_date, venue selection)
+- [x] Add invoice metadata fields (invoice_number, invoice_date, venue selection)
 
 **Step 2: Create Invoice & Line Items**
-- [ ] API: POST /api/invoices - create invoice header
-- [ ] API: POST /api/invoices/:id/line-items - create line items from reviewed data
-- [ ] Store raw supplier data (product_code, product_name, pricing)
-- [ ] Set supplier_item_list_id and master_product_id to NULL initially
+- [x] API: POST /api/invoices - create invoice header (DONE - with force_create override)
+- [x] API: Create line items from reviewed data (DONE)
+- [x] Store raw supplier data (product_code, product_name, pricing) (DONE)
+- [x] Duplicate invoice detection with warning (DONE)
+- [x] Testing mode toggle for ignoring duplicate check (DONE)
 
-**Step 3: Match to Supplier Items**
-- [ ] API: GET /api/supplier-items/match - find existing supplier items by SKU
-- [ ] Auto-create new supplier_item_list entries for unmatched items
-- [ ] Update invoice_line_items with supplier_item_list_id
-- [ ] UI: Show matched vs new supplier items
+**Step 3: Match to Supplier Items (IMPLEMENTED - NEEDS TESTING)**
+- [x] API: Tier 1 - Find existing supplier items by SKU (DONE)
+- [x] API: Tier 2 - Fuzzy match against master_products (DONE - NEW)
+- [x] Auto-create new supplier_item_list entries (DONE)
+- [x] Update invoice_line_items with supplier_item_list_id (DONE)
+- [x] Update invoice_line_items with master_product_id if fuzzy matched (DONE)
+- [x] Track auto_matched flag and confidence_score (DONE)
+- [x] UI: Show matched vs created vs needs manual items (ALREADY WORKS)
+- [ ] **USER TESTING REQUIRED** - See "CRITICAL - TEST THIS FIRST" above
 
-**Step 4: Match to Master Products (Manual Review)**
-- [ ] API: POST /api/master-products/fuzzy-search - find similar master products
-- [ ] UI: Show suggested matches with confidence scores
+**Step 4: Match to Master Products (Manual Review) - NOT YET STARTED**
+- [ ] UI: Show items that need manual matching (from failed category)
+- [ ] UI: Fuzzy search suggestions with confidence scores
 - [ ] UI: Allow user to select match or create new master product
+- [ ] API: PUT /api/invoice-line-items/:id/link-master-product
 - [ ] Update supplier_item_list.master_product_id
 - [ ] Update invoice_line_items.master_product_id
-- [ ] Track matching metadata (auto_matched, verified, confidence_score)
+- [ ] Update supplier_item_list.verified = true
 
 **Step 5: Complete Import**
 - [ ] Summary screen showing import results
