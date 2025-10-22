@@ -1582,6 +1582,17 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 
 ---
 
+## 📚 Important Documentation Files
+
+- **[masterproducts.md](./masterproducts.md)** ⭐ **Product Inventory & Expansion Reference**
+  - Complete dump of all 1,159 master products
+  - Organized by category and subcategory
+  - Expansion recommendations and notes
+  - Use this when adding new products to avoid duplicates
+  - Updated after each bulk product addition
+
+---
+
 ## Development Notes
 
 ### Working with Claude Code
