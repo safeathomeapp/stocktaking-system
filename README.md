@@ -1471,6 +1471,117 @@ Example: "5 bottles of Beck's in the Main Bar" creates a stock_entry with:
 
 ---
 
+## Master Products Catalog Structure
+
+**Comprehensive product database organized by category and subcategory. Each product includes multiple sizes and variants.**
+
+### Spirit Categories
+
+#### 1. **GIN** (London Dry, Botanical, Flavored)
+- London Dry Gin (Bombay Sapphire, Beefeater, Tanqueray, Gordon's)
+- Premium/Craft Gin (Monkey 47, Hendrick's, Roku, Opihr)
+- Flavored Gin (Tanqueray Rangpur, Bombay Sapphire Distilled Lime, Whitley Neill)
+- Botanical Gin (Sipsmith, Tarquin's)
+
+#### 2. **VODKA** (Standard, Premium, Flavored)
+- Standard Vodka (Smirnoff, Absolut, Ketel One, Cîroc, Grey Goose)
+- Premium Vodka (Belvedere, Żubrówka, Nemiroff)
+- Flavored Vodka (Vanilla, Raspberry, Lemon, Cranberry variants)
+
+#### 3. **WHISKY** (Single Malt Scotch, Blended, Bourbon, Irish, Japanese)
+- Single Malt Scotch - Speyside (Glenfiddich 12/15/18, Balvenie 12/15, Glenlivet 12/18)
+- Single Malt Scotch - Islay (Laphroaig 10/15/18, Ardbeg, Talisker 10)
+- Single Malt Scotch - Highland (Dalmore 12/15/18, Oban, Ben Nevis)
+- Blended Scotch (Johnnie Walker Red/Black/Gold/Blue, Chivas Regal 12)
+- Bourbon (Jack Daniel's, Woodford Reserve, Maker's Mark, Buffalo Trace)
+- Irish Whiskey (Jameson, Bushmills, Tullamore Dew, Powers)
+- Japanese Whisky (Yamazaki, Hibiki, Hakushu)
+
+#### 4. **RUM** (White, Dark, Spiced, Aged)
+- White Rum (Bacardi, Captain Morgan White, Havana Club)
+- Dark/Navy Rum (Captain Morgan Spiced, Appleton Estate Signature, Myers's)
+- Premium Aged Rum (Appleton Estate 12/21 Year, El Dorado 12/15/21)
+- Rhum Agricole (Rhum Clément, Rhum J.M.)
+
+#### 5. **TEQUILA & MEZCAL**
+- Tequila Blanco (Jose Cuervo, Don Julio, Patron, Casamigos)
+- Tequila Reposado (Don Julio Reposado, Patron Reposado)
+- Tequila Anejo (Don Julio Anejo, Patron Anejo)
+- Mezcal (Del Maguey, Vida, Crema de Mezcal)
+
+#### 6. **BRANDY & COGNAC**
+- Cognac VSOP (Hennessy, Remy Martin, Courvoisier, Martell)
+- Cognac XO (Hennessy XO, Remy Martin XO)
+- Brandy (Metaxa, Armagnac, Calvados)
+
+#### 7. **LIQUEURS** (Cream, Herbal, Fruit, Coffee, Nut)
+- Cream Liqueurs (Baileys Irish Cream, Amaretto, Frangelico, Kahlúa)
+- Herbal Liqueurs (Drambuie, Benedictine, Chartreuse, Jägermeister)
+- Fruit Liqueurs (Chambord, Cointreau, Grand Marnier, Midori, Peach Schnapps)
+- Coffee Liqueurs (Kahlúa, Tia Maria)
+
+### Wine Categories
+
+#### 8. **RED WINE** (Pinot Noir, Merlot, Cabernet Sauvignon, etc.)
+- Pinot Noir (Burgundy, New Zealand, California, Australian variants)
+- Merlot (Bordeaux, California, Chilean variants)
+- Cabernet Sauvignon (Bordeaux, California Napa, Australian variants)
+- Shiraz/Syrah (Australian, French Rhône variants)
+- Rioja (Spanish - Tempranillo blends)
+- Super Tuscan (Italian - Cabernet/Merlot blends)
+- Other Red (Barolo, Barbaresco, Grenache)
+
+#### 9. **WHITE WINE** (Sauvignon Blanc, Chardonnay, Riesling, etc.)
+- Sauvignon Blanc (Loire, New Zealand, Chilean variants)
+- Chardonnay (Burgundy, Chablis, California variants)
+- Riesling (Alsace, German, Australian variants)
+- Pinot Grigio (Italian, European variants)
+- Albariño (Spanish variants)
+- Grüner Veltliner (Austrian variants)
+
+#### 10. **SPARKLING WINE** (Champagne, Prosecco, Cava, etc.)
+- Champagne (Non-Vintage, Vintage, Prestige Cuvée)
+- Prosecco (Italian - DOC, DOCG variants)
+- Cava (Spanish - Brut, Extra Dry)
+- English Sparkling (Nyetimber, Ridgeview)
+- Champagne/Prosecco Multiple Bottle Sizes (75cl, 150cl Magnum, 20cl splits)
+
+#### 11. **FORTIFIED WINE** (Port, Sherry, Vermouth, Madeira)
+- Port (Tawny, Vintage, Ruby, LBV)
+- Sherry (Fino, Amontillado, Oloroso, Cream)
+- Vermouth (Dry, Sweet, Italian, French)
+- Madeira (Sercial, Verdelho, Bual, Malmsey)
+
+### Beer & Cider
+
+#### 12. **BEER** (Lager, Ale, Stout, IPA, Cider)
+- Lager (Stella Artois, Heineken, Budweiser, Corona, San Miguel)
+- Pale Ale (Kronenbourg 1664, Foster's, Carlsberg)
+- IPA (Timothy Taylor, Brooklyn Brewery, Fuller's London Pride)
+- Stout (Guinness, Murphy's Irish Stout)
+- Cider (Magners, Strongbow, Kopparberg, Bulmers)
+- Multiple Sizes: 330ml can/bottle, 500ml can/bottle, 1L bottle
+
+#### 13. **SOFT DRINKS & MIXERS**
+- Tonic Water (Fever-Tree, Schweppes, Q Tonic, Fentimans)
+- Ginger Beer (Fever-Tree, Crabbie's, Old Jamaica)
+- Cola (Coca-Cola, Diet Coke, Pepsi, Sprite, 7UP, San Pellegrino)
+- Juices (Orange, Cranberry, Pineapple, Apple, Tomato)
+- Energy Drinks (Red Bull, Monster, Lucozade)
+- Still Water/Sparkling (Perrier, San Pellegrino, Voss)
+
+### Food & Bar Snacks
+
+#### 14. **BAR SNACKS & FOOD** (Nuts, Crisps, Olives, Cheese, Charcuterie)
+- Nuts (Salted Peanuts, Cashews, Almonds, Mixed Nuts - KP, Planters, Blue Diamond)
+- Crisps (Lay's, Walker's, Pringles - multiple flavors)
+- Olives & Pickles (Mixed Olives, Marinated Vegetables)
+- Cheese & Charcuterie (Cheddar, Brie, Prosciutto, Salami)
+- Dried Fruit & Seeds
+- Gourmet Items (Nuts with flavoring, Roasted Chickpeas, Mixed Snack Plates)
+
+---
+
 ## Development Notes
 
 ### Working with Claude Code
