@@ -1699,6 +1699,40 @@ psql -U postgres stocktaking_local < backup_20251020.sql
 
 ---
 
+## 📋 Latest Session Summary (October 22, 2025)
+
+### Completed Tasks:
+
+**1. Step 4 Form Improvements** ✅
+- Category field: Changed from text input to dropdown (18 active categories)
+- Unit size label: Updated from "(ml)" to "(ml or g)" for beverages and snacks
+- Form pre-fill: unit_type, unit_size, case_size auto-populated from parsed invoice data
+
+**2. Dashboard Redirect Fixed** ✅
+- Fixed navigation route from `/dashboard` → `/` (correct home route)
+- Modal completion now properly redirects to dashboard
+
+**3. Pack & Size Data Flow** ✅
+- Added `pack_size` and `unit_size` columns to `invoice_line_items` table
+- Backend now stores parsed pack and size data from PDF invoices
+- Frontend displays Pack and Size fields in Step 4 matcher
+- Modal receives pack_size and unit_size directly (no more regex parsing)
+- Example: "KP Salted Cashews Carded | SKU: 184963 | Pack: 12 | Size: 30g"
+
+**4. Documentation** ✅
+- Updated README with fuzzy matching issues section
+- Added 20+ clarification questions for next session on matching logic
+- Referenced affected files and configuration
+
+### Known Issues Requiring Next Session:
+
+**Fuzzy Matching Logic Review** (documented in README)
+- Conflicting logics in how products are matched to master database
+- Questions raised about accuracy, statistics, and success criteria
+- Owner to provide redesign vision and answers before implementation
+
+---
+
 **Version**: 2.0.1 (Localhost Edition)
-**Last Updated**: October 20, 2025
+**Last Updated**: October 22, 2025
 **Architecture**: Fully self-contained localhost application (no cloud dependencies)
