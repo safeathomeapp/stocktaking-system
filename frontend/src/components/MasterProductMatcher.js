@@ -189,6 +189,18 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
                 <span>{currentItem.product_description}</span>
               </div>
             )}
+            {currentItem.pack_size && (
+              <div className="detail-row">
+                <strong>Pack:</strong>
+                <span>{currentItem.pack_size}</span>
+              </div>
+            )}
+            {currentItem.unit_size && (
+              <div className="detail-row">
+                <strong>Size:</strong>
+                <span>{currentItem.unit_size}</span>
+              </div>
+            )}
             <div className="detail-row">
               <strong>Quantity:</strong>
               <span>{currentItem.quantity}</span>
@@ -308,6 +320,8 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
           productCode={currentItem.product_code}
           quantity={currentItem.quantity}
           unitPrice={currentItem.unit_price}
+          packSize={currentItem.pack_size}
+          unitSize={currentItem.unit_size}
           onCancel={() => setShowCreateNew(false)}
           onConfirm={async (newProduct) => {
             try {
@@ -373,20 +387,28 @@ const CreateNewProductModal = ({
   productCode,
   quantity,
   unitPrice,
+  packSize,
+  unitSize,
   onCancel,
   onConfirm
 }) => {
   const [categories, setCategories] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
 
-  // Parse invoice data to extract unit information
+  // Use direct invoice data or fall back to parsing if not provided
   const parseInvoiceData = () => {
     const parsed = {
       unit_type: 'bottle',
-      unit_size: '',
-      case_size: ''
+      unit_size: unitSize || '',
+      case_size: packSize || ''
     };
 
+    // If we have direct unit_size and pack_size from invoice, use those
+    if (unitSize && packSize) {
+      return parsed;
+    }
+
+    // Fallback: parse from description if invoice data not provided
     if (productDescription) {
       const desc = productDescription.toLowerCase();
 
@@ -398,26 +420,30 @@ const CreateNewProductModal = ({
       else if (desc.includes('bag')) parsed.unit_type = 'pack';
       else if (desc.includes('cask')) parsed.unit_type = 'cask';
 
-      // Extract unit_size (ml or g)
-      const mlMatch = productDescription.match(/(\d+)\s*ml/i);
-      const gMatch = productDescription.match(/(\d+)\s*g\b/i);
-      const literMatch = productDescription.match(/(\d+(?:\.\d+)?)\s*[Ll]/);
+      // Extract unit_size (ml or g) if not provided directly
+      if (!parsed.unit_size) {
+        const mlMatch = productDescription.match(/(\d+)\s*ml/i);
+        const gMatch = productDescription.match(/(\d+)\s*g\b/i);
+        const literMatch = productDescription.match(/(\d+(?:\.\d+)?)\s*[Ll]/);
 
-      if (mlMatch) {
-        parsed.unit_size = mlMatch[1];
-      } else if (literMatch) {
-        // Convert liters to ml
-        parsed.unit_size = Math.round(parseFloat(literMatch[1]) * 1000);
-      } else if (gMatch) {
-        parsed.unit_size = gMatch[1];
+        if (mlMatch) {
+          parsed.unit_size = mlMatch[1];
+        } else if (literMatch) {
+          // Convert liters to ml
+          parsed.unit_size = Math.round(parseFloat(literMatch[1]) * 1000);
+        } else if (gMatch) {
+          parsed.unit_size = gMatch[1];
+        }
       }
 
-      // Extract case_size (e.g., "24x500ml" or "x12")
-      const caseMatch = productDescription.match(/(?:^|\s)(\d+)\s*x\s*\d+/i) ||
-                       productDescription.match(/x\s*(\d+)$/i) ||
-                       productDescription.match(/(?:case|pack)\s+(?:of\s+)?(\d+)/i);
-      if (caseMatch) {
-        parsed.case_size = caseMatch[1];
+      // Extract case_size if not provided directly
+      if (!parsed.case_size) {
+        const caseMatch = productDescription.match(/(?:^|\s)(\d+)\s*x\s*\d+/i) ||
+                         productDescription.match(/x\s*(\d+)$/i) ||
+                         productDescription.match(/(?:case|pack)\s+(?:of\s+)?(\d+)/i);
+        if (caseMatch) {
+          parsed.case_size = caseMatch[1];
+        }
       }
     }
 

@@ -673,7 +673,9 @@ function SupplierInvoiceReview() {
           vat_code: 'S',
           vat_rate: 20,
           vat_amount: vatAmount,
-          line_total: lineTotal
+          line_total: lineTotal,
+          pack_size: p.packSize || p.caseSize || '',
+          unit_size: p.unitSize || ''
         };
       });
 

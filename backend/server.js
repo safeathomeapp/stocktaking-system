@@ -2826,9 +2826,11 @@ app.post('/api/invoices', async (req, res) => {
           vat_rate,
           vat_amount,
           line_total,
+          pack_size,
+          unit_size,
           created_at,
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
         RETURNING *
       `, [
         invoiceId,
@@ -2844,7 +2846,9 @@ app.post('/api/invoices', async (req, res) => {
         item.vat_code || 'S',
         item.vat_rate || 20,
         item.vat_amount || 0,
-        item.line_total || 0
+        item.line_total || 0,
+        item.pack_size || '',
+        item.unit_size || ''
       ]);
 
       lineItemInserts.push(lineItemResult.rows[0]);
