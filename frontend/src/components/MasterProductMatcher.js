@@ -304,6 +304,10 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
       {showCreateNew && (
         <CreateNewProductModal
           productName={currentItem.product_name}
+          productDescription={currentItem.product_description}
+          productCode={currentItem.product_code}
+          quantity={currentItem.quantity}
+          unitPrice={currentItem.unit_price}
           onCancel={() => setShowCreateNew(false)}
           onConfirm={async (newProduct) => {
             try {
@@ -363,17 +367,93 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
 };
 
 // Create New Product Modal Component
-const CreateNewProductModal = ({ productName, onCancel, onConfirm }) => {
+const CreateNewProductModal = ({
+  productName,
+  productDescription,
+  productCode,
+  quantity,
+  unitPrice,
+  onCancel,
+  onConfirm
+}) => {
+  const [categories, setCategories] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+
+  // Parse invoice data to extract unit information
+  const parseInvoiceData = () => {
+    const parsed = {
+      unit_type: 'bottle',
+      unit_size: '',
+      case_size: ''
+    };
+
+    if (productDescription) {
+      const desc = productDescription.toLowerCase();
+
+      // Try to detect unit_type
+      if (desc.includes('can')) parsed.unit_type = 'can';
+      else if (desc.includes('keg')) parsed.unit_type = 'keg';
+      else if (desc.includes('case')) parsed.unit_type = 'case';
+      else if (desc.includes('pack')) parsed.unit_type = 'pack';
+      else if (desc.includes('bag')) parsed.unit_type = 'pack';
+      else if (desc.includes('cask')) parsed.unit_type = 'cask';
+
+      // Extract unit_size (ml or g)
+      const mlMatch = productDescription.match(/(\d+)\s*ml/i);
+      const gMatch = productDescription.match(/(\d+)\s*g\b/i);
+      const literMatch = productDescription.match(/(\d+(?:\.\d+)?)\s*[Ll]/);
+
+      if (mlMatch) {
+        parsed.unit_size = mlMatch[1];
+      } else if (literMatch) {
+        // Convert liters to ml
+        parsed.unit_size = Math.round(parseFloat(literMatch[1]) * 1000);
+      } else if (gMatch) {
+        parsed.unit_size = gMatch[1];
+      }
+
+      // Extract case_size (e.g., "24x500ml" or "x12")
+      const caseMatch = productDescription.match(/(?:^|\s)(\d+)\s*x\s*\d+/i) ||
+                       productDescription.match(/x\s*(\d+)$/i) ||
+                       productDescription.match(/(?:case|pack)\s+(?:of\s+)?(\d+)/i);
+      if (caseMatch) {
+        parsed.case_size = caseMatch[1];
+      }
+    }
+
+    return parsed;
+  };
+
+  const parsedInvoiceData = parseInvoiceData();
+
   const [formData, setFormData] = React.useState({
     name: productName,
     brand: '',
     category: '',
-    unit_type: 'bottle', // Default to bottle
-    unit_size: '',
-    case_size: '',
+    unit_type: parsedInvoiceData.unit_type,
+    unit_size: parsedInvoiceData.unit_size,
+    case_size: parsedInvoiceData.case_size,
     barcode: ''
   });
-  const [loading, setLoading] = React.useState(false);
+
+  // Load categories on mount
+  React.useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await apiService.getMasterProductCategories();
+        if (response.success && response.data) {
+          // Extract unique categories
+          const uniqueCategories = Array.from(
+            new Set(response.data.map(item => item.category))
+          ).filter(Boolean).sort();
+          setCategories(uniqueCategories);
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      }
+    };
+    loadCategories();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -448,14 +528,17 @@ const CreateNewProductModal = ({ productName, onCancel, onConfirm }) => {
 
           <div className="form-group">
             <label htmlFor="category">Category</label>
-            <input
+            <select
               id="category"
-              type="text"
               name="category"
               value={formData.category}
               onChange={handleInputChange}
-              placeholder="e.g., Soft Drinks"
-            />
+            >
+              <option value="">-- Select Category --</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
 
           <div className="form-row">
@@ -479,7 +562,7 @@ const CreateNewProductModal = ({ productName, onCancel, onConfirm }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="unit_size">Unit Size (ml)</label>
+              <label htmlFor="unit_size">Unit Size (ml or g)</label>
               <input
                 id="unit_size"
                 type="number"
