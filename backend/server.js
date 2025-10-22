@@ -590,7 +590,12 @@ app.get('/api/master-products', async (req, res) => {
 // Get master product categories summary
 app.get('/api/master-products/categories/summary', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM master_products_summary ORDER BY category');
+    const result = await pool.query(`
+      SELECT DISTINCT category
+      FROM master_products
+      WHERE active = true AND category IS NOT NULL
+      ORDER BY category
+    `);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching categories summary:', error);
