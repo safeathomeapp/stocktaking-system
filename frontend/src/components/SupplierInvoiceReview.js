@@ -738,7 +738,7 @@ function SupplierInvoiceReview() {
 
     // Navigate to dashboard after 2 seconds
     setTimeout(() => {
-      navigate('/dashboard');
+      navigate('/');
     }, 2000);
   };
 
