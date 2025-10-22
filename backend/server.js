@@ -691,6 +691,82 @@ app.post('/api/master-products/search', async (req, res) => {
   }
 });
 
+// Create new master product
+app.post('/api/master-products', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const {
+      name,
+      brand,
+      category,
+      subcategory,
+      unit_type,
+      unit_size,
+      case_size,
+      barcode,
+      ean_code,
+      upc_code
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !unit_type) {
+      return res.status(400).json({ error: 'Product name and unit_type are required' });
+    }
+
+    // Check if product already exists (to prevent exact duplicates)
+    const checkDuplicate = await client.query(
+      `SELECT id FROM master_products
+       WHERE LOWER(name) = LOWER($1) AND LOWER(COALESCE(brand, '')) = LOWER(COALESCE($2, ''))
+       AND unit_size = $3 AND case_size = $4`,
+      [name, brand || null, unit_size || null, case_size || null]
+    );
+
+    if (checkDuplicate.rows.length > 0) {
+      return res.status(409).json({
+        error: 'Product already exists',
+        existingId: checkDuplicate.rows[0].id
+      });
+    }
+
+    // Create new master product
+    const result = await client.query(
+      `INSERT INTO master_products (
+        name, brand, category, subcategory, unit_type, unit_size, case_size,
+        barcode, ean_code, upc_code, active, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, NOW(), NOW())
+      RETURNING id, name, brand, category, subcategory, unit_type, unit_size,
+                case_size, barcode, ean_code, upc_code, created_at`,
+      [name, brand || null, category || null, subcategory || null, unit_type,
+       unit_size || null, case_size || null, barcode || null, ean_code || null,
+       upc_code || null]
+    );
+
+    const newProduct = result.rows[0];
+    res.status(201).json({
+      success: true,
+      data: {
+        id: newProduct.id,
+        name: newProduct.name,
+        brand: newProduct.brand,
+        category: newProduct.category,
+        subcategory: newProduct.subcategory,
+        unit_type: newProduct.unit_type,
+        unit_size: newProduct.unit_size,
+        case_size: newProduct.case_size,
+        barcode: newProduct.barcode,
+        ean_code: newProduct.ean_code,
+        upc_code: newProduct.upc_code,
+        created_at: newProduct.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Error creating master product:', error);
+    res.status(500).json({ error: 'Failed to create master product', message: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 // ===== SESSION MANAGEMENT ENDPOINTS =====
 
 // Create new stock-taking session
@@ -2331,27 +2407,31 @@ app.post('/api/invoices/:invoiceId/match-supplier-items', async (req, res) => {
           );
 
           if (existingItem.rows.length > 0) {
-            // Match found!
             supplierItemId = existingItem.rows[0].id;
             masterProductId = existingItem.rows[0].master_product_id;
 
-            // Update line item with links
-            await client.query(
-              `UPDATE invoice_line_items
-               SET supplier_item_list_id = $1, master_product_id = $2
-               WHERE id = $3`,
-              [supplierItemId, masterProductId, lineItem.id]
-            );
+            // If existing item has master_product_id, use it as-is (Tier 1 match)
+            if (masterProductId) {
+              // Update line item with links
+              await client.query(
+                `UPDATE invoice_line_items
+                 SET supplier_item_list_id = $1, master_product_id = $2
+                 WHERE id = $3`,
+                [supplierItemId, masterProductId, lineItem.id]
+              );
 
-            matchResults.matched.push({
-              lineItemId: lineItem.id,
-              productName: lineItem.product_name,
-              supplierItemId: supplierItemId,
-              masterProductId: masterProductId,
-              status: 'matched'
-            });
+              matchResults.matched.push({
+                lineItemId: lineItem.id,
+                productName: lineItem.product_name,
+                supplierItemId: supplierItemId,
+                masterProductId: masterProductId,
+                status: 'matched'
+              });
 
-            continue;
+              continue;
+            }
+            // If existing item has no master_product_id, fall through to Tier 2 fuzzy matching
+            // to attempt to link it to a master product
           }
         }
 
@@ -2390,40 +2470,53 @@ app.post('/api/invoices/:invoiceId/match-supplier-items', async (req, res) => {
           [searchTerm, searchTerm]
         );
 
-        // Determine if we found a good fuzzy match (score >= 60)
+        // Determine if we found a good fuzzy match (score >= 45)
+        // Lowered from 60 because Tier 4 (moderate similarity 35-50%) has natural ceiling at 45
         const bestMatch = fuzzyMatchResult.rows.length > 0 ? fuzzyMatchResult.rows[0] : null;
         const confidenceScore = bestMatch ? bestMatch.relevance_score : 0;
-        const isAutoMatched = bestMatch && confidenceScore >= 60;
+        const isAutoMatched = bestMatch && confidenceScore >= 45;
 
         if (isAutoMatched) {
           masterProductId = bestMatch.id;
         }
 
-        // Create new supplier_item_list entry (with or without master_product_id)
-        const newItemResult = await client.query(
-          `INSERT INTO supplier_item_list (
-            supplier_id,
-            supplier_sku,
-            supplier_name,
-            supplier_description,
-            master_product_id,
-            auto_matched,
-            confidence_score,
-            active
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)
-          RETURNING id`,
-          [
-            invoice.supplier_id,
-            lineItem.product_code || `AUTO-${lineItem.id}`,
-            lineItem.product_name,
-            lineItem.product_description,
-            masterProductId,
-            isAutoMatched,
-            confidenceScore
-          ]
-        );
+        // If we have an existing supplier_item_id (from earlier lookup), UPDATE it with new match results
+        // Otherwise, CREATE a new entry
+        if (supplierItemId) {
+          // Update existing supplier_item_list entry with fuzzy match results
+          await client.query(
+            `UPDATE supplier_item_list
+             SET master_product_id = $1, auto_matched = $2, confidence_score = $3, updated_at = NOW()
+             WHERE id = $4`,
+            [masterProductId, isAutoMatched, confidenceScore, supplierItemId]
+          );
+        } else {
+          // Create new supplier_item_list entry (with or without master_product_id)
+          const newItemResult = await client.query(
+            `INSERT INTO supplier_item_list (
+              supplier_id,
+              supplier_sku,
+              supplier_name,
+              supplier_description,
+              master_product_id,
+              auto_matched,
+              confidence_score,
+              active
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+            RETURNING id`,
+            [
+              invoice.supplier_id,
+              lineItem.product_code || `AUTO-${lineItem.id}`,
+              lineItem.product_name,
+              lineItem.product_description,
+              masterProductId,
+              isAutoMatched,
+              confidenceScore
+            ]
+          );
 
-        supplierItemId = newItemResult.rows[0].id;
+          supplierItemId = newItemResult.rows[0].id;
+        }
 
         // Update line item with links
         await client.query(
@@ -2531,15 +2624,17 @@ app.put('/api/invoice-line-items/:id/link-master-product', async (req, res) => {
     );
 
     // Update the supplier_item_list entry with master_product_id and matching metadata
+    // This is CRITICAL for system learning - it enables future imports to recognize this supplier SKU
     if (lineItem.supplier_item_list_id) {
-      await client.query(
+      const updateResult = await client.query(
         `UPDATE supplier_item_list
          SET master_product_id = $1,
              verified = $2,
              confidence_score = $3,
              auto_matched = $4,
              updated_at = CURRENT_TIMESTAMP
-         WHERE id = $5`,
+         WHERE id = $5
+         RETURNING id, master_product_id, verified, confidence_score`,
         [
           masterProductId,
           verified,
@@ -2548,6 +2643,10 @@ app.put('/api/invoice-line-items/:id/link-master-product', async (req, res) => {
           lineItem.supplier_item_list_id
         ]
       );
+
+      console.log(`[LEARNING] Updated supplier_item_list ${lineItem.supplier_item_list_id} with master_product_id ${masterProductId}, verified=${verified}, confidence=${confidenceScore}, rows_affected=${updateResult.rowCount}`);
+    } else {
+      console.warn(`[WARNING] Line item ${id} has no supplier_item_list_id - system won't learn for future imports!`);
     }
 
     await client.query('COMMIT');

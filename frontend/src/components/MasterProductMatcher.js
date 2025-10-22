@@ -300,19 +300,240 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
         </div>
       </div>
 
-      {/* Create new product modal (placeholder for future) */}
+      {/* Create new product modal */}
       {showCreateNew && (
-        <div className="modal-overlay" onClick={() => setShowCreateNew(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Create New Master Product</h3>
-            <p>This feature will be implemented next.</p>
-            <p>Product: {currentItem.product_name}</p>
-            <button onClick={() => setShowCreateNew(false)} className="btn-primary">
-              Close
+        <CreateNewProductModal
+          productName={currentItem.product_name}
+          onCancel={() => setShowCreateNew(false)}
+          onConfirm={async (newProduct) => {
+            try {
+              setLoading(true);
+              const response = await apiService.linkMasterProduct(currentItem.id, {
+                masterProductId: newProduct.id,
+                confidenceScore: 100, // User-created match is 100% confident
+                verified: true
+              });
+
+              if (response.success) {
+                // Record as newly created
+                setMatchingResults([
+                  ...matchingResults,
+                  {
+                    lineItemId: currentItem.id,
+                    productName: currentItem.product_name,
+                    matchedTo: newProduct.name,
+                    confidenceScore: 100,
+                    action: 'created'
+                  }
+                ]);
+
+                // Move to next item or complete
+                if (currentIndex < lineItems.length - 1) {
+                  setCurrentIndex(currentIndex + 1);
+                } else {
+                  onComplete({
+                    invoiceId,
+                    results: [
+                      ...matchingResults,
+                      {
+                        lineItemId: currentItem.id,
+                        productName: currentItem.product_name,
+                        matchedTo: newProduct.name,
+                        confidenceScore: 100,
+                        action: 'created'
+                      }
+                    ]
+                  });
+                }
+              } else {
+                alert('Failed to create product: ' + response.error);
+              }
+            } catch (error) {
+              console.error('Error creating product:', error);
+              alert('Failed to create product');
+            } finally {
+              setLoading(false);
+              setShowCreateNew(false);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// Create New Product Modal Component
+const CreateNewProductModal = ({ productName, onCancel, onConfirm }) => {
+  const [formData, setFormData] = React.useState({
+    name: productName,
+    brand: '',
+    category: '',
+    unit_type: 'bottle', // Default to bottle
+    unit_size: '',
+    case_size: '',
+    barcode: ''
+  });
+  const [loading, setLoading] = React.useState(false);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.unit_type) {
+      alert('Product name and unit type are required');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await apiService.createMasterProduct({
+        name: formData.name,
+        brand: formData.brand || null,
+        category: formData.category || null,
+        unit_type: formData.unit_type,
+        unit_size: formData.unit_size ? parseInt(formData.unit_size) : null,
+        case_size: formData.case_size ? parseInt(formData.case_size) : null,
+        barcode: formData.barcode || null
+      });
+
+      if (response.success) {
+        onConfirm(response.data.data || response.data);
+      } else {
+        alert('Failed to create product: ' + response.error);
+      }
+    } catch (error) {
+      console.error('Error creating product:', error);
+      alert('Failed to create product: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h3>Create New Master Product</h3>
+        <form onSubmit={handleSubmit} className="create-product-form">
+          <div className="form-group">
+            <label htmlFor="name">Product Name *</label>
+            <input
+              id="name"
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder="e.g., Coke Zero"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="brand">Brand</label>
+            <input
+              id="brand"
+              type="text"
+              name="brand"
+              value={formData.brand}
+              onChange={handleInputChange}
+              placeholder="e.g., Coca-Cola"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="category">Category</label>
+            <input
+              id="category"
+              type="text"
+              name="category"
+              value={formData.category}
+              onChange={handleInputChange}
+              placeholder="e.g., Soft Drinks"
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="unit_type">Unit Type *</label>
+              <select
+                id="unit_type"
+                name="unit_type"
+                value={formData.unit_type}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="bottle">Bottle</option>
+                <option value="can">Can</option>
+                <option value="keg">Keg</option>
+                <option value="case">Case</option>
+                <option value="pack">Pack</option>
+                <option value="cask">Cask</option>
+                <option value="bag-in-box">Bag in Box</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="unit_size">Unit Size (ml)</label>
+              <input
+                id="unit_size"
+                type="number"
+                name="unit_size"
+                value={formData.unit_size}
+                onChange={handleInputChange}
+                placeholder="e.g., 330"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="case_size">Case Size</label>
+              <input
+                id="case_size"
+                type="number"
+                name="case_size"
+                value={formData.case_size}
+                onChange={handleInputChange}
+                placeholder="e.g., 24"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="barcode">Barcode</label>
+            <input
+              id="barcode"
+              type="text"
+              name="barcode"
+              value={formData.barcode}
+              onChange={handleInputChange}
+              placeholder="e.g., 5000112545654"
+            />
+          </div>
+
+          <div className="modal-actions">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="btn-secondary"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={loading}
+            >
+              {loading ? 'Creating...' : 'Create Product'}
             </button>
           </div>
-        </div>
-      )}
+        </form>
+      </div>
     </div>
   );
 };
