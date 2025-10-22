@@ -1047,6 +1047,79 @@ For each line item that needs master product linking:
 - Pricing only in invoice_line_items (changes with each invoice)
 - Product specs only in master_products (change rarely)
 
+---
+
+## 🚧 Known Issues - Product Matching Logic (In Review)
+
+**Status**: Product matching system has conflicting logics that need clarification. Owner to redesign vision and provide answers in next session.
+
+### Current Implementation
+
+**Fuzzy Matching Algorithm** (PostgreSQL `pg_trgm` extension):
+- Uses similarity score (0-1 scale) + custom tiered scoring
+- 4-tier ranking system:
+  - TIER 1: Exact prefix match (score 100+)
+  - TIER 2: Word boundary match (score 80+)
+  - TIER 3: High similarity >50% (score 60+)
+  - TIER 4: Moderate similarity >35% (score 40+)
+
+**Statistics Calculation** (InvoiceImportSummary.js):
+- `supplierMatched`: From Step 3 (supplier_item_list matching)
+- `masterProductMatched`: Items with `action === 'matched'`
+- Success criteria: All items matched
+
+### Issues Requiring Clarification
+
+**Before next session, owner should document:**
+
+1. **Matching Accuracy**
+   - [ ] Are items not matching that should match? Which examples?
+   - [ ] Are items matching incorrectly? Which examples?
+   - [ ] What confidence threshold should be required? (currently >35%)
+   - [ ] Should fuzzy matching be disabled/replaced with exact matching?
+
+2. **Statistics & Success Criteria**
+   - [ ] What counts as "success"? (auto-match only? include manual?)
+   - [ ] Are summary stats showing wrong counts?
+   - [ ] Which statistics are misleading or incorrect?
+   - [ ] Should "matched" include both auto-matched AND manually-matched items?
+
+3. **System Flow**
+   - [ ] Step 3 (Supplier matching): Should this be automatic or manual?
+   - [ ] Step 4 (Master product matching): Current role? What should change?
+   - [ ] Should confidence scores affect next steps?
+   - [ ] When should user see "failed" status vs "unmatched"?
+
+4. **Data Processing**
+   - [ ] How should similarity thresholds be tuned?
+   - [ ] Should matching rules differ by product category?
+   - [ ] How to handle partial matches (brand match but not size)?
+   - [ ] Should unit_size/case_size affect match quality?
+
+5. **User Experience**
+   - [ ] Should auto-matching be hidden or transparent?
+   - [ ] Should users always see suggestions even for perfect matches?
+   - [ ] How many suggestions should display? (currently 5)
+   - [ ] Should there be a "confidence bar" showing match quality?
+
+### Next Steps
+
+**Session Start Procedure:**
+1. Owner provides written redesign of desired matching behavior
+2. Owner answers clarification questions above
+3. Claude Code implements based on new vision
+4. Test with real supplier invoices
+5. Iterate on scoring/thresholds as needed
+
+### Files Involved
+
+- **Backend**: `backend/server.js` (lines 616-670, 2438+) - Fuzzy matching queries
+- **Frontend**: `frontend/src/components/MasterProductMatcher.js` - Match suggestion UI
+- **Frontend**: `frontend/src/components/InvoiceImportSummary.js` - Statistics display
+- **Reference**: `masterproducts.md` - Product database documentation
+
+---
+
 #### 6. Conduct New Stocktake
 
 **Count Products in Each Area**:
