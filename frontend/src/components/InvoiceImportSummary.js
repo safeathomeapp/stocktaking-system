@@ -237,7 +237,7 @@ const InvoiceImportSummary = ({
         )}
 
         {/* Warnings - Temporarily disabled */}
-        {/* {itemsSkipped > 0 && (
+        {false && itemsSkipped > 0 && (
           <div className="summary-section">
             <div className="warning-card">
               <div className="warning-header">
@@ -251,7 +251,7 @@ const InvoiceImportSummary = ({
               </p>
             </div>
           </div>
-        )} */
+        )}
 
         {/* Success Message */}
         {itemsSkipped === 0 && itemsImported > 0 && (
