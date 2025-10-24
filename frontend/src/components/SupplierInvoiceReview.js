@@ -1452,7 +1452,7 @@ function SupplierInvoiceReview() {
               supplierMatchResults={supplierMatchResults}
               masterProductMatchResults={masterProductMatchResults}
               ignoredItemsCount={products.filter(p => !p.selected).length}
-              systemIgnoredItemsCount={0}
+              systemIgnoredItemsCount={hiddenProductsCount}
               onConfirm={handleConfirmImport}
               onBack={() => setCurrentStep(4)}
               onEdit={() => setCurrentStep(2)}
