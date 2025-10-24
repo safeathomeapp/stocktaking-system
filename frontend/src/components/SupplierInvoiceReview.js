@@ -426,6 +426,9 @@ function SupplierInvoiceReview() {
   const [ignoredProductSkus, setIgnoredProductSkus] = useState([]);
   const [hiddenProductsCount, setHiddenProductsCount] = useState(0);
 
+  // Track user-deselected items for summary display
+  const [userIgnoredItemsCount, setUserIgnoredItemsCount] = useState(0);
+
   // Load venue name on mount
   useEffect(() => {
     if (!venueId) {
@@ -732,6 +735,10 @@ function SupplierInvoiceReview() {
       return;
     }
 
+    // Capture user ignored count BEFORE modifying products array
+    const userIgnoredCount = products.filter(p => !p.selected).length;
+    setUserIgnoredItemsCount(userIgnoredCount);
+
     setLoading(true);
     setLoadingMessage('Looking up supplier...');
     setError(null);
@@ -949,6 +956,8 @@ function SupplierInvoiceReview() {
     setMasterProductMatchResults(null);
     setError(null);
     setSuccess(null);
+    setUserIgnoredItemsCount(0);
+    setHiddenProductsCount(0);
   };
 
   const selectedCount = products.filter(p => p.selected).length;
@@ -1451,7 +1460,7 @@ function SupplierInvoiceReview() {
               }}
               supplierMatchResults={supplierMatchResults}
               masterProductMatchResults={masterProductMatchResults}
-              ignoredItemsCount={products.filter(p => !p.selected).length}
+              ignoredItemsCount={userIgnoredItemsCount}
               systemIgnoredItemsCount={hiddenProductsCount}
               onConfirm={handleConfirmImport}
               onBack={() => setCurrentStep(4)}

@@ -16,27 +16,29 @@ const InvoiceImportSummary = ({
   // Total items from original invoice (before any filtering)
   const totalItems = invoiceData?.lineItems?.length || 0;
 
-  // Items that were imported (selected/checked in this session)
-  const itemsImported = ignoredItemsCount > 0 ? totalItems - ignoredItemsCount : totalItems;
-
   // Items user ignored in this session (unchecked items)
   const itemsUserIgnored = ignoredItemsCount || 0;
 
   // Items system ignored (previously marked to ignore for this venue/supplier)
   const itemsSystemIgnored = systemIgnoredItemsCount || 0;
 
+  // Items that were actually imported (selected and not ignored by system)
+  const itemsImported = totalItems - itemsUserIgnored - itemsSystemIgnored;
+
   // Supplier matching stats
   const supplierMatches = supplierMatchResults?.results?.matched?.length || supplierMatchResults?.matched || 0;
   const newSupplierMatches = supplierMatchResults?.results?.created?.length || supplierMatchResults?.created || 0;
 
-  // Master product linking stats
-  const masterProductsLinked = invoiceData?.lineItems?.filter(item => item.masterProductId || item.master_product_id).length || 0;
-  const newMasterProducts = masterProductMatchResults?.results?.filter(r => r.action === 'created').length || 0;
+  // Master product linking stats (from Step 4 manual matching results)
+  const matchedProducts = masterProductMatchResults?.results?.filter(r => r.action === 'matched').length || 0;
+  const createdProducts = masterProductMatchResults?.results?.filter(r => r.action === 'created').length || 0;
+  const masterProductsLinked = matchedProducts + createdProducts;
+  const newMasterProducts = createdProducts;
 
-  // Items skipped (items in invoice that failed to match or were intentionally skipped)
-  const itemsSkipped = itemsImported - masterProductsLinked;
+  // Items skipped (items that don't have master product links)
+  const itemsSkipped = masterProductMatchResults?.results?.filter(r => r.action === 'skipped').length || 0;
 
-  // Completion rate (percentage of imported items linked to master products)
+  // Completion rate (percentage of imported items with master product links)
   const completionRate = itemsImported > 0 ? Math.round((masterProductsLinked / itemsImported) * 100) : 0;
 
   const getStatusBadgeClass = (status) => {
