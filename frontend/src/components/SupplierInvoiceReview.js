@@ -574,11 +574,18 @@ function SupplierInvoiceReview() {
       let filteredProducts = data.data.products;
       let hiddenCount = 0;
 
+      console.log('🔍 DEBUG: Checking for ignored items after PDF parse');
+      console.log('Supplier name:', supplierName);
+      console.log('Venue ID:', venueId);
+      console.log('Total products from PDF:', data.data.products.length);
+      console.log('Sample product SKUs:', data.data.products.slice(0, 3).map(p => p.sku));
+
       try {
         // Determine supplier ID
         let supplierId = null;
         try {
           const suppliersResponse = await apiService.getSuppliers();
+          console.log('Suppliers response:', suppliersResponse);
           if (suppliersResponse.success && Array.isArray(suppliersResponse.data)) {
             const matchedSupplier = suppliersResponse.data.find(s =>
               s.sup_name.toLowerCase().includes(supplierName.toLowerCase()) ||
@@ -586,6 +593,9 @@ function SupplierInvoiceReview() {
             );
             if (matchedSupplier) {
               supplierId = matchedSupplier.sup_id;
+              console.log('✅ Found matching supplier:', matchedSupplier.sup_name, 'ID:', supplierId);
+            } else {
+              console.log('❌ No matching supplier found for:', supplierName);
             }
           }
         } catch (err) {
@@ -594,9 +604,13 @@ function SupplierInvoiceReview() {
 
         // If we found a supplier, check for ignored items
         if (supplierId) {
+          console.log('Checking ignored items for venue:', venueId, 'supplier:', supplierId);
           const ignoredResponse = await apiService.checkVenueIgnoredItems(venueId, supplierId);
+          console.log('Ignored items response:', ignoredResponse);
           if (ignoredResponse.success) {
-            const ignoredSkus = ignoredResponse.ignoredSkus || [];
+            // API wraps response under 'data' property
+            const ignoredSkus = ignoredResponse.data?.ignoredSkus || [];
+            console.log('Found ignored SKUs:', ignoredSkus);
             if (ignoredSkus.length > 0) {
               filteredProducts = data.data.products.filter(
                 p => !ignoredSkus.includes(p.sku)
@@ -604,8 +618,13 @@ function SupplierInvoiceReview() {
               hiddenCount = data.data.products.length - filteredProducts.length;
               setIgnoredProductSkus(ignoredSkus);
               setHiddenProductsCount(hiddenCount);
+              console.log('✅ Filtered out', hiddenCount, 'ignored items. Remaining:', filteredProducts.length);
+            } else {
+              console.log('ℹ️ No ignored items found for this supplier/venue');
             }
           }
+        } else {
+          console.log('⚠️ Could not determine supplier ID, skipping ignore check');
         }
       } catch (err) {
         console.warn('Error checking ignored items during PDF parsing:', err);
@@ -787,7 +806,8 @@ function SupplierInvoiceReview() {
       try {
         const ignoredResponse = await apiService.checkVenueIgnoredItems(venueId, supplierId);
         if (ignoredResponse.success) {
-          const ignoredSkus = ignoredResponse.ignoredSkus || [];
+          // API wraps response under 'data' property
+          const ignoredSkus = ignoredResponse.data?.ignoredSkus || [];
           setIgnoredProductSkus(ignoredSkus);
 
           // Filter out ignored products
