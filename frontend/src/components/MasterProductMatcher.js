@@ -9,6 +9,10 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [matchingResults, setMatchingResults] = useState([]);
   const [showCreateNew, setShowCreateNew] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchTab, setShowSearchTab] = useState(false);
 
   const currentItem = lineItems[currentIndex];
   const progress = ((currentIndex) / lineItems.length) * 100;
@@ -18,12 +22,16 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
     if (currentItem) {
       loadMatches();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex]);
 
   const loadMatches = async () => {
     setLoading(true);
     setSelectedMatch(null);
     setMatches([]);
+    setShowSearchTab(false);
+    setSearchQuery('');
+    setSearchResults([]);
 
     try {
       const response = await apiService.fuzzyMatchMasterProduct({
@@ -40,6 +48,33 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
       alert('Failed to load product matches');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await apiService.searchMasterProducts(searchQuery, null, null, 50);
+
+      if (response.success) {
+        // Filter out already selected suggested matches from search results
+        const filteredResults = response.data.results.filter(
+          result => !matches.some(m => m.id === result.id)
+        );
+        setSearchResults(filteredResults);
+      }
+    } catch (error) {
+      console.error('Error searching products:', error);
+      alert('Failed to search products');
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -212,64 +247,179 @@ const MasterProductMatcher = ({ invoiceId, lineItems, onComplete, onBack }) => {
           </div>
         </div>
 
-        {/* Suggested matches */}
+        {/* Matches and Search Section */}
         <div className="matches-section">
-          <h3>Suggested Matches from Master Catalog:</h3>
+          {/* Tabs */}
+          <div className="matches-tabs">
+            <button
+              className={`tab-button ${!showSearchTab ? 'active' : ''}`}
+              onClick={() => {
+                setShowSearchTab(false);
+                setSearchQuery('');
+                setSearchResults([]);
+              }}
+            >
+              📌 Suggested Matches ({matches.length})
+            </button>
+            <button
+              className={`tab-button ${showSearchTab ? 'active' : ''}`}
+              onClick={() => setShowSearchTab(true)}
+            >
+              🔍 Search Catalog
+            </button>
+          </div>
 
-          {loading ? (
-            <div className="loading">Searching for matches...</div>
-          ) : matches.length > 0 ? (
-            <div className="matches-list">
-              {matches.map((match) => (
-                <div
-                  key={match.id}
-                  className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
-                  onClick={() => handleSelectMatch(match)}
-                >
-                  <div className="match-header">
-                    <h4>{match.productName}</h4>
-                    <span className={`confidence-badge ${getConfidenceBadgeClass(match.confidenceScore)}`}>
-                      {match.confidenceScore}% match
-                    </span>
-                  </div>
-                  <div className="match-details">
-                    {match.brand && (
-                      <div className="match-detail">
-                        <strong>Brand:</strong> {match.brand}
+          {/* Suggested Matches Tab */}
+          {!showSearchTab && (
+            <>
+              <h3>Suggested Matches from Master Catalog:</h3>
+              {loading ? (
+                <div className="loading">Searching for matches...</div>
+              ) : matches.length > 0 ? (
+                <div className="matches-list">
+                  {matches.map((match) => (
+                    <div
+                      key={match.id}
+                      className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
+                      onClick={() => handleSelectMatch(match)}
+                    >
+                      <div className="match-header">
+                        <h4>{match.productName}</h4>
+                        <span className={`confidence-badge ${getConfidenceBadgeClass(match.confidenceScore)}`}>
+                          {match.confidenceScore}% match
+                        </span>
                       </div>
-                    )}
-                    {match.category && (
-                      <div className="match-detail">
-                        <strong>Category:</strong> {match.category}
+                      <div className="match-details">
+                        {match.brand && (
+                          <div className="match-detail">
+                            <strong>Brand:</strong> {match.brand}
+                          </div>
+                        )}
+                        {match.category && (
+                          <div className="match-detail">
+                            <strong>Category:</strong> {match.category}
+                          </div>
+                        )}
+                        {match.unitSize && match.unitType && (
+                          <div className="match-detail">
+                            <strong>Size:</strong> {match.unitSize} {match.unitType}
+                          </div>
+                        )}
+                        {match.caseSize && (
+                          <div className="match-detail">
+                            <strong>Case Size:</strong> {match.caseSize}
+                          </div>
+                        )}
+                        {match.barcode && (
+                          <div className="match-detail">
+                            <strong>Barcode:</strong> {match.barcode}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {match.unitSize && match.unitType && (
-                      <div className="match-detail">
-                        <strong>Size:</strong> {match.unitSize} {match.unitType}
-                      </div>
-                    )}
-                    {match.caseSize && (
-                      <div className="match-detail">
-                        <strong>Case Size:</strong> {match.caseSize}
-                      </div>
-                    )}
-                    {match.barcode && (
-                      <div className="match-detail">
-                        <strong>Barcode:</strong> {match.barcode}
-                      </div>
-                    )}
-                  </div>
-                  {selectedMatch?.id === match.id && (
-                    <div className="selected-indicator">
-                      ✓ Selected
+                      {selectedMatch?.id === match.id && (
+                        <div className="selected-indicator">
+                          ✓ Selected
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="no-matches">
+                  <p>No similar products found in master catalog</p>
+                  <p style={{ fontSize: '0.9rem', color: '#999' }}>
+                    Try the Search Catalog tab to browse all products
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Search Tab */}
+          {showSearchTab && (
+            <div className="search-tab">
+              <form onSubmit={handleSearch} className="search-form">
+                <input
+                  type="text"
+                  placeholder="Search by product name, brand, category..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input"
+                />
+                <button type="submit" disabled={isSearching} className="search-button">
+                  {isSearching ? '⏳ Searching...' : '🔍 Search'}
+                </button>
+              </form>
+
+              {searchQuery && (
+                <div className="search-results">
+                  {isSearching ? (
+                    <div className="loading">Searching for "{searchQuery}"...</div>
+                  ) : searchResults.length > 0 ? (
+                    <div className="results-info">
+                      Found {searchResults.length} matching products
+                    </div>
+                  ) : (
+                    <div className="no-matches">
+                      No products found for "{searchQuery}"
+                    </div>
+                  )}
+
+                  {!isSearching && searchResults.length > 0 && (
+                    <div className="matches-list">
+                      {searchResults.map((result) => (
+                        <div
+                          key={result.id}
+                          className={`match-card ${selectedMatch?.id === result.id ? 'selected' : ''}`}
+                          onClick={() => {
+                            handleSelectMatch(result);
+                            setShowSearchTab(false);
+                          }}
+                        >
+                          <div className="match-header">
+                            <h4>{result.product_name || result.name}</h4>
+                            <span className={`confidence-badge ${getConfidenceBadgeClass(result.confidenceScore)}`}>
+                              {result.confidenceScore}% match
+                            </span>
+                          </div>
+                          <div className="match-details">
+                            {result.brand && (
+                              <div className="match-detail">
+                                <strong>Brand:</strong> {result.brand}
+                              </div>
+                            )}
+                            {result.category && (
+                              <div className="match-detail">
+                                <strong>Category:</strong> {result.category}
+                              </div>
+                            )}
+                            {result.unit_size && result.unit_type && (
+                              <div className="match-detail">
+                                <strong>Size:</strong> {result.unit_size} {result.unit_type}
+                              </div>
+                            )}
+                            {result.case_size && (
+                              <div className="match-detail">
+                                <strong>Case Size:</strong> {result.case_size}
+                              </div>
+                            )}
+                            {result.barcode && (
+                              <div className="match-detail">
+                                <strong>Barcode:</strong> {result.barcode}
+                              </div>
+                            )}
+                          </div>
+                          {selectedMatch?.id === result.id && (
+                            <div className="selected-indicator">
+                              ✓ Selected
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="no-matches">
-              <p>No similar products found in master catalog</p>
+              )}
             </div>
           )}
         </div>
