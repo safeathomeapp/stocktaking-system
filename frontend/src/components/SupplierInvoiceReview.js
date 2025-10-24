@@ -608,7 +608,6 @@ function SupplierInvoiceReview() {
               );
               hiddenCount = data.data.products.length - filteredProducts.length;
               setIgnoredProductSkus(ignoredSkus);
-              setHiddenProductsCount(hiddenCount);
             }
           }
         }
@@ -616,6 +615,8 @@ function SupplierInvoiceReview() {
         console.warn('Error checking ignored items during PDF parsing:', err);
       }
 
+      // Always set hiddenProductsCount (even if 0) to reset from previous imports
+      setHiddenProductsCount(hiddenCount);
       setProducts(filteredProducts);
       setSuccess(`Successfully parsed ${filteredProducts.length} products from ${file.name}${hiddenCount > 0 ? ` (${hiddenCount} previously ignored)` : ''}`);
 
@@ -782,36 +783,8 @@ function SupplierInvoiceReview() {
         }
       }
 
-      // Fetch venue-specific ignored items and filter products
-      setLoadingMessage('Checking ignored items for this venue...');
-      try {
-        const ignoredResponse = await apiService.checkVenueIgnoredItems(venueId, supplierId);
-        if (ignoredResponse.success) {
-          // API wraps response under 'data' property
-          const ignoredSkus = ignoredResponse.data?.ignoredSkus || [];
-          setIgnoredProductSkus(ignoredSkus);
-
-          // Filter out ignored products
-          if (ignoredSkus.length > 0) {
-            const filteredProducts = selectedProducts.filter(
-              p => !ignoredSkus.includes(p.sku)
-            );
-            const hiddenCount = selectedProducts.length - filteredProducts.length;
-            setHiddenProductsCount(hiddenCount);
-
-            // Update products to exclude ignored items
-            setProducts(prevProducts =>
-              prevProducts.filter(p => !ignoredSkus.includes(p.sku))
-            );
-
-            // Update selectedProducts reference for invoice creation
-            selectedProducts = filteredProducts;
-          }
-        }
-      } catch (err) {
-        console.warn('Error checking ignored items:', err);
-        // Continue anyway if this fails
-      }
+      // Note: Ignored items already filtered in PDF parsing (Step 1)
+      // No need to filter again here - hiddenProductsCount is already set
 
       setLoadingMessage('Creating invoice...');
 
