@@ -574,18 +574,12 @@ function SupplierInvoiceReview() {
       let filteredProducts = data.data.products;
       let hiddenCount = 0;
 
-      console.log('🔍 DEBUG: Checking for ignored items after PDF parse');
-      console.log('Supplier name:', supplierName);
-      console.log('Venue ID:', venueId);
-      console.log('Total products from PDF:', data.data.products.length);
-      console.log('Sample product SKUs:', data.data.products.slice(0, 3).map(p => p.sku));
 
       try {
         // Determine supplier ID
         let supplierId = null;
         try {
           const suppliersResponse = await apiService.getSuppliers();
-          console.log('Suppliers response:', suppliersResponse);
           if (suppliersResponse.success && Array.isArray(suppliersResponse.data)) {
             const matchedSupplier = suppliersResponse.data.find(s =>
               s.sup_name.toLowerCase().includes(supplierName.toLowerCase()) ||
@@ -593,9 +587,6 @@ function SupplierInvoiceReview() {
             );
             if (matchedSupplier) {
               supplierId = matchedSupplier.sup_id;
-              console.log('✅ Found matching supplier:', matchedSupplier.sup_name, 'ID:', supplierId);
-            } else {
-              console.log('❌ No matching supplier found for:', supplierName);
             }
           }
         } catch (err) {
@@ -604,13 +595,10 @@ function SupplierInvoiceReview() {
 
         // If we found a supplier, check for ignored items
         if (supplierId) {
-          console.log('Checking ignored items for venue:', venueId, 'supplier:', supplierId);
           const ignoredResponse = await apiService.checkVenueIgnoredItems(venueId, supplierId);
-          console.log('Ignored items response:', ignoredResponse);
           if (ignoredResponse.success) {
             // API wraps response under 'data' property
             const ignoredSkus = ignoredResponse.data?.ignoredSkus || [];
-            console.log('Found ignored SKUs:', ignoredSkus);
             if (ignoredSkus.length > 0) {
               filteredProducts = data.data.products.filter(
                 p => !ignoredSkus.includes(p.sku)
@@ -618,13 +606,8 @@ function SupplierInvoiceReview() {
               hiddenCount = data.data.products.length - filteredProducts.length;
               setIgnoredProductSkus(ignoredSkus);
               setHiddenProductsCount(hiddenCount);
-              console.log('✅ Filtered out', hiddenCount, 'ignored items. Remaining:', filteredProducts.length);
-            } else {
-              console.log('ℹ️ No ignored items found for this supplier/venue');
             }
           }
-        } else {
-          console.log('⚠️ Could not determine supplier ID, skipping ignore check');
         }
       } catch (err) {
         console.warn('Error checking ignored items during PDF parsing:', err);
@@ -661,7 +644,6 @@ function SupplierInvoiceReview() {
   const proceedWithInvoiceCreation = async (invoiceData) => {
     try {
       const response = await apiService.createInvoice(invoiceData);
-      console.log('Create invoice response:', response);
 
       if (response.success) {
         // Extract invoice data - handle both wrapped and unwrapped responses
@@ -681,7 +663,6 @@ function SupplierInvoiceReview() {
         setLoadingMessage('Matching supplier items...');
 
         const matchResponse = await apiService.matchSupplierItems(invId);
-        console.log('Match supplier items response:', matchResponse);
 
         if (matchResponse.success) {
           // Extract match data - handle both wrapped and unwrapped responses
@@ -710,8 +691,6 @@ function SupplierInvoiceReview() {
               });
             }
           }
-
-          console.log('Master product map by name:', Object.keys(masterProductMap).length, 'items');
 
           // Update products with masterProductId using product name as key
           if (Object.keys(masterProductMap).length > 0) {
@@ -758,8 +737,6 @@ function SupplierInvoiceReview() {
     setError(null);
 
     try {
-      console.log('Creating invoice with venue ID:', venueId);
-
       // Step 1: Get supplier ID - either find existing or create new
       let supplierId = null;
 
@@ -774,7 +751,6 @@ function SupplierInvoiceReview() {
 
           if (matchedSupplier) {
             supplierId = matchedSupplier.sup_id;
-            console.log('Found existing supplier:', supplierId);
           }
         }
       } catch (err) {
@@ -783,7 +759,6 @@ function SupplierInvoiceReview() {
 
       // If supplier not found, create a new one
       if (!supplierId) {
-        console.log('Creating new supplier:', supplierName);
         setLoadingMessage('Creating supplier...');
 
         const createResponse = await apiService.createSupplier({
@@ -793,7 +768,6 @@ function SupplierInvoiceReview() {
 
         if (createResponse.success) {
           supplierId = createResponse.data.sup_id || createResponse.data.data?.sup_id;
-          console.log('Created new supplier:', supplierId);
         } else {
           setError(`Failed to create supplier: ${createResponse.error}`);
           setLoading(false);
@@ -884,13 +858,10 @@ function SupplierInvoiceReview() {
         force_create: !duplicateCheckEnabled
       };
 
-      console.log('Invoice data:', invoiceData);
-
       // Check for duplicate invoice before creating (if enabled)
       if (duplicateCheckEnabled) {
         setLoadingMessage('Checking for duplicate invoice...');
         const duplicateCheck = await apiService.checkDuplicateInvoice(supplierId, invoiceNumber);
-        console.log('Duplicate check result:', duplicateCheck);
 
         if (duplicateCheck.success && duplicateCheck.data.duplicate) {
           // Show warning dialog
@@ -900,8 +871,6 @@ function SupplierInvoiceReview() {
           setLoading(false);
           return;
         }
-      } else {
-        console.log('Duplicate check disabled for testing');
       }
 
       // No duplicate (or check disabled), proceed with creation
@@ -920,14 +889,51 @@ function SupplierInvoiceReview() {
     setCurrentStep(5); // Move to summary
   };
 
-  // Step 5: Confirm and complete
-  const handleConfirmImport = () => {
-    setSuccess('Invoice imported successfully!');
+  // Step 6: Confirm and complete import
+  const handleConfirmImport = async () => {
+    // Show loading state while finalizing
+    setLoading(true);
+    setLoadingMessage('Finalizing invoice import...');
 
-    // Navigate to dashboard after 2 seconds
-    setTimeout(() => {
-      navigate('/');
-    }, 2000);
+    try {
+      // Verify invoice exists and all data is complete
+      if (!invoiceId) {
+        setError('Invoice ID not found. Please contact support.');
+        setLoading(false);
+        return;
+      }
+
+      // Optional: Add any final validation or cleanup here
+      // For now, the invoice is already created and all matching is complete
+
+      setSuccess(
+        `✓ Invoice #${invoiceId} has been successfully imported!\n\n` +
+        `Summary:\n` +
+        `• Total items: ${products.length}\n` +
+        `• Items imported: ${products.filter(p => p.selected).length}\n` +
+        `• Items ignored: ${products.filter(p => !p.selected).length}\n` +
+        `• Products matched: ${masterProductMatchResults?.results?.filter(r => r.action === 'matched').length || 0}\n` +
+        `• New products created: ${masterProductMatchResults?.results?.filter(r => r.action === 'created').length || 0}`
+      );
+
+      // Log completion
+      console.log('✓ Invoice import completed:', {
+        invoiceId,
+        totalProducts: products.length,
+        selectedProducts: products.filter(p => p.selected).length,
+        masterProductMatches: masterProductMatchResults
+      });
+
+      // Navigate to dashboard after 3 seconds
+      setTimeout(() => {
+        navigate('/');
+      }, 3000);
+    } catch (err) {
+      console.error('Error finalizing invoice:', err);
+      setError('Failed to finalize invoice: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
