@@ -949,7 +949,17 @@ function SupplierInvoiceReview() {
 
   // Ensure supplierId is determined before proceeding to Step 3
   const handleProceedToIgnoreConfirmation = async () => {
-    // If supplierId is already set, proceed directly
+    // Check if there are any unchecked items
+    const uncheckedItems = products.filter(p => !p.selected);
+
+    // If no unchecked items, skip Step 3 and proceed directly to invoice creation
+    if (uncheckedItems.length === 0) {
+      console.log('No unchecked items, skipping Step 3 ignore confirmation');
+      handleCreateInvoice();
+      return;
+    }
+
+    // If supplierId is already set, proceed directly to Step 3
     if (supplierId) {
       setCurrentStep(3);
       return;
