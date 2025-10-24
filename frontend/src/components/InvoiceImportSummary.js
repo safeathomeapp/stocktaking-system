@@ -13,17 +13,17 @@ const InvoiceImportSummary = ({
 }) => {
 
   // Calculate statistics
-  // Total items from original invoice (before any filtering)
-  const totalItems = invoiceData?.lineItems?.length || 0;
-
-  // Items user ignored in this session (unchecked items)
+  // Items user ignored in this session (unchecked items in Step 2)
   const itemsUserIgnored = ignoredItemsCount || 0;
 
   // Items system ignored (previously marked to ignore for this venue/supplier)
   const itemsSystemIgnored = systemIgnoredItemsCount || 0;
 
-  // Items that were actually imported (selected and not ignored by system)
-  const itemsImported = totalItems - itemsUserIgnored - itemsSystemIgnored;
+  // Items that were actually imported (lineItems in the invoice)
+  const itemsImported = invoiceData?.lineItems?.length || 0;
+
+  // Total items from original PDF (imported + all excluded items)
+  const totalItems = itemsImported + itemsUserIgnored + itemsSystemIgnored;
 
   // Supplier matching stats
   const supplierMatches = supplierMatchResults?.results?.matched?.length || supplierMatchResults?.matched || 0;
