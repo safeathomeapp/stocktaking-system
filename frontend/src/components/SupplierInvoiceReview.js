@@ -560,7 +560,6 @@ function SupplierInvoiceReview() {
 
       setParsedData(data.data);
       setSupplierName(data.data.supplier);
-      setProducts(data.data.products);
 
       // Pre-populate form fields from parsed data
       if (data.data.invoiceNumber) {
@@ -570,7 +569,50 @@ function SupplierInvoiceReview() {
         setInvoiceDate(data.data.invoiceDate);
       }
 
-      setSuccess(`Successfully parsed ${data.data.totalProducts} products from ${file.name}`);
+      // Filter out previously ignored items for this supplier/venue
+      const supplierName = data.data.supplier;
+      let filteredProducts = data.data.products;
+      let hiddenCount = 0;
+
+      try {
+        // Determine supplier ID
+        let supplierId = null;
+        try {
+          const suppliersResponse = await apiService.getSuppliers();
+          if (suppliersResponse.success && Array.isArray(suppliersResponse.data)) {
+            const matchedSupplier = suppliersResponse.data.find(s =>
+              s.sup_name.toLowerCase().includes(supplierName.toLowerCase()) ||
+              supplierName.toLowerCase().includes(s.sup_name.toLowerCase())
+            );
+            if (matchedSupplier) {
+              supplierId = matchedSupplier.sup_id;
+            }
+          }
+        } catch (err) {
+          console.warn('Error fetching suppliers for ignored items check:', err);
+        }
+
+        // If we found a supplier, check for ignored items
+        if (supplierId) {
+          const ignoredResponse = await apiService.checkVenueIgnoredItems(venueId, supplierId);
+          if (ignoredResponse.success) {
+            const ignoredSkus = ignoredResponse.ignoredSkus || [];
+            if (ignoredSkus.length > 0) {
+              filteredProducts = data.data.products.filter(
+                p => !ignoredSkus.includes(p.sku)
+              );
+              hiddenCount = data.data.products.length - filteredProducts.length;
+              setIgnoredProductSkus(ignoredSkus);
+              setHiddenProductsCount(hiddenCount);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Error checking ignored items during PDF parsing:', err);
+      }
+
+      setProducts(filteredProducts);
+      setSuccess(`Successfully parsed ${filteredProducts.length} products from ${file.name}${hiddenCount > 0 ? ` (${hiddenCount} previously ignored)` : ''}`);
 
     } catch (err) {
       console.error('Error parsing PDF:', err);
