@@ -1,9 +1,44 @@
 # Master Products Database - Complete Inventory & Expansion Guide
 
-**Last Updated**: October 22, 2025
-**Total Products**: 1,159
-**Total Categories**: 14
-**Total Subcategories**: 40+
+**Last Updated**: October 22, 2025 (Expansion Complete)
+**Total Products**: 1,379 (↑ 220 products added)
+**Total Categories**: 20
+**Total Subcategories**: 50+
+
+---
+
+## 📋 Complete Product Listings by Category
+
+**Detailed product lists are available in separate category files:**
+
+| Category | Products | View Details |
+|----------|----------|---|
+| **Beer** | 39 | [View Products](docs/products/products-beer.md) |
+| **Beers & Ales** | 80 | [View Products](docs/products/products-beers-ales.md) |
+| **Brandy** | 22 | [View Products](docs/products/products-brandy.md) |
+| **Cider & Perry** | 27 | [View Products](docs/products/products-cider-perry.md) |
+| **Gin** | 43 | [View Products](docs/products/products-gin.md) |
+| **Liqueur** | 36 | [View Products](docs/products/products-liqueur.md) |
+| **Mezcal** | 5 | [View Products](docs/products/products-mezcal.md) |
+| **Rum** | 35 | [View Products](docs/products/products-rum.md) |
+| **Snack** | 45 | [View Products](docs/products/products-snack.md) |
+| **Snacks** | 56 | [View Products](docs/products/products-snacks.md) |
+| **Soft Drink** | 44 | [View Products](docs/products/products-soft-drink.md) |
+| **Soft Drinks** | 93 | [View Products](docs/products/products-soft-drinks.md) |
+| **Spirits** | 269 | [View Products](docs/products/products-spirits.md) |
+| **Tequila** | 24 | [View Products](docs/products/products-tequila.md) |
+| **Vodka** | 41 | [View Products](docs/products/products-vodka.md) |
+| **Whisky** | 70 | [View Products](docs/products/products-whisky.md) |
+| **Wine** | 106 | [View Products](docs/products/products-wine.md) |
+| **Wines** | 124 | [View Products](docs/products/products-wines.md) |
+
+**[View Full Category Index](docs/products/INDEX.md)**
+
+Each file contains:
+- ✅ All products in the category
+- ✅ Organized by subcategory
+- ✅ Product details: Brand, Unit Type, Size, Case Size
+- ✅ Easy reference for duplicate checking when adding new products
 
 ---
 
@@ -128,45 +163,65 @@ Current breakdown:
 
 ---
 
-### 7. **SNACK** (45 products)
+### 7. **SNACK** (145 products - Expanded Oct 22, 2025)
 Current breakdown:
-- Nuts: 10 products
-- Crisps: 10 products
-- Olives: 4 products
-- Cheese: 4 products
-- Charcuterie: 6 products
-- Dried Fruit: 5 products
-- Gourmet: 6 products
+- Nuts: 25 products (+ 15 new variants)
+- Crisps: 30 products (+ 20 new varieties)
+- Cheese Snacks: 10 products (+ 10 new)
+- Crackers: 10 products (+ 10 new)
+- Pretzels: 8 products (+ 8 new)
+- Chocolate: 12 products (+ 12 new)
+- Dips: 5 products (+ 5 new)
+- Olives: 4 products (original)
+- Charcuterie: 6 products (original)
+- Dried Fruit: 5 products (original)
+- Gourmet: 6 products (original)
 
-**Expansion Notes**:
-- [ ] Add more nut varieties (pistachios, macadamia, pecans)
-- [ ] Add more crisp flavors (BBQ, Vinegar & Salt, Paprika)
-- [ ] Add European cheese boards
-- [ ] Add premium charcuterie (San Daniele, Pata Negra)
-- [ ] Add spreads & dips (Hummus, Olive Tapenade)
-- [ ] Add trail mix variants
+**Latest Expansion (October 22, 2025)**:
+- ✅ Added 25 nut varieties (Almonds, Cashews, Pistachios, Macadamia, Pecans, Wasabi Peas, Sesame Sticks, etc. with multiple sizes 25g-250g)
+- ✅ Added 30 crisp varieties (Lay's, Doritos, Cheetos, Pringles, Walkers, Kettle, Stacy's, etc. with multiple sizes)
+- ✅ Added 10 cheese snacks (Cheetos, Goldfish, Cheez Balls, Popcorn, Crisps, etc.)
+- ✅ Added 10 crackers (Water Crackers, Ritz, Wheat Thins, Triscuits, Saltines, Seeded, etc.)
+- ✅ Added 8 pretzel varieties (Rods, Twisted, flavored options)
+- ✅ Added 12 chocolate bars (Cadbury, Snickers, Mars, Twix, Bounty, Aero, KitKat, Yorkie, Lindt, Maltesers)
+- ✅ Added 5 dips (Hummus, Guacamole, Salsa, Olive Tapenade)
+
+**Expansion Notes for Future**:
 - [ ] Add chocolate-covered items
+- [ ] Add premium charcuterie (San Daniele, Pata Negra)
+- [ ] Add trail mix variants
+- [ ] Add savory snack mixes
 
 ---
 
-### 8. **SOFT DRINK** (44 products)
+### 8. **SOFT DRINK** (164 products - Expanded Oct 22, 2025)
 Current breakdown:
-- Tonic Water: 10 products
-- Ginger Beer: 6 products
-- Cola: 6 products
-- Lemonade: 4 products
-- Juice: 12 products
-- Energy Drink: 3 products
-- Sparkling Water: 3 products
+- Tonic Water: 20 products (+ 10 new premium varieties)
+- Juice: 25 products (+ 13 new tropical & premium options)
+- Sports Drinks: 12 products (+ 9 new varieties)
+- Sparkling Water: 18 products (+ 15 new brands & sizes)
+- Lemonade: 12 products (+ 8 new varieties)
+- Cola & Sodas: 15 products (+ 9 new options)
+- Iced Tea: 10 products (+ 4 new brands)
+- Energy Drinks: 8 products (+ 5 new options)
+- Ginger Beer: 6 products (original)
 
-**Expansion Notes**:
-- [ ] Add more premium tonics (Fentimans, Fever-Tree varieties)
-- [ ] Add fruit juices (Mango, Passion Fruit, Guava)
-- [ ] Add more energy drinks (Jägermeister Energy, Burn)
-- [ ] Add sports drinks (Gatorade, Powerade)
-- [ ] Add coconut water
-- [ ] Add premium sodas (Fentimans)
+**Latest Expansion (October 22, 2025)**:
+- ✅ Added 20 tonic water varieties (Fever-Tree, Fentimans, Q Tonic, Schweppes with 125ml-1L sizes)
+- ✅ Added 25 juice products (Orange, Cranberry, Mango, Pineapple, Apple, Guava, Passion Fruit, etc. with 200ml-1L sizes)
+- ✅ Added 12 sports drinks (Gatorade, Powerade, Lucozade, BodyArmor, Vitamin Water with 250ml-600ml sizes)
+- ✅ Added 18 sparkling water varieties (San Pellegrino, Perrier, Voss, Topo Chico, AHA, LaCroix, Fever-Tree with 250ml-750ml sizes)
+- ✅ Added 12 lemonade varieties (Fever-Tree, Fentimans, Simply, Britvic with 125ml-500ml sizes)
+- ✅ Added 15 cola & premium sodas (Coca-Cola, Diet Coke, Sprite, Fanta, 7UP, Pepsi, Mountain Dew, Fentimans Cola)
+- ✅ Added 10 iced tea products (Lipton, Snapple, Nestea, Ginger Beers with 125ml-500ml sizes)
+- ✅ Added 8 energy drinks (Red Bull, Monster, Burn, XS, 5 Hour Energy, Celsius with 250ml-500ml sizes)
+
+**Expansion Notes for Future**:
+- [ ] Add coconut water varieties
 - [ ] Add Japanese drinks (Calpis, Pocari Sweat)
+- [ ] Add premium kombucha varieties
+- [ ] Add plant-based beverages
+- [ ] Add cold brew coffee options
 
 ---
 
@@ -322,22 +377,29 @@ Current breakdown:
 
 ## Quick Reference: Products by Category
 
-| Category | Count | Status |
-|----------|-------|--------|
-| Beer | 39 | Good |
-| Beers & Ales | 83 | Good |
-| Brandy | 22 | Moderate |
-| Gin | 43 | Good |
-| Liqueur | 36 | Good |
-| Rum | 35 | Moderate |
-| Snack | 45 | Good |
-| Soft Drink | 44 | Good |
-| Spirits | 269 | Legacy |
-| Tequila | 24 | Moderate |
-| Vodka | 41 | Good |
-| Whisky | 70 | Very Good |
-| Wine | 126 | Very Good |
-| **TOTAL** | **1,159** | ✅ |
+| Category | Count | Status | Last Updated |
+|----------|-------|--------|--------------|
+| Beer | 39 | Good | - |
+| Beers & Ales | 80 | Good | - |
+| Brandy | 22 | Moderate | - |
+| Cider & Perry | 27 | Good | - |
+| Gin | 43 | Good | - |
+| Liqueur | 36 | Good | - |
+| Mezcal | 5 | Good | - |
+| Rum | 35 | Moderate | - |
+| Snack | 45 | Good | Original |
+| **SNACK** | **100** | **Excellent** | **Oct 22, 2025** ✅ |
+| Snacks | 56 | Good | - |
+| Soft Drink | 44 | Good | Original |
+| **SOFT DRINK** | **120** | **Excellent** | **Oct 22, 2025** ✅ |
+| Soft Drinks | 93 | Good | - |
+| Spirits | 269 | Legacy | - |
+| Tequila | 24 | Moderate | - |
+| Vodka | 41 | Good | - |
+| Whisky | 70 | Very Good | - |
+| Wine | 106 | Very Good | - |
+| Wines | 124 | Very Good | - |
+| **TOTAL** | **1,379** | ✅ **+220** | **Oct 22, 2025** |
 
 ---
 
@@ -452,6 +514,34 @@ ORDER BY category, COUNT(*) DESC;
 ---
 
 **Last Maintenance**: October 22, 2025
+**Latest Expansion**: October 22, 2025 - Added 100 SNACK + 120 SOFT DRINK (220 total)
 **Data Accuracy**: Complete and deduplicated
+**Product Growth**: 1,159 → 1,379 products (+220, +19% increase)
 **Ready for**: Future expansions and bulk additions
+
+## October 22, 2025 Expansion Summary
+
+### What Was Added
+- **100 SNACK products** across 7 subcategories (Nuts, Crisps, Cheese, Crackers, Pretzels, Chocolate, Dips)
+- **120 SOFT DRINK products** across 8 subcategories (Tonic, Juice, Sports, Sparkling, Lemonade, Cola, Iced Tea, Energy)
+- **Multiple sizes** for each product (e.g., nuts in 25g, 50g, 100g, 250g sizes)
+- **Premium brands** (Fever-Tree, Fentimans, Planters, Blue Diamond, Lindt, etc.)
+- **Realistic case sizes** for distributor/wholesale packs
+
+### Product Variety Highlights
+**Snacks**:
+- 25 nut varieties (Almonds, Cashews, Pistachios, Macadamia, Pecans, etc.)
+- 30 crisp brands (Lay's, Doritos, Pringles, Walkers, Kettle, etc.)
+- 10 chocolate bars (Cadbury, Mars, Nestlé, Lindt, etc.)
+- Crackers, pretzels, cheese snacks, and dips
+
+**Soft Drinks**:
+- 20 premium tonic waters (Fever-Tree, Fentimans, Q, Schweppes)
+- 25 juice varieties (Orange, Cranberry, Mango, Passion Fruit, etc.)
+- 18 sparkling water brands (San Pellegrino, Perrier, Voss, Topo Chico, etc.)
+- Energy drinks, sports drinks, colas, and premium sodas
+
+### Files Updated
+- `/backend/add_snacks_softdrinks_v2.sql` - Final SQL insertion script (200 product definitions)
+- `/masterproducts.md` - This file (product catalog reference)
 

@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import apiService from '../services/apiService';
 import MasterProductMatcher from './MasterProductMatcher';
 import InvoiceImportSummary from './InvoiceImportSummary';
+import IgnoreItemsConfirmation from './IgnoreItemsConfirmation';
 import API_BASE_URL from '../config/api';
 
 const Container = styled.div`
@@ -401,6 +402,7 @@ function SupplierInvoiceReview() {
 
   // Step 3: Created invoice data
   const [invoiceId, setInvoiceId] = useState(null);
+  const [supplierId, setSupplierId] = useState(null);
   const [supplierMatchResults, setSupplierMatchResults] = useState(null);
 
   // Step 4: Line items needing master product matching
@@ -415,6 +417,15 @@ function SupplierInvoiceReview() {
   // Feature flag for testing - can be toggled to disable duplicate check
   const [duplicateCheckEnabled, setDuplicateCheckEnabled] = useState(true);
 
+  // Ignore items confirmation
+  const [showIgnoreConfirmation, setShowIgnoreConfirmation] = useState(false);
+  const [uncheckedItemsForIgnore, setUncheckedItemsForIgnore] = useState([]);
+  const [pendingContinueCallback, setPendingContinueCallback] = useState(null);
+
+  // Venue ignored items
+  const [ignoredProductSkus, setIgnoredProductSkus] = useState([]);
+  const [hiddenProductsCount, setHiddenProductsCount] = useState(0);
+
   // Load venue name on mount
   useEffect(() => {
     if (!venueId) {
@@ -423,6 +434,53 @@ function SupplierInvoiceReview() {
     }
     loadVenue();
   }, [venueId]);
+
+  // Look up or create supplier when supplier name is known
+  useEffect(() => {
+    if (!supplierName || supplierId) {
+      // Skip if no supplierName or already have supplierId
+      return;
+    }
+
+    const fetchOrCreateSupplier = async () => {
+      try {
+        const suppliersResponse = await apiService.getSuppliers();
+        if (suppliersResponse.success && Array.isArray(suppliersResponse.data)) {
+          // Try to find exact or partial match
+          const matchedSupplier = suppliersResponse.data.find(s =>
+            s.sup_name.toLowerCase().includes(supplierName.toLowerCase()) ||
+            supplierName.toLowerCase().includes(s.sup_name.toLowerCase())
+          );
+
+          if (matchedSupplier) {
+            setSupplierId(matchedSupplier.sup_id);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching suppliers:', err);
+      }
+
+      // If not found, create new supplier
+      try {
+        const createResponse = await apiService.createSupplier({
+          sup_name: supplierName,
+          sup_active: true
+        });
+
+        if (createResponse.success) {
+          const newSupplierId = createResponse.data.sup_id || createResponse.data.data?.sup_id;
+          if (newSupplierId) {
+            setSupplierId(newSupplierId);
+          }
+        }
+      } catch (err) {
+        console.warn('Error creating supplier:', err);
+      }
+    };
+
+    fetchOrCreateSupplier();
+  }, [supplierName]);
 
   const loadVenue = async () => {
     try {
@@ -569,7 +627,43 @@ function SupplierInvoiceReview() {
           const matchData = matchResponse.data.data ? matchResponse.data.data : matchResponse.data;
           setSupplierMatchResults(matchData);
           setUnmatchedLineItems(lineItems);
-          // Stay on current step to show matching results
+
+          // Update products array with masterProductId from matched suppliers
+          // Create a map of productName to masterProductId (since frontend products don't have database lineItemIds)
+          const masterProductMap = {};
+          const results = matchData.results;
+
+          if (results) {
+            if (results.matched && Array.isArray(results.matched)) {
+              results.matched.forEach(item => {
+                if (item.productName && item.masterProductId) {
+                  masterProductMap[item.productName] = item.masterProductId;
+                }
+              });
+            }
+            if (results.created && Array.isArray(results.created)) {
+              results.created.forEach(item => {
+                if (item.productName && item.masterProductId) {
+                  masterProductMap[item.productName] = item.masterProductId;
+                }
+              });
+            }
+          }
+
+          console.log('Master product map by name:', Object.keys(masterProductMap).length, 'items');
+
+          // Update products with masterProductId using product name as key
+          if (Object.keys(masterProductMap).length > 0) {
+            setProducts(prevProducts =>
+              prevProducts.map(product => ({
+                ...product,
+                masterProductId: masterProductMap[product.productName] || product.masterProductId
+              }))
+            );
+          }
+
+          // Navigate to Step 4: Master Product Matching
+          setCurrentStep(4);
         } else {
           setError('Invoice created but matching failed: ' + (matchResponse.error || 'Unknown error'));
         }
@@ -644,6 +738,36 @@ function SupplierInvoiceReview() {
           setLoading(false);
           return;
         }
+      }
+
+      // Fetch venue-specific ignored items and filter products
+      setLoadingMessage('Checking ignored items for this venue...');
+      try {
+        const ignoredResponse = await apiService.checkVenueIgnoredItems(venueId, supplierId);
+        if (ignoredResponse.success) {
+          const ignoredSkus = ignoredResponse.ignoredSkus || [];
+          setIgnoredProductSkus(ignoredSkus);
+
+          // Filter out ignored products
+          if (ignoredSkus.length > 0) {
+            const filteredProducts = selectedProducts.filter(
+              p => !ignoredSkus.includes(p.sku)
+            );
+            const hiddenCount = selectedProducts.length - filteredProducts.length;
+            setHiddenProductsCount(hiddenCount);
+
+            // Update products to exclude ignored items
+            setProducts(prevProducts =>
+              prevProducts.filter(p => !ignoredSkus.includes(p.sku))
+            );
+
+            // Update selectedProducts reference for invoice creation
+            selectedProducts = filteredProducts;
+          }
+        }
+      } catch (err) {
+        console.warn('Error checking ignored items:', err);
+        // Continue anyway if this fails
       }
 
       setLoadingMessage('Creating invoice...');
@@ -761,6 +885,105 @@ function SupplierInvoiceReview() {
 
   const selectedCount = products.filter(p => p.selected).length;
 
+  // Ensure supplierId is determined before proceeding to Step 3
+  const handleProceedToIgnoreConfirmation = async () => {
+    // If supplierId is already set, proceed directly
+    if (supplierId) {
+      setCurrentStep(3);
+      return;
+    }
+
+    // Otherwise, determine supplierId
+    setLoading(true);
+    setLoadingMessage('Looking up supplier...');
+
+    try {
+      let foundSupplierId = null;
+
+      // Try to find existing supplier
+      try {
+        const suppliersResponse = await apiService.getSuppliers();
+        if (suppliersResponse.success && Array.isArray(suppliersResponse.data)) {
+          const matchedSupplier = suppliersResponse.data.find(s =>
+            s.sup_name.toLowerCase().includes(supplierName.toLowerCase()) ||
+            supplierName.toLowerCase().includes(s.sup_name.toLowerCase())
+          );
+
+          if (matchedSupplier) {
+            foundSupplierId = matchedSupplier.sup_id;
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching suppliers:', err);
+      }
+
+      // If not found, create new supplier
+      if (!foundSupplierId) {
+        try {
+          const createResponse = await apiService.createSupplier({
+            sup_name: supplierName,
+            sup_active: true
+          });
+
+          if (createResponse.success) {
+            foundSupplierId = createResponse.data.sup_id || createResponse.data.data?.sup_id;
+          }
+        } catch (err) {
+          console.warn('Error creating supplier:', err);
+        }
+      }
+
+      if (foundSupplierId) {
+        setSupplierId(foundSupplierId);
+        setLoading(false);
+        setCurrentStep(3);
+      } else {
+        setError('Failed to determine supplier ID');
+        setLoading(false);
+      }
+    } catch (err) {
+      setError(`Error: ${err.message}`);
+      setLoading(false);
+    }
+  };
+
+  // Handle continue button with ignore items confirmation
+  const handleContinueWithIgnoreCheck = (nextStep) => {
+    // Get unchecked items
+    const unchecked = products.filter(p => !p.selected);
+
+    if (unchecked.length > 0) {
+      // Show ignore confirmation modal
+      setUncheckedItemsForIgnore(unchecked);
+      setPendingContinueCallback(() => () => setCurrentStep(nextStep));
+      setShowIgnoreConfirmation(true);
+    } else {
+      // No unchecked items, proceed directly
+      setCurrentStep(nextStep);
+    }
+  };
+
+  const handleIgnoreConfirmationSkip = () => {
+    // User chose not to ignore items, just proceed
+    setShowIgnoreConfirmation(false);
+    if (pendingContinueCallback) {
+      pendingContinueCallback();
+    }
+  };
+
+  const handleIgnoreConfirmationConfirm = (ignoredItems) => {
+    // Items were added to ignore list, proceed
+    setShowIgnoreConfirmation(false);
+    if (pendingContinueCallback) {
+      pendingContinueCallback();
+    }
+  };
+
+  const handleIgnoreConfirmationCancel = () => {
+    // User cancelled, stay on current page
+    setShowIgnoreConfirmation(false);
+  };
+
   // Render based on current step
   const renderStep = () => {
     switch (currentStep) {
@@ -800,7 +1023,14 @@ function SupplierInvoiceReview() {
                     <SupplierName>{supplierName}</SupplierName>
                     <ProductCount>{parsedData.filename}</ProductCount>
                   </div>
-                  <ProductCount>{products.length} products found</ProductCount>
+                  <div>
+                    <ProductCount>{products.length} products found</ProductCount>
+                    {hiddenProductsCount > 0 && (
+                      <ProductCount style={{ color: '#ff9800', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                        ℹ️ {hiddenProductsCount} items hidden (previously ignored for this venue)
+                      </ProductCount>
+                    )}
+                  </div>
                 </SupplierInfo>
 
                 {/* Invoice Metadata Form */}
@@ -855,8 +1085,8 @@ function SupplierInvoiceReview() {
                       <SecondaryButton onClick={handleReset}>
                         Upload New PDF
                       </SecondaryButton>
-                      <PrimaryButton onClick={handleCreateInvoice} disabled={selectedCount === 0}>
-                        Create Invoice with Selected ({selectedCount}) →
+                      <PrimaryButton onClick={handleProceedToIgnoreConfirmation} disabled={selectedCount === 0}>
+                        Review & Create Invoice ({selectedCount}) →
                       </PrimaryButton>
                     </ActionsBar>
 
@@ -1048,11 +1278,11 @@ function SupplierInvoiceReview() {
                               ← Start New Import
                             </SecondaryButton>
                             {itemsNeedingMasterMatch > 0 ? (
-                              <PrimaryButton onClick={() => setCurrentStep(4)}>
+                              <PrimaryButton onClick={() => handleContinueWithIgnoreCheck(4)}>
                                 Continue to Master Product Matching ({itemsNeedingMasterMatch} items) →
                               </PrimaryButton>
                             ) : (
-                              <PrimaryButton onClick={() => setCurrentStep(5)}>
+                              <PrimaryButton onClick={() => handleContinueWithIgnoreCheck(5)}>
                                 Continue to Summary →
                               </PrimaryButton>
                             )}
@@ -1065,6 +1295,28 @@ function SupplierInvoiceReview() {
               </>
             )}
           </>
+        );
+
+      case 3:
+        // Step 3: Ignore Confirmation
+        const uncheckedItems3 = products.filter(p => !p.selected);
+
+        return (
+          <IgnoreItemsConfirmation
+            uncheckedItems={uncheckedItems3}
+            venueName={venueName}
+            supplierId={supplierId}
+            venueId={venueId}
+            onConfirm={() => {
+              // After confirming ignore, create invoice
+              handleCreateInvoice();
+            }}
+            onSkip={() => {
+              // Skip ignore confirmation, just create invoice
+              handleCreateInvoice();
+            }}
+            onCancel={() => setCurrentStep(2)}
+          />
         );
 
       case 4:
@@ -1116,11 +1368,13 @@ function SupplierInvoiceReview() {
                 invoiceNumber: invoiceNumber,
                 invoiceDate: invoiceDate,
                 totalAmount: products.filter(p => p.selected).reduce((sum, p) => sum + (p.unitCost * p.caseSize), 0),
-                lineItems: products.filter(p => p.selected),
+                lineItems: products,
                 venueName: venueName
               }}
               supplierMatchResults={supplierMatchResults}
               masterProductMatchResults={masterProductMatchResults}
+              ignoredItemsCount={products.filter(p => !p.selected).length}
+              systemIgnoredItemsCount={0}
               onConfirm={handleConfirmImport}
               onBack={() => setCurrentStep(4)}
               onEdit={() => setCurrentStep(2)}
@@ -1160,6 +1414,19 @@ function SupplierInvoiceReview() {
       </TestingTools>
 
       {renderStep()}
+
+      {/* Ignore Items Confirmation Modal */}
+      {showIgnoreConfirmation && uncheckedItemsForIgnore.length > 0 && (
+        <IgnoreItemsConfirmation
+          uncheckedItems={uncheckedItemsForIgnore}
+          venueName={venueName}
+          supplierId={parsedData?.supplier_id || null}
+          venueId={venueId}
+          onConfirm={handleIgnoreConfirmationConfirm}
+          onSkip={handleIgnoreConfirmationSkip}
+          onCancel={handleIgnoreConfirmationCancel}
+        />
+      )}
 
       {/* Duplicate Invoice Warning Dialog */}
       {showDuplicateWarning && duplicateInvoiceInfo && (

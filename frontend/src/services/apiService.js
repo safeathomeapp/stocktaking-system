@@ -640,6 +640,47 @@ export const apiService = {
     }
   },
 
+  // Venue Ignored Items
+  addVenueIgnoredItems: async (venueId, ignoredItemsData) => {
+    try {
+      const response = await api.post(`/api/venues/${venueId}/ignored-items`, ignoredItemsData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Add venue ignored items error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  getVenueIgnoredItems: async (venueId) => {
+    try {
+      const response = await api.get(`/api/venues/${venueId}/ignored-items`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get venue ignored items error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  removeVenueIgnoredItem: async (venueId, ignoredItemId) => {
+    try {
+      const response = await api.delete(`/api/venues/${venueId}/ignored-items/${ignoredItemId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Remove venue ignored item error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
+  checkVenueIgnoredItems: async (venueId, supplierId) => {
+    try {
+      const response = await api.get(`/api/venues/${venueId}/check-ignored-items/${supplierId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Check venue ignored items error:', error);
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  },
+
 };
 
 export default apiService;

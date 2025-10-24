@@ -3817,6 +3817,121 @@ app.get('/api/venues/:venueId/last-session-date', async (req, res) => {
   }
 });
 
+// ============================================================================
+// VENUE IGNORED ITEMS ENDPOINTS
+// ============================================================================
+
+// GET: List ignored items for a venue
+app.get('/api/venues/:venueId/ignored-items', async (req, res) => {
+  try {
+    const { venueId } = req.params;
+    const result = await pool.query(
+      `SELECT id, supplier_id, supplier_sku, product_name, ignore_reason, ignored_by, created_at
+       FROM venue_ignored_items
+       WHERE venue_id = $1
+       ORDER BY created_at DESC`,
+      [venueId]
+    );
+    res.json({
+      success: true,
+      ignoredItems: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching ignored items:', error);
+    res.status(500).json({ error: 'Failed to fetch ignored items' });
+  }
+});
+
+// POST: Add items to ignore list for a venue
+// Body: { venueId, supplierId, items: [{ supplierSku, productName, ignoreReason }] }
+app.post('/api/venues/:venueId/ignored-items', async (req, res) => {
+  try {
+    const { venueId } = req.params;
+    const { supplierId, items, ignoredBy } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Items array is required and must not be empty' });
+    }
+
+    const insertedItems = [];
+
+    for (const item of items) {
+      try {
+        const result = await pool.query(
+          `INSERT INTO venue_ignored_items
+           (venue_id, supplier_id, supplier_sku, product_name, ignore_reason, ignored_by)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (venue_id, supplier_id, supplier_sku)
+           DO UPDATE SET ignore_reason = EXCLUDED.ignore_reason, updated_at = CURRENT_TIMESTAMP
+           RETURNING id, product_name, supplier_sku`,
+          [venueId, supplierId, item.supplierSku, item.productName, item.ignoreReason || null, ignoredBy || null]
+        );
+        insertedItems.push(result.rows[0]);
+      } catch (error) {
+        console.error(`Error adding ignored item ${item.supplierSku}:`, error);
+        // Continue with other items even if one fails
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${insertedItems.length} items added to ignore list`,
+      ignoredItems: insertedItems
+    });
+  } catch (error) {
+    console.error('Error adding ignored items:', error);
+    res.status(500).json({ error: 'Failed to add ignored items' });
+  }
+});
+
+// DELETE: Remove item from ignore list
+app.delete('/api/venues/:venueId/ignored-items/:ignoredItemId', async (req, res) => {
+  try {
+    const { venueId, ignoredItemId } = req.params;
+    const result = await pool.query(
+      `DELETE FROM venue_ignored_items
+       WHERE id = $1 AND venue_id = $2
+       RETURNING id, product_name`,
+      [ignoredItemId, venueId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Ignored item not found' });
+    }
+
+    res.json({
+      success: true,
+      message: `Removed "${result.rows[0].product_name}" from ignore list`,
+      removedItem: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error removing ignored item:', error);
+    res.status(500).json({ error: 'Failed to remove ignored item' });
+  }
+});
+
+// GET: Check if supplier items should be ignored for a venue
+// Query params: ?supplierId=UUID
+app.get('/api/venues/:venueId/check-ignored-items/:supplierId', async (req, res) => {
+  try {
+    const { venueId, supplierId } = req.params;
+    const result = await pool.query(
+      `SELECT supplier_sku, product_name FROM venue_ignored_items
+       WHERE venue_id = $1 AND supplier_id = $2`,
+      [venueId, supplierId]
+    );
+
+    res.json({
+      success: true,
+      ignoredSkus: result.rows.map(row => row.supplier_sku),
+      ignoredProducts: result.rows
+    });
+  } catch (error) {
+    console.error('Error checking ignored items:', error);
+    res.status(500).json({ error: 'Failed to check ignored items' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Master Products API ready at /api/master-products`);

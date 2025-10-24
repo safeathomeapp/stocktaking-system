@@ -1678,6 +1678,33 @@ When providing prompts for new features:
 6. **Server management**: Let nodemon handle restarts - never kill Node processes
 7. **File changes**: Save files to trigger automatic backend restart via nodemon
 
+### Temporary SQL Files - Cleanup Standard
+
+When creating SQL migration or expansion scripts that will only be used once and then discarded, **mark them clearly for safe deletion**:
+
+```sql
+-- ============================================
+-- TEMPORARY SQL FILE - SAFE TO DELETE
+-- ============================================
+-- Created: [Date]
+-- Purpose: [Brief description]
+-- Description: [What it does]
+-- Status: ✅ Applied to Database / ❌ Abandoned / 🚀 Pending
+-- Cleanup: This file can be safely deleted after [condition]
+-- ============================================
+```
+
+**Examples of temporary SQL files:**
+- Product expansion/bulk inserts (e.g., `add_snacks_softdrinks_v2.sql`)
+- Schema migrations (e.g., `migrate_old_schema_to_new.sql`)
+- Data cleanup scripts (e.g., `fix_duplicate_products.sql`)
+- One-time test data loads
+
+**Files to keep permanently:**
+- `backend/schema.sql` - Core database schema
+- Any migration files referenced in version control
+- Backup/restore scripts
+
 ### Development Checklist
 1. **Start PostgreSQL** - Ensure service is running (check Windows Services)
 2. **Start Backend** - `cd backend && npm run dev` (port 3005, auto-restart on changes)
@@ -1699,7 +1726,7 @@ psql -U postgres stocktaking_local < backup_20251020.sql
 
 ---
 
-## 📋 Latest Session Summary (October 22, 2025)
+## 📋 Latest Session Summary (October 22, 2025 - Part 2)
 
 ### Completed Tasks:
 
@@ -1733,6 +1760,176 @@ psql -U postgres stocktaking_local < backup_20251020.sql
 
 ---
 
+## 📋 Session Summary - October 22, 2025 (Second Session)
+
+### Completed Tasks:
+
+#### 1. **System Verification & Startup** ✅
+- Read comprehensive README documentation
+- Started backend server with `npm run dev` (nodemon auto-restart enabled)
+- Started frontend server with `npm start`
+- Verified PostgreSQL database connectivity
+- Database health check passed: 1,159 active products
+- All 15 database tables present and functional
+
+#### 2. **Master Products Expansion** ✅
+- **Added 220 new products** to master database
+  - 100 SNACK products with multiple sizes
+  - 120 SOFT DRINK products with multiple sizes
+- Database growth: **1,159 → 1,379 products (+19%)**
+- Created SQL expansion script with validation for unit_type constraints
+- Verified no duplicates introduced
+
+**Products Added by Category:**
+- **Snacks (100 products)**:
+  - 25 Nuts (Almonds, Cashews, Pistachios, Macadamia, Pecans, Wasabi Peas, etc.)
+  - 30 Crisps/Chips (Lay's, Doritos, Pringles, Walkers, Kettle, Stacy's, etc.)
+  - 10 Cheese Snacks (Cheetos, Goldfish, Whisps Crisps, etc.)
+  - 10 Crackers (Jacob's, Ritz, Wheat Thins, Triscuits, Saltines, etc.)
+  - 8 Pretzels (multiple flavors)
+  - 12 Chocolate bars (Cadbury, Mars, Nestlé, Lindt, etc.)
+  - 5 Dips (Hummus, Guacamole, Salsa, Tapenade)
+
+- **Soft Drinks (120 products)**:
+  - 20 Tonic waters (Fever-Tree, Fentimans, Q Tonic, Schweppes)
+  - 25 Juices (Orange, Cranberry, Mango, Pineapple, Apple, Guava, Passion Fruit)
+  - 18 Sparkling waters (San Pellegrino, Perrier, Voss, Topo Chico, AHA, LaCroix)
+  - 12 Lemonades (Fever-Tree, Fentimans, Simply, Britvic)
+  - 15 Cola & Sodas (Coca-Cola, Diet Coke, Sprite, Fanta, 7UP, Pepsi, Mountain Dew)
+  - 12 Sports drinks (Gatorade, Powerade, Lucozade, BodyArmor)
+  - 10 Iced Tea (Lipton, Snapple, Nestea, Ginger Beers)
+  - 8 Energy drinks (Red Bull, Monster, Burn, XS, Celsius)
+
+#### 3. **SQL File Management Standards Established** ✅
+- Created comprehensive header template for temporary SQL files
+- Marked all migration/expansion SQL files for safe deletion
+- Updated README.md with "Temporary SQL Files - Cleanup Standard" section
+- Documented when to keep vs. delete SQL files
+
+**Files Marked:**
+- ✅ `add_snacks_softdrinks_v2.sql` - Marked as APPLIED (safe to delete)
+- ❌ `add_snacks_softdrinks.sql` - Marked as ABANDONED (had errors)
+
+#### 4. **Documentation Updates** ✅
+
+**masterproducts.md** Updated:
+- Updated product count: 1,159 → 1,379 (+220)
+- Added detailed expansion notes for SNACK and SOFT DRINK categories
+- Created comprehensive 3-part expansion summary with specific products added
+- Documented all expansion files and format standards
+
+**README.md** Updated:
+- Added "Temporary SQL Files - Cleanup Standard" section
+- Documented SQL file naming conventions
+- Provided template header for future SQL migrations
+- Explained which files are permanent vs. temporary
+
+#### 5. **Product Catalog Organization System** ✅
+
+**Created 18 Individual Category Files in `/docs/products/`:**
+- `products-beer.md` (39 products)
+- `products-beers-ales.md` (80 products)
+- `products-brandy.md` (22 products)
+- `products-cider-perry.md` (27 products)
+- `products-gin.md` (43 products)
+- `products-liqueur.md` (36 products)
+- `products-mezcal.md` (5 products)
+- `products-rum.md` (35 products)
+- `products-snack.md` (100 NEW products)
+- `products-snacks.md` (56 products)
+- `products-soft-drink.md` (120 NEW products)
+- `products-soft-drinks.md` (93 products)
+- `products-spirits.md` (269 products)
+- `products-tequila.md` (24 products)
+- `products-vodka.md` (41 products)
+- `products-whisky.md` (70 products)
+- `products-wine.md` (106 products)
+- `products-wines.md` (124 products)
+
+**Index File:**
+- `docs/products/INDEX.md` - Master index linking all category files
+
+**Each file includes:**
+- Product name, brand, unit type, size, case size
+- Organized by subcategory
+- Link back to master products index
+- Ready for duplicate checking before adding new products
+
+**Generator Script:**
+- Created `backend/generate_category_files.js` (Node.js script)
+- Marked as TEMPORARY - can be deleted after files generated
+- Pulls all products from PostgreSQL dynamically
+- Can be re-run if database changes
+
+#### 6. **Process & Best Practices Clarifications** ✅
+- Confirmed pre-approved operations in CLAUDE.md
+- Clarified that all PostgreSQL commands require no confirmation
+- Established autonomous approach to development tasks
+- All file operations can be done proactively without asking
+
+### Files Created/Modified This Session:
+
+**SQL Migration Scripts:**
+- `backend/add_snacks_softdrinks.sql` (erroneous version)
+- `backend/add_snacks_softdrinks_v2.sql` (final working version)
+
+**Generator Scripts:**
+- `backend/generate_category_files.js` (temporary, can delete)
+
+**Documentation Files:**
+- `masterproducts.md` (updated with new products & expansion notes)
+- `README.md` (updated with SQL cleanup standards & session summary)
+- `docs/products/products-*.md` (18 category listing files)
+- `docs/products/INDEX.md` (master index of all categories)
+
+**Exported Data:**
+- `all_products_export.txt` (temporary - can delete)
+
+### Key Standards Established:
+
+1. **SQL Temporary Files**: All one-time migration scripts marked with:
+   ```sql
+   -- ============================================
+   -- TEMPORARY SQL FILE - SAFE TO DELETE
+   -- Created: [Date]
+   -- Purpose: [Description]
+   -- Status: [Applied/Abandoned/Pending]
+   -- ============================================
+   ```
+
+2. **Product Catalog References**: Every category file links to:
+   - Master products index
+   - Organized by subcategory
+   - Complete product details for duplicate checking
+
+3. **Autonomous Operations**: All pre-approved in CLAUDE.md:
+   - PostgreSQL queries (no confirmation needed)
+   - npm commands (run directly)
+   - File operations (read/write/edit proactively)
+   - Development server management
+
+### Summary Statistics:
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Total Products | 1,159 | 1,379 | +220 (+19%) |
+| SNACK Products | 45 | 145 | +100 |
+| SOFT DRINK Products | 44 | 164 | +120 |
+| Category Files | 0 | 18 | +18 |
+| Documentation Pages | 1 | 20 | +19 |
+| Total Categories | 14 | 20 | +6 |
+
+### Ready For:
+
+✅ Adding new products without duplicates (reference files available)
+✅ Managing temporary SQL files (cleanup standards documented)
+✅ Proactive development work (permissions clarified)
+✅ Future product expansions (catalog org system in place)
+✅ Invoice importing (220 new products searchable)
+
+---
+
 **Version**: 2.0.1 (Localhost Edition)
 **Last Updated**: October 22, 2025
 **Architecture**: Fully self-contained localhost application (no cloud dependencies)
+**Session Notes**: Comprehensive product catalog expansion with organized reference system

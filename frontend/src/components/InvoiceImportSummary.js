@@ -5,17 +5,39 @@ const InvoiceImportSummary = ({
   invoiceData,
   supplierMatchResults,
   masterProductMatchResults,
+  ignoredItemsCount = 0,
+  systemIgnoredItemsCount = 0,
   onConfirm,
   onBack,
   onEdit
 }) => {
 
   // Calculate statistics
-  const totalLineItems = invoiceData?.lineItems?.length || 0;
-  const supplierMatched = supplierMatchResults?.matched || 0;
-  const supplierCreated = supplierMatchResults?.created || 0;
-  const masterProductMatched = masterProductMatchResults?.results?.filter(r => r.action === 'matched').length || 0;
-  const masterProductSkipped = masterProductMatchResults?.results?.filter(r => r.action === 'skipped').length || 0;
+  // Total items from original invoice (before any filtering)
+  const totalItems = invoiceData?.lineItems?.length || 0;
+
+  // Items that were imported (selected/checked in this session)
+  const itemsImported = ignoredItemsCount > 0 ? totalItems - ignoredItemsCount : totalItems;
+
+  // Items user ignored in this session (unchecked items)
+  const itemsUserIgnored = ignoredItemsCount || 0;
+
+  // Items system ignored (previously marked to ignore for this venue/supplier)
+  const itemsSystemIgnored = systemIgnoredItemsCount || 0;
+
+  // Supplier matching stats
+  const supplierMatches = supplierMatchResults?.results?.matched?.length || supplierMatchResults?.matched || 0;
+  const newSupplierMatches = supplierMatchResults?.results?.created?.length || supplierMatchResults?.created || 0;
+
+  // Master product linking stats
+  const masterProductsLinked = invoiceData?.lineItems?.filter(item => item.masterProductId || item.master_product_id).length || 0;
+  const newMasterProducts = masterProductMatchResults?.results?.filter(r => r.action === 'created').length || 0;
+
+  // Items skipped (items in invoice that failed to match or were intentionally skipped)
+  const itemsSkipped = itemsImported - masterProductsLinked;
+
+  // Completion rate (percentage of imported items linked to master products)
+  const completionRate = itemsImported > 0 ? Math.round((masterProductsLinked / itemsImported) * 100) : 0;
 
   const getStatusBadgeClass = (status) => {
     switch (status) {
@@ -74,7 +96,7 @@ const InvoiceImportSummary = ({
               </div>
               <div className="detail-item">
                 <strong>Total Items:</strong>
-                <span>{totalLineItems}</span>
+                <span>{totalItems}</span>
               </div>
               <div className="detail-item">
                 <strong>Venue:</strong>
@@ -87,19 +109,29 @@ const InvoiceImportSummary = ({
         {/* Statistics Cards */}
         <div className="summary-section">
           <h3>Import Statistics</h3>
-          <div className="stats-grid">
+
+          {/* Row 1: Item Counts */}
+          <div className="stats-row">
             <div className="stat-card stat-total">
               <div className="stat-icon">📦</div>
               <div className="stat-content">
-                <div className="stat-value">{totalLineItems}</div>
+                <div className="stat-value">{totalItems}</div>
                 <div className="stat-label">Total Items</div>
+              </div>
+            </div>
+
+            <div className="stat-card stat-imported">
+              <div className="stat-icon">📥</div>
+              <div className="stat-content">
+                <div className="stat-value">{itemsImported}</div>
+                <div className="stat-label">Items Imported</div>
               </div>
             </div>
 
             <div className="stat-card stat-matched">
               <div className="stat-icon">✓</div>
               <div className="stat-content">
-                <div className="stat-value">{supplierMatched}</div>
+                <div className="stat-value">{supplierMatches}</div>
                 <div className="stat-label">Supplier Matches</div>
               </div>
             </div>
@@ -107,23 +139,53 @@ const InvoiceImportSummary = ({
             <div className="stat-card stat-created">
               <div className="stat-icon">+</div>
               <div className="stat-content">
-                <div className="stat-value">{supplierCreated}</div>
-                <div className="stat-label">New Supplier Items</div>
+                <div className="stat-value">{newSupplierMatches}</div>
+                <div className="stat-label">New Supplier Matches</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Ignore & Master Product Stats */}
+          <div className="stats-row">
+            <div className="stat-card stat-ignored-user">
+              <div className="stat-icon">👤</div>
+              <div className="stat-content">
+                <div className="stat-value">{itemsUserIgnored}</div>
+                <div className="stat-label">Items User Ignored</div>
+              </div>
+            </div>
+
+            <div className="stat-card stat-ignored-system">
+              <div className="stat-icon">⚙️</div>
+              <div className="stat-content">
+                <div className="stat-value">{itemsSystemIgnored}</div>
+                <div className="stat-label">Items System Ignored</div>
               </div>
             </div>
 
             <div className="stat-card stat-master-matched">
               <div className="stat-icon">🔗</div>
               <div className="stat-content">
-                <div className="stat-value">{masterProductMatched}</div>
+                <div className="stat-value">{masterProductsLinked}</div>
                 <div className="stat-label">Master Products Linked</div>
               </div>
             </div>
 
+            <div className="stat-card stat-master-new">
+              <div className="stat-icon">✨</div>
+              <div className="stat-content">
+                <div className="stat-value">{newMasterProducts}</div>
+                <div className="stat-label">New Master Products</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 3: Completion Stats */}
+          <div className="stats-row">
             <div className="stat-card stat-skipped">
               <div className="stat-icon">⊗</div>
               <div className="stat-content">
-                <div className="stat-value">{masterProductSkipped}</div>
+                <div className="stat-value">{itemsSkipped}</div>
                 <div className="stat-label">Items Skipped</div>
               </div>
             </div>
@@ -131,9 +193,7 @@ const InvoiceImportSummary = ({
             <div className="stat-card stat-completion">
               <div className="stat-icon">📊</div>
               <div className="stat-content">
-                <div className="stat-value">
-                  {totalLineItems > 0 ? Math.round((masterProductMatched / totalLineItems) * 100) : 0}%
-                </div>
+                <div className="stat-value">{completionRate}%</div>
                 <div className="stat-label">Completion Rate</div>
               </div>
             </div>
@@ -177,7 +237,7 @@ const InvoiceImportSummary = ({
         )}
 
         {/* Warnings */}
-        {masterProductSkipped > 0 && (
+        {itemsSkipped > 0 && (
           <div className="summary-section">
             <div className="warning-card">
               <div className="warning-header">
@@ -185,7 +245,7 @@ const InvoiceImportSummary = ({
                 <h4>Attention Required</h4>
               </div>
               <p>
-                {masterProductSkipped} item{masterProductSkipped !== 1 ? 's were' : ' was'} skipped during matching.
+                {itemsSkipped} item{itemsSkipped !== 1 ? 's were' : ' was'} skipped during matching.
                 These items will be stored in the invoice but won't have master product links.
                 You can match them manually later from the invoice details page.
               </p>
@@ -194,7 +254,7 @@ const InvoiceImportSummary = ({
         )}
 
         {/* Success Message */}
-        {masterProductSkipped === 0 && totalLineItems > 0 && (
+        {itemsSkipped === 0 && itemsImported > 0 && (
           <div className="summary-section">
             <div className="success-card">
               <div className="success-header">
@@ -202,7 +262,7 @@ const InvoiceImportSummary = ({
                 <h4>Perfect Match!</h4>
               </div>
               <p>
-                All {totalLineItems} items have been successfully matched to master products.
+                All {itemsImported} items have been successfully matched to master products.
                 This invoice is ready to be imported into your system.
               </p>
             </div>
