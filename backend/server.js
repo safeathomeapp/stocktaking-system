@@ -2126,10 +2126,8 @@ async function parseSupplierInvoicePDF(buffer) {
       const startsWithSixDigits = /^\d{6}/.test(lines[i]);
       if (startsWithSixDigits) {
         productLineIndices.push(i);
-        console.log(`Line ${i} starts with 6 digits: ${lines[i].substring(0, 50)}`);
       }
     }
-    console.log(`Total product lines found: ${productLineIndices.length}`);
 
     // Second pass: find all category headers with their line indices and metadata
     // Format: "CATEGORY_NAME SUB-TOTAL : ITEMS X GOODS : £YYYYYY.YY" or starts with known category
@@ -2332,18 +2330,6 @@ async function parseSupplierInvoicePDF(buffer) {
     }
 
     console.log(`Parsed ${products.length} products from invoice`);
-    console.log('SKUs parsed:', products.map(p => p.sku).join(', '));
-
-    // Log products that start with specific SKUs for debugging
-    const skusToDebug = ['212311', '256375', '147180', '097149', '097153'];
-    for (const sku of skusToDebug) {
-      const found = products.find(p => p.sku === sku);
-      if (found) {
-        console.log(`✓ SKU ${sku} FOUND: ${found.name}`);
-      } else {
-        console.log(`✗ SKU ${sku} NOT FOUND`);
-      }
-    }
 
     // Build categories array in PDF order with product counts
     // This metadata is used in Step 2 to organize products by category

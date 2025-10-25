@@ -639,9 +639,6 @@ function SupplierInvoiceReview() {
 
       // Filter out previously ignored items for this supplier/venue
       const supplierName = data.data.supplier;
-      const invoiceNumber = data.data.invoiceNumber;
-      console.log('DEBUG: Invoice number extracted from PDF:', invoiceNumber);
-      console.log('DEBUG: Supplier name extracted from PDF:', supplierName);
       let filteredProducts = data.data.products;
       let hiddenCount = 0;
 
@@ -658,7 +655,6 @@ function SupplierInvoiceReview() {
             );
             if (matchedSupplier) {
               supplierId = matchedSupplier.sup_id;
-              console.log('DEBUG: Matched supplier ID:', supplierId, 'Name:', matchedSupplier.sup_name);
             }
           }
         } catch (err) {
@@ -681,22 +677,12 @@ function SupplierInvoiceReview() {
               const normalizedIgnoredSkus = normalizeSkus(ignoredSkus);
               const ignoredByCategory = {};
 
-              console.log('DEBUG: Total products from API:', data.data.products.length);
-              console.log('DEBUG: Normalized ignored SKUs:', normalizedIgnoredSkus);
-
               for (const product of data.data.products) {
                 const normalizedProductSku = String(product.sku).trim();
-                if (normalizedIgnoredSkus.includes(normalizedProductSku)) {
-                  console.log(`DEBUG: SKU ${normalizedProductSku} MATCHED, category: ${product.category}`);
-                  if (product.category) {
-                    ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
-                  } else {
-                    console.log(`DEBUG: SKU ${normalizedProductSku} MATCHED but NO CATEGORY assigned!`);
-                  }
+                if (normalizedIgnoredSkus.includes(normalizedProductSku) && product.category) {
+                  ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
                 }
               }
-              console.log('DEBUG: ignoredByCategory map:', ignoredByCategory);
-              console.log('DEBUG: Category names from PDF:', data.data.categories?.map(c => c.name) || []);
 
               // Now filter the products (using normalized SKUs)
               filteredProducts = data.data.products.filter(
@@ -711,7 +697,6 @@ function SupplierInvoiceReview() {
                   ...cat,
                   ignoredCount: ignoredByCategory[cat.name] || 0
                 }));
-                console.log('DEBUG: Updated categories with ignoredCount:', updatedCategories);
                 data.data.categories = updatedCategories;
               }
             }
