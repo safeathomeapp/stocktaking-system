@@ -675,6 +675,8 @@ function SupplierInvoiceReview() {
                   ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
                 }
               }
+              console.log('DEBUG: ignoredByCategory map:', ignoredByCategory);
+              console.log('DEBUG: Category names from PDF:', data.data.categories?.map(c => c.name) || []);
 
               // Now filter the products
               filteredProducts = data.data.products.filter(
@@ -689,6 +691,7 @@ function SupplierInvoiceReview() {
                   ...cat,
                   ignoredCount: ignoredByCategory[cat.name] || 0
                 }));
+                console.log('DEBUG: Updated categories with ignoredCount:', updatedCategories);
                 data.data.categories = updatedCategories;
               }
             }
