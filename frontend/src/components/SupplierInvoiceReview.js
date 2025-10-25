@@ -681,16 +681,22 @@ function SupplierInvoiceReview() {
               const normalizedIgnoredSkus = normalizeSkus(ignoredSkus);
               const ignoredByCategory = {};
 
+              console.log('DEBUG: Total products from API:', data.data.products.length);
+              console.log('DEBUG: Normalized ignored SKUs:', normalizedIgnoredSkus);
+
               for (const product of data.data.products) {
                 const normalizedProductSku = String(product.sku).trim();
-                if (normalizedIgnoredSkus.includes(normalizedProductSku) && product.category) {
-                  ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
+                if (normalizedIgnoredSkus.includes(normalizedProductSku)) {
+                  console.log(`DEBUG: SKU ${normalizedProductSku} MATCHED, category: ${product.category}`);
+                  if (product.category) {
+                    ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
+                  } else {
+                    console.log(`DEBUG: SKU ${normalizedProductSku} MATCHED but NO CATEGORY assigned!`);
+                  }
                 }
               }
               console.log('DEBUG: ignoredByCategory map:', ignoredByCategory);
               console.log('DEBUG: Category names from PDF:', data.data.categories?.map(c => c.name) || []);
-              console.log('DEBUG: Sample ignored SKUs (first 5):', normalizedIgnoredSkus.slice(0, 5));
-              console.log('DEBUG: Sample product SKUs (first 5):', data.data.products.slice(0, 5).map(p => String(p.sku).trim()));
 
               // Now filter the products (using normalized SKUs)
               filteredProducts = data.data.products.filter(
