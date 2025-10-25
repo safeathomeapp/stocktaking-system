@@ -307,8 +307,10 @@ function CategoryProductsDisplay({
               <CategoryLabel>
                 <span className="category-name">{category.name}</span>
                 <span className="category-meta">
-                  ({categoryProducts.length} items)
-                  {category.ignoredCount > 0 && ` • ${category.ignoredCount} ignored`}
+                  (
+                  {categoryProducts.length - (category.ignoredCount || 0)} items
+                  {category.ignoredCount > 0 && ` - ${category.ignoredCount} system ignored`}
+                  )
                   {category.subtotal && ` • £${category.subtotal.toFixed(2)}`}
                 </span>
               </CategoryLabel>
