@@ -2105,6 +2105,7 @@ async function parseSupplierInvoicePDF(buffer) {
       'WINES SPIRITS BEERS',
       'WINE SPIRITS BEERS',
       'FRUIT & VEG',
+      'FRUIT&VEG',  // Also match without spaces
       'FRUIT AND VEG',
       'NON-FOOD',
       'GROCERY',
@@ -2177,9 +2178,14 @@ async function parseSupplierInvoicePDF(buffer) {
       }
 
       if (categoryMatch && categoryMatch.length >= 2) {
-        const categoryName = categoryMatch[1].trim();
+        let categoryName = categoryMatch[1].trim();
         const itemCount = categoryMatch[2] ? parseInt(categoryMatch[2]) : 0;
         const subtotal = categoryMatch[3] ? parseFloat(categoryMatch[3]) : 0;
+
+        // Normalize category names (handle spacing inconsistencies)
+        categoryName = categoryName.replace(/FRUIT\s*&\s*VEG/i, 'FRUIT & VEG');
+        categoryName = categoryName.replace(/FRUIT\s+AND\s+VEG/i, 'FRUIT & VEG');
+        categoryName = categoryName.toUpperCase();
 
         // Only treat as category if name is reasonable (avoid duplicates, numbers at start)
         if (categoryName.length > 2 && categoryName.length < 60 && !categoryName.match(/^\d/)) {
