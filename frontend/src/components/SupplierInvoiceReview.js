@@ -399,8 +399,9 @@ function SupplierInvoiceReview() {
 
   // Category support (from PDF parser)
   // Categories enable hierarchical product display with parent/child checkbox logic
-  const [categories, setCategories] = useState([]); // Array of {name, itemCount, subtotal}
+  const [categories, setCategories] = useState([]); // Array of {name, itemCount, subtotal, ignoredCount}
   const [hasCategories, setHasCategories] = useState(false); // Flag to show/hide category features
+  const [ignoredItemsByCategory, setIgnoredItemsByCategory] = useState({}); // Map of categoryName -> count
 
   // Step 2: Invoice metadata
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -443,6 +444,51 @@ function SupplierInvoiceReview() {
     }
     loadVenue();
   }, [venueId]);
+
+  // Query and count ignored items by category when supplierId changes
+  useEffect(() => {
+    if (!supplierId || !venueId || categories.length === 0) {
+      return; // Need all three to calculate ignored counts
+    }
+
+    const queryIgnoredItems = async () => {
+      try {
+        // Fetch ignored items for this venue
+        const response = await apiService.get(`/venues/${venueId}/ignored-items`);
+
+        if (response.success && response.data && Array.isArray(response.data)) {
+          // Build a map of category -> count of ignored items
+          const ignoredByCategory = {};
+
+          // For each ignored item, find which category it belongs to
+          for (const ignoredItem of response.data) {
+            // Find the product in our products array that matches this ignored SKU
+            const product = products.find(p => p.sku === ignoredItem.product_sku);
+
+            if (product && product.category) {
+              // Increment count for this category
+              ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
+            }
+          }
+
+          // Update categories array to include ignored count
+          setIgnoredItemsByCategory(ignoredByCategory);
+
+          // Add ignored count to categories
+          const updatedCategories = categories.map(cat => ({
+            ...cat,
+            ignoredCount: ignoredByCategory[cat.name] || 0
+          }));
+          setCategories(updatedCategories);
+        }
+      } catch (err) {
+        console.warn('Error querying ignored items:', err);
+        // Continue without ignored counts - not critical
+      }
+    };
+
+    queryIgnoredItems();
+  }, [supplierId, venueId, categories.length]); // Re-run if these change
 
   // Look up or create supplier when supplier name is known
   useEffect(() => {

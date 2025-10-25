@@ -20,10 +20,18 @@ import PartialStateCheckbox from './PartialStateCheckbox';
  * - Full keyboard accessibility
  *
  * PROPS:
- * - categories: Array of category objects {name, itemCount, subtotal}
+ * - categories: Array of category objects {name, itemCount, subtotal, ignoredCount}
  * - products: Array of products with category field assigned
  * - onProductToggle: Callback when product checkbox changes
  * - onCategoryToggle: Callback when category checkbox changes
+ *
+ * CATEGORY OBJECT STRUCTURE:
+ * {
+ *   name: string,                // Category name (e.g., "RETAIL GROCERY")
+ *   itemCount: number,          // Total products in this category
+ *   subtotal: number,           // Category total from PDF (£)
+ *   ignoredCount: number        // Count of previously ignored items in this category
+ * }
  *
  * STYLING:
  * - Category headers with distinctive styling and collapse icon
@@ -300,6 +308,7 @@ function CategoryProductsDisplay({
                 <span className="category-name">{category.name}</span>
                 <span className="category-meta">
                   ({categoryProducts.length} items)
+                  {category.ignoredCount > 0 && ` • ${category.ignoredCount} ignored`}
                   {category.subtotal && ` • £${category.subtotal.toFixed(2)}`}
                 </span>
               </CategoryLabel>
