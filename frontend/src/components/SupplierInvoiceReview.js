@@ -445,10 +445,10 @@ function SupplierInvoiceReview() {
     loadVenue();
   }, [venueId]);
 
-  // Query and count ignored items by category when supplierId changes
+  // Query and count ignored items by category when supplierId or products change
   useEffect(() => {
-    if (!supplierId || !venueId || categories.length === 0) {
-      return; // Need all three to calculate ignored counts
+    if (!supplierId || !venueId || categories.length === 0 || products.length === 0) {
+      return; // Need all of these to calculate ignored counts
     }
 
     const queryIgnoredItems = async () => {
@@ -457,6 +457,8 @@ function SupplierInvoiceReview() {
         const response = await apiService.get(`/venues/${venueId}/ignored-items`);
 
         if (response.success && response.data && Array.isArray(response.data)) {
+          console.log(`Found ${response.data.length} ignored items for venue ${venueId}`);
+
           // Build a map of category -> count of ignored items
           const ignoredByCategory = {};
 
@@ -468,8 +470,13 @@ function SupplierInvoiceReview() {
             if (product && product.category) {
               // Increment count for this category
               ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
+              console.log(`Ignored item ${ignoredItem.product_sku} belongs to category: ${product.category}`);
+            } else if (ignoredItem.product_sku) {
+              console.warn(`Could not find product for ignored SKU: ${ignoredItem.product_sku}`);
             }
           }
+
+          console.log('Ignored items by category:', ignoredByCategory);
 
           // Update categories array to include ignored count
           setIgnoredItemsByCategory(ignoredByCategory);
@@ -479,7 +486,10 @@ function SupplierInvoiceReview() {
             ...cat,
             ignoredCount: ignoredByCategory[cat.name] || 0
           }));
+          console.log('Updated categories with ignored counts:', updatedCategories);
           setCategories(updatedCategories);
+        } else {
+          console.log('No ignored items found for this venue');
         }
       } catch (err) {
         console.warn('Error querying ignored items:', err);
@@ -488,7 +498,7 @@ function SupplierInvoiceReview() {
     };
 
     queryIgnoredItems();
-  }, [supplierId, venueId, categories.length]); // Re-run if these change
+  }, [supplierId, venueId, products.length]); // Re-run when products are loaded
 
   // Look up or create supplier when supplier name is known
   useEffect(() => {
