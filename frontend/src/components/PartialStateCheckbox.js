@@ -70,14 +70,14 @@ const CheckboxBox = styled.div`
   `}
 
   /* Hover effect for unchecked state */
-  ${!props.checked && !props.partial && `
+  ${props => !props.checked && !props.partial && `
     &:hover {
       border-color: #999;
     }
   `}
 
   /* Hover effect for checked/partial state */
-  ${(props.checked || props.partial) && `
+  ${props => (props.checked || props.partial) && `
     &:hover {
       box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
     }
