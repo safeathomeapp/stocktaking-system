@@ -2090,8 +2090,114 @@ async function parseSupplierInvoicePDF(buffer) {
       }
     }
 
+    // === CATEGORY EXTRACTION (BOOKER-SPECIFIC) ===
+    // Booker invoices organize products into categories with headers
+    // Category headers appear before their products and contain category name + subtotal info
+    // Examples: "TOBACCO", "RETAIL GROCERY", "WINES SPIRITS BEERS", etc.
+
+    // Common Booker categories - use as reference for detection
+    const KNOWN_CATEGORIES = [
+      'TOBACCO',
+      'RETAIL GROCERY',
+      'CATERING GROCERY',
+      'CONFECTIONERY',
+      'WINES SPIRITS BEERS',
+      'WINE SPIRITS BEERS',
+      'FRUIT & VEG',
+      'FRUIT AND VEG',
+      'NON-FOOD',
+      'GROCERY',
+      'BEVERAGES',
+      'SPIRITS',
+      'WINE',
+      'BEER',
+      'SOFT DRINKS',
+      'FROZEN FOOD',
+      'FRESH FOOD',
+      'DAIRY',
+      'BAKERY'
+    ];
+
+    const categoryMap = {}; // Track category metadata: name, itemCount, subtotal
+    let currentCategory = 'UNCATEGORIZED'; // Default category for products before any header
+    const categoryOrder = []; // Preserve PDF order of categories
+
+    // First pass: identify all product line indices
+    const productLineIndices = [];
+    for (let i = 0; i < lines.length; i++) {
+      const startsWithSixDigits = /^\d{6}/.test(lines[i]);
+      if (startsWithSixDigits) {
+        productLineIndices.push(i);
+      }
+    }
+
+    // Second pass: detect category headers using multiple pattern matching strategies
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const startsWithSixDigits = /^\d{6}/.test(line);
+
+      // Skip if it's a product line
+      if (startsWithSixDigits) {
+        continue;
+      }
+
+      // Skip if it's in the header section (before first product)
+      if (productLineIndices.length === 0 || i < productLineIndices[0]) {
+        continue;
+      }
+
+      // Skip if it's after last product
+      if (i > productLineIndices[productLineIndices.length - 1]) {
+        continue;
+      }
+
+      // Detect category headers using multiple patterns
+      // Pattern 1: LINE WITH SUB-TOTAL KEYWORD
+      // Format: "CATEGORY_NAME    SUB-TOTAL : ITEMS X GOODS : YYYYYY.YY [EXC.VAT]"
+      let categoryMatch = line.match(/^([A-Z\s&\-]+?)\s+SUB-TOTAL\s*:\s*ITEMS\s+(\d+)\s+GOODS\s*:\s*([\d.]+)/i);
+
+      // Pattern 2: KNOWN CATEGORY KEYWORD (case-insensitive)
+      // If line starts with a known category, treat it as a category header
+      if (!categoryMatch) {
+        for (const knownCat of KNOWN_CATEGORIES) {
+          if (line.toUpperCase().startsWith(knownCat.toUpperCase())) {
+            const categoryName = knownCat;
+
+            // Try to extract item count and subtotal from the line
+            // Format variants: number spaces price OR ITEMS X GOODS Y format
+            const statsMatch = line.match(/(?:ITEMS?\s+(\d+)|\b(\d+)\b)\s+(?:GOODS\s*:\s*)?([\d.]+)/i);
+            const itemCount = statsMatch ? parseInt(statsMatch[1] || statsMatch[2]) : 0;
+            const subtotal = statsMatch ? parseFloat(statsMatch[3]) : 0;
+
+            categoryMatch = [line, categoryName, itemCount.toString(), subtotal.toString()];
+            break;
+          }
+        }
+      }
+
+      if (categoryMatch && categoryMatch.length >= 2) {
+        const categoryName = categoryMatch[1].trim();
+        const itemCount = categoryMatch[2] ? parseInt(categoryMatch[2]) : 0;
+        const subtotal = categoryMatch[3] ? parseFloat(categoryMatch[3]) : 0;
+
+        // Only treat as category if not already seen and name is reasonable
+        if (!categoryMap[categoryName] && categoryName.length > 2 && categoryName.length < 60 && !categoryName.match(/^\d/)) {
+          // This is a new category header (avoid numbers at start of name)
+          currentCategory = categoryName;
+          categoryMap[categoryName] = {
+            name: categoryName,
+            itemCount: itemCount,
+            subtotal: subtotal
+          };
+          categoryOrder.push(categoryName);
+          console.log(`Detected category: "${categoryName}" (${itemCount} items, subtotal: ${subtotal})`);
+        }
+      }
+    }
+
     // === PRODUCT EXTRACTION (BOOKER-SPECIFIC) ===
     const products = [];
+    currentCategory = 'UNCATEGORIZED'; // Reset for product parsing
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -2100,7 +2206,28 @@ async function parseSupplierInvoicePDF(buffer) {
       const startsWithSixDigits = /^\d{6}/.test(line);
 
       if (!startsWithSixDigits) {
-        continue; // Skip lines that don't start with 6 digits (headers, etc.)
+        // Check if this line is a category header and update currentCategory
+        // Pattern 1: Line with SUB-TOTAL keyword
+        let categoryMatch = line.match(/^([A-Z\s&\-]+?)\s+SUB-TOTAL\s*:\s*ITEMS\s+(\d+)\s+GOODS\s*:\s*([\d.]+)/i);
+
+        // Pattern 2: Known category keyword
+        if (!categoryMatch) {
+          for (const knownCat of KNOWN_CATEGORIES) {
+            if (line.toUpperCase().startsWith(knownCat.toUpperCase())) {
+              categoryMatch = true; // Mark as found
+              currentCategory = knownCat;
+              break;
+            }
+          }
+        } else if (categoryMatch) {
+          // Extract category name from regex match
+          const categoryName = categoryMatch[1].trim();
+          if (!categoryName.match(/^\d/)) {
+            currentCategory = categoryName;
+          }
+        }
+
+        continue; // Skip non-product lines
       }
 
       // Look for lines with price patterns (e.g., "£12.50" or "12.50")
@@ -2188,6 +2315,7 @@ async function parseSupplierInvoicePDF(buffer) {
         productName = productName.replace(/\s+\d+(?:ml|g|cl|l|kg|s|pk|cm)\b/i, '').trim();
 
         if (productName.length > 2) {
+          // Add product with category assignment
           products.push({
             sku: sku,
             name: productName,
@@ -2196,6 +2324,7 @@ async function parseSupplierInvoicePDF(buffer) {
             packSize: packSize,
             unitCost: unitPrice,
             caseSize: quantity,
+            category: currentCategory, // NEW: Assign product to its category
             selected: true // Default to selected
           });
         }
@@ -2204,6 +2333,23 @@ async function parseSupplierInvoicePDF(buffer) {
 
     console.log(`Parsed ${products.length} products from invoice`);
 
+    // Build categories array in PDF order with product counts
+    // This metadata is used in Step 2 to organize products by category
+    const categoriesList = categoryOrder.map(categoryName => {
+      const metadata = categoryMap[categoryName];
+      const productsInCategory = products.filter(p => p.category === categoryName);
+      return {
+        name: categoryName,
+        itemCount: productsInCategory.length, // Actual count from parsing
+        subtotal: metadata.subtotal // From PDF header
+      };
+    });
+
+    // Log category extraction results
+    if (categoriesList.length > 0) {
+      console.log(`Detected ${categoriesList.length} categories:`, categoriesList.map(c => `${c.name} (${c.itemCount} items)`).join(', '));
+    }
+
     return {
       supplierName: supplierName || 'Unknown Supplier',
       invoiceNumber: invoiceNumber,
@@ -2211,6 +2357,8 @@ async function parseSupplierInvoicePDF(buffer) {
       customerNumber: customerNumber,
       deliveryNumber: deliveryNumber,
       products: products,
+      categories: categoriesList, // NEW: Category metadata for Step 2 UI
+      hasCategories: categoriesList.length > 0, // NEW: Flag to indicate if categories were detected
       totalPages: pdfData.total || 1
     };
 
@@ -2242,6 +2390,8 @@ app.post('/api/invoices/parse-supplier-pdf', upload.single('pdf'), async (req, r
         customerNumber: parsedData.customerNumber,
         deliveryNumber: parsedData.deliveryNumber,
         products: parsedData.products,
+        categories: parsedData.categories, // NEW: Category metadata
+        hasCategories: parsedData.hasCategories, // NEW: Flag for UI to show/hide category features
         totalPages: parsedData.totalPages,
         totalProducts: parsedData.products.length
       }
