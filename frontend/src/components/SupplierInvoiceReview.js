@@ -457,23 +457,23 @@ function SupplierInvoiceReview() {
         const response = await fetch(`/api/venues/${venueId}/ignored-items`);
         const ignoredItemsData = await response.json();
 
-        if (response.ok && ignoredItemsData && Array.isArray(ignoredItemsData)) {
-          console.log(`Found ${ignoredItemsData.length} ignored items for venue ${venueId}`);
+        if (response.ok && ignoredItemsData && ignoredItemsData.ignoredItems && Array.isArray(ignoredItemsData.ignoredItems)) {
+          console.log(`Found ${ignoredItemsData.ignoredItems.length} ignored items for venue ${venueId}`);
 
           // Build a map of category -> count of ignored items
           const ignoredByCategory = {};
 
           // For each ignored item, find which category it belongs to
-          for (const ignoredItem of ignoredItemsData) {
+          for (const ignoredItem of ignoredItemsData.ignoredItems) {
             // Find the product in our products array that matches this ignored SKU
-            const product = products.find(p => p.sku === ignoredItem.product_sku);
+            const product = products.find(p => p.sku === ignoredItem.supplier_sku);
 
             if (product && product.category) {
               // Increment count for this category
               ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
-              console.log(`Ignored item ${ignoredItem.product_sku} belongs to category: ${product.category}`);
-            } else if (ignoredItem.product_sku) {
-              console.warn(`Could not find product for ignored SKU: ${ignoredItem.product_sku}`);
+              console.log(`Ignored item ${ignoredItem.supplier_sku} belongs to category: ${product.category}`);
+            } else if (ignoredItem.supplier_sku) {
+              console.warn(`Could not find product for ignored SKU: ${ignoredItem.supplier_sku}`);
             }
           }
 
