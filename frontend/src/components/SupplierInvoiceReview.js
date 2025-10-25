@@ -673,18 +673,28 @@ function SupplierInvoiceReview() {
             const ignoredSkus = ignoredResponse.data?.ignoredSkus || [];
             if (ignoredSkus.length > 0) {
               // Calculate ignored count by category BEFORE filtering products
+              // Handle SKU format mismatch (padding, leading zeros, etc.)
+              const normalizeSkus = (skus) => {
+                return skus.map(sku => String(sku).trim());
+              };
+
+              const normalizedIgnoredSkus = normalizeSkus(ignoredSkus);
               const ignoredByCategory = {};
+
               for (const product of data.data.products) {
-                if (ignoredSkus.includes(product.sku) && product.category) {
+                const normalizedProductSku = String(product.sku).trim();
+                if (normalizedIgnoredSkus.includes(normalizedProductSku) && product.category) {
                   ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
                 }
               }
               console.log('DEBUG: ignoredByCategory map:', ignoredByCategory);
               console.log('DEBUG: Category names from PDF:', data.data.categories?.map(c => c.name) || []);
+              console.log('DEBUG: Sample ignored SKUs (first 5):', normalizedIgnoredSkus.slice(0, 5));
+              console.log('DEBUG: Sample product SKUs (first 5):', data.data.products.slice(0, 5).map(p => String(p.sku).trim()));
 
-              // Now filter the products
+              // Now filter the products (using normalized SKUs)
               filteredProducts = data.data.products.filter(
-                p => !ignoredSkus.includes(p.sku)
+                p => !normalizedIgnoredSkus.includes(String(p.sku).trim())
               );
               hiddenCount = data.data.products.length - filteredProducts.length;
               setIgnoredProductSkus(ignoredSkus);
