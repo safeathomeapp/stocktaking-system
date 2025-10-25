@@ -668,11 +668,29 @@ function SupplierInvoiceReview() {
             // API wraps response under 'data' property
             const ignoredSkus = ignoredResponse.data?.ignoredSkus || [];
             if (ignoredSkus.length > 0) {
+              // Calculate ignored count by category BEFORE filtering products
+              const ignoredByCategory = {};
+              for (const product of data.data.products) {
+                if (ignoredSkus.includes(product.sku) && product.category) {
+                  ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
+                }
+              }
+
+              // Now filter the products
               filteredProducts = data.data.products.filter(
                 p => !ignoredSkus.includes(p.sku)
               );
               hiddenCount = data.data.products.length - filteredProducts.length;
               setIgnoredProductSkus(ignoredSkus);
+
+              // Update categories with ignored counts calculated from ORIGINAL products
+              if (data.data.categories && Array.isArray(data.data.categories)) {
+                const updatedCategories = data.data.categories.map(cat => ({
+                  ...cat,
+                  ignoredCount: ignoredByCategory[cat.name] || 0
+                }));
+                data.data.categories = updatedCategories;
+              }
             }
           }
         }
