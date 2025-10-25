@@ -5,6 +5,7 @@ import apiService from '../services/apiService';
 import MasterProductMatcher from './MasterProductMatcher';
 import InvoiceImportSummary from './InvoiceImportSummary';
 import IgnoreItemsConfirmation from './IgnoreItemsConfirmation';
+import CategoryProductsDisplay from './CategoryProductsDisplay';
 import API_BASE_URL from '../config/api';
 
 const Container = styled.div`
@@ -396,6 +397,11 @@ function SupplierInvoiceReview() {
   const [products, setProducts] = useState([]);
   const [supplierName, setSupplierName] = useState('');
 
+  // Category support (from PDF parser)
+  // Categories enable hierarchical product display with parent/child checkbox logic
+  const [categories, setCategories] = useState([]); // Array of {name, itemCount, subtotal}
+  const [hasCategories, setHasCategories] = useState(false); // Flag to show/hide category features
+
   // Step 2: Invoice metadata
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -618,6 +624,18 @@ function SupplierInvoiceReview() {
       // Always set hiddenProductsCount (even if 0) to reset from previous imports
       setHiddenProductsCount(hiddenCount);
       setProducts(filteredProducts);
+
+      // Extract and store categories from parsed data (if available)
+      // Categories enable hierarchical product display with collapsible groups
+      if (data.data.categories && Array.isArray(data.data.categories) && data.data.categories.length > 0) {
+        setCategories(data.data.categories);
+        setHasCategories(true);
+        console.log(`Loaded ${data.data.categories.length} categories from PDF`);
+      } else {
+        setCategories([]);
+        setHasCategories(false);
+      }
+
       setSuccess(`Successfully parsed ${filteredProducts.length} products from ${file.name}${hiddenCount > 0 ? ` (${hiddenCount} previously ignored)` : ''}`);
 
     } catch (err) {
@@ -628,12 +646,36 @@ function SupplierInvoiceReview() {
     }
   };
 
+  /**
+   * Toggle individual product selection
+   * If categories exist, this also updates category parent checkbox state
+   */
   const toggleProduct = (index) => {
     setProducts(products.map((p, i) =>
       i === index ? { ...p, selected: !p.selected } : p
     ));
   };
 
+  /**
+   * Toggle all products in a specific category
+   * When category checkbox is clicked, all products in that category are toggled
+   *
+   * LOGIC:
+   * - Find all products with matching category name
+   * - Set their selected state to the provided newState
+   * - Maintains hierarchical structure
+   */
+  const toggleCategory = (categoryName, newState) => {
+    setProducts(products.map(p =>
+      p.category === categoryName ? { ...p, selected: newState } : p
+    ));
+  };
+
+  /**
+   * Toggle all products (Select All / Deselect All buttons)
+   * Only available when categories are NOT being used
+   * When categories are present, use toggleCategory instead for granular control
+   */
   const toggleAll = (selected) => {
     setProducts(products.map(p => ({ ...p, selected })));
   };
@@ -1135,13 +1177,20 @@ function SupplierInvoiceReview() {
                 {!supplierMatchResults ? (
                   // Show product selection and create invoice button
                   <>
+                    {/* Actions Bar - Hide Select All/Deselect All when categories are present */}
                     <ActionsBar>
-                      <SecondaryButton onClick={() => toggleAll(true)}>
-                        Select All
-                      </SecondaryButton>
-                      <SecondaryButton onClick={() => toggleAll(false)}>
-                        Deselect All
-                      </SecondaryButton>
+                      {/* Only show Select All/Deselect All when NO categories are detected */}
+                      {/* When categories exist, users control selection at category level instead */}
+                      {!hasCategories && (
+                        <>
+                          <SecondaryButton onClick={() => toggleAll(true)}>
+                            Select All
+                          </SecondaryButton>
+                          <SecondaryButton onClick={() => toggleAll(false)}>
+                            Deselect All
+                          </SecondaryButton>
+                        </>
+                      )}
                       <SecondaryButton onClick={handleReset}>
                         Upload New PDF
                       </SecondaryButton>
@@ -1150,54 +1199,72 @@ function SupplierInvoiceReview() {
                       </PrimaryButton>
                     </ActionsBar>
 
-                    <TableContainer>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableHeader style={{ width: '50px' }}>Include</TableHeader>
-                            <TableHeader>SKU</TableHeader>
-                            <TableHeader>Product Name</TableHeader>
-                            <TableHeader style={{ width: '120px' }}>Pack Size</TableHeader>
-                            <TableHeader style={{ width: '120px' }}>Unit Size</TableHeader>
-                            <TableHeader style={{ width: '100px' }}>Unit Cost</TableHeader>
-                            <TableHeader style={{ width: '100px' }}>Case Size</TableHeader>
-                          </TableRow>
-                        </TableHead>
-                        <tbody>
-                          {products.map((product, index) => (
-                            <TableRow key={index}>
-                              <TableCell>
-                                <Checkbox
-                                  type="checkbox"
-                                  checked={product.selected}
-                                  onChange={() => toggleProduct(index)}
-                                />
-                              </TableCell>
-                              <TableCell>{product.sku}</TableCell>
-                              <TableCell>{product.name}</TableCell>
-                              <TableCell>
-                                <Input
-                                  type="text"
-                                  value={product.packSize}
-                                  onChange={(e) => updateProduct(index, 'packSize', e.target.value)}
-                                  placeholder="Pack size"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="text"
-                                  value={product.unitSize}
-                                  onChange={(e) => updateProduct(index, 'unitSize', e.target.value)}
-                                  placeholder="Unit size"
-                                />
-                              </TableCell>
-                              <TableCell>£{product.unitCost.toFixed(2)}</TableCell>
-                              <TableCell>{product.caseSize}</TableCell>
+                    {/* Product Display - Conditional Rendering */}
+                    {/* Show categorized view when categories are detected, flat table otherwise */}
+                    {hasCategories ? (
+                      // Category-organized product display
+                      // Features:
+                      // - Category headers with collapse/expand triangles (▼/▶)
+                      // - Parent checkbox toggles all children
+                      // - Partial-state checkbox for mixed selection
+                      // - Products indented under categories
+                      <CategoryProductsDisplay
+                        categories={categories}
+                        products={products}
+                        onProductToggle={toggleProduct}
+                        onCategoryToggle={toggleCategory}
+                      />
+                    ) : (
+                      // Flat table view (no categories)
+                      <TableContainer>
+                        <Table>
+                          <TableHead>
+                            <TableRow>
+                              <TableHeader style={{ width: '50px' }}>Include</TableHeader>
+                              <TableHeader>SKU</TableHeader>
+                              <TableHeader>Product Name</TableHeader>
+                              <TableHeader style={{ width: '120px' }}>Pack Size</TableHeader>
+                              <TableHeader style={{ width: '120px' }}>Unit Size</TableHeader>
+                              <TableHeader style={{ width: '100px' }}>Unit Cost</TableHeader>
+                              <TableHeader style={{ width: '100px' }}>Case Size</TableHeader>
                             </TableRow>
-                          ))}
-                        </tbody>
-                      </Table>
-                    </TableContainer>
+                          </TableHead>
+                          <tbody>
+                            {products.map((product, index) => (
+                              <TableRow key={index}>
+                                <TableCell>
+                                  <Checkbox
+                                    type="checkbox"
+                                    checked={product.selected}
+                                    onChange={() => toggleProduct(index)}
+                                  />
+                                </TableCell>
+                                <TableCell>{product.sku}</TableCell>
+                                <TableCell>{product.name}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={product.packSize}
+                                    onChange={(e) => updateProduct(index, 'packSize', e.target.value)}
+                                    placeholder="Pack size"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={product.unitSize}
+                                    onChange={(e) => updateProduct(index, 'unitSize', e.target.value)}
+                                    placeholder="Unit size"
+                                  />
+                                </TableCell>
+                                <TableCell>£{product.unitCost.toFixed(2)}</TableCell>
+                                <TableCell>{product.caseSize}</TableCell>
+                              </TableRow>
+                            ))}
+                          </tbody>
+                        </Table>
+                      </TableContainer>
+                    )}
                   </>
                 ) : (
                   // Show matching results after invoice creation
