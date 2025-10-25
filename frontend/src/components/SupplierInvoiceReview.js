@@ -453,12 +453,18 @@ function SupplierInvoiceReview() {
 
     const queryIgnoredItems = async () => {
       try {
+        // Debug: log product structure
+        if (products.length > 0) {
+          console.log('Sample product:', products[0]);
+        }
+
         // Fetch ignored items for this venue using fetch API
         const response = await fetch(`/api/venues/${venueId}/ignored-items`);
         const ignoredItemsData = await response.json();
 
         if (response.ok && ignoredItemsData && ignoredItemsData.ignoredItems && Array.isArray(ignoredItemsData.ignoredItems)) {
           console.log(`Found ${ignoredItemsData.ignoredItems.length} ignored items for venue ${venueId}`);
+          console.log('First ignored item:', ignoredItemsData.ignoredItems[0]);
 
           // Build a map of category -> count of ignored items
           const ignoredByCategory = {};
@@ -473,7 +479,7 @@ function SupplierInvoiceReview() {
               ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
               console.log(`Ignored item ${ignoredItem.supplier_sku} belongs to category: ${product.category}`);
             } else if (ignoredItem.supplier_sku) {
-              console.warn(`Could not find product for ignored SKU: ${ignoredItem.supplier_sku}`);
+              console.warn(`Could not find product for ignored SKU: ${ignoredItem.supplier_sku} - product found: ${product ? 'yes' : 'no'}, has category: ${product?.category ? 'yes' : 'no'}`);
             }
           }
 
@@ -499,7 +505,7 @@ function SupplierInvoiceReview() {
     };
 
     queryIgnoredItems();
-  }, [supplierId, venueId, products.length]); // Re-run when products are loaded
+  }, [supplierId, venueId, products.length, categories.length]); // Re-run when products or categories are loaded
 
   // Look up or create supplier when supplier name is known
   useEffect(() => {
