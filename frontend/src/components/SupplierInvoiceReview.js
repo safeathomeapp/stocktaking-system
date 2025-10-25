@@ -639,6 +639,9 @@ function SupplierInvoiceReview() {
 
       // Filter out previously ignored items for this supplier/venue
       const supplierName = data.data.supplier;
+      const invoiceNumber = data.data.invoiceNumber;
+      console.log('DEBUG: Invoice number extracted from PDF:', invoiceNumber);
+      console.log('DEBUG: Supplier name extracted from PDF:', supplierName);
       let filteredProducts = data.data.products;
       let hiddenCount = 0;
 
@@ -655,6 +658,7 @@ function SupplierInvoiceReview() {
             );
             if (matchedSupplier) {
               supplierId = matchedSupplier.sup_id;
+              console.log('DEBUG: Matched supplier ID:', supplierId, 'Name:', matchedSupplier.sup_name);
             }
           }
         } catch (err) {
