@@ -2091,8 +2091,9 @@ async function parseSupplierInvoicePDF(buffer) {
     }
 
     // === CATEGORY EXTRACTION (BOOKER-SPECIFIC) ===
-    // Booker invoices organize products into categories with headers
-    // Category headers appear before their products and contain category name + subtotal info
+    // Booker invoices organize products into categories
+    // FORMAT: Products are listed, then followed by their category header with subtotal
+    // Each category header sums up the items that preceded it
     // Examples: "TOBACCO", "RETAIL GROCERY", "WINES SPIRITS BEERS", etc.
 
     // Common Booker categories - use as reference for detection
@@ -2118,10 +2119,6 @@ async function parseSupplierInvoicePDF(buffer) {
       'BAKERY'
     ];
 
-    const categoryMap = {}; // Track category metadata: name, itemCount, subtotal
-    let currentCategory = 'UNCATEGORIZED'; // Default category for products before any header
-    const categoryOrder = []; // Preserve PDF order of categories
-
     // First pass: identify all product line indices
     const productLineIndices = [];
     for (let i = 0; i < lines.length; i++) {
@@ -2131,7 +2128,10 @@ async function parseSupplierInvoicePDF(buffer) {
       }
     }
 
-    // Second pass: detect category headers using multiple pattern matching strategies
+    // Second pass: find all category headers with their line indices and metadata
+    // Format: "CATEGORY_NAME SUB-TOTAL : ITEMS X GOODS : £YYYYYY.YY" or starts with known category
+    const categoryHeaders = []; // Array of {lineIndex, name, itemCount, subtotal}
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const startsWithSixDigits = /^\d{6}/.test(line);
@@ -2151,12 +2151,11 @@ async function parseSupplierInvoicePDF(buffer) {
         continue;
       }
 
-      // Detect category headers using multiple patterns
       // Pattern 1: LINE WITH SUB-TOTAL KEYWORD
       // Format: "CATEGORY_NAME    SUB-TOTAL : ITEMS X GOODS : YYYYYY.YY [EXC.VAT]"
       let categoryMatch = line.match(/^([A-Z\s&\-]+?)\s+SUB-TOTAL\s*:\s*ITEMS\s+(\d+)\s+GOODS\s*:\s*([\d.]+)/i);
 
-      // Pattern 2: KNOWN CATEGORY KEYWORD (case-insensitive)
+      // Pattern 2: KNOWN CATEGORY KEYWORD at start of line
       // If line starts with a known category, treat it as a category header
       if (!categoryMatch) {
         for (const knownCat of KNOWN_CATEGORIES) {
@@ -2180,24 +2179,26 @@ async function parseSupplierInvoicePDF(buffer) {
         const itemCount = categoryMatch[2] ? parseInt(categoryMatch[2]) : 0;
         const subtotal = categoryMatch[3] ? parseFloat(categoryMatch[3]) : 0;
 
-        // Only treat as category if not already seen and name is reasonable
-        if (!categoryMap[categoryName] && categoryName.length > 2 && categoryName.length < 60 && !categoryName.match(/^\d/)) {
-          // This is a new category header (avoid numbers at start of name)
-          currentCategory = categoryName;
-          categoryMap[categoryName] = {
-            name: categoryName,
-            itemCount: itemCount,
-            subtotal: subtotal
-          };
-          categoryOrder.push(categoryName);
-          console.log(`Detected category: "${categoryName}" (${itemCount} items, subtotal: ${subtotal})`);
+        // Only treat as category if name is reasonable (avoid duplicates, numbers at start)
+        if (categoryName.length > 2 && categoryName.length < 60 && !categoryName.match(/^\d/)) {
+          // Check if we already have this category
+          const existingCategory = categoryHeaders.find(c => c.name === categoryName);
+          if (!existingCategory) {
+            // This is a new category header
+            categoryHeaders.push({
+              lineIndex: i,
+              name: categoryName,
+              itemCount: itemCount,
+              subtotal: subtotal
+            });
+            console.log(`Detected category: "${categoryName}" at line ${i} (${itemCount} items, subtotal: £${subtotal})`);
+          }
         }
       }
     }
 
     // === PRODUCT EXTRACTION (BOOKER-SPECIFIC) ===
     const products = [];
-    currentCategory = 'UNCATEGORIZED'; // Reset for product parsing
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -2206,27 +2207,6 @@ async function parseSupplierInvoicePDF(buffer) {
       const startsWithSixDigits = /^\d{6}/.test(line);
 
       if (!startsWithSixDigits) {
-        // Check if this line is a category header and update currentCategory
-        // Pattern 1: Line with SUB-TOTAL keyword
-        let categoryMatch = line.match(/^([A-Z\s&\-]+?)\s+SUB-TOTAL\s*:\s*ITEMS\s+(\d+)\s+GOODS\s*:\s*([\d.]+)/i);
-
-        // Pattern 2: Known category keyword
-        if (!categoryMatch) {
-          for (const knownCat of KNOWN_CATEGORIES) {
-            if (line.toUpperCase().startsWith(knownCat.toUpperCase())) {
-              categoryMatch = true; // Mark as found
-              currentCategory = knownCat;
-              break;
-            }
-          }
-        } else if (categoryMatch) {
-          // Extract category name from regex match
-          const categoryName = categoryMatch[1].trim();
-          if (!categoryName.match(/^\d/)) {
-            currentCategory = categoryName;
-          }
-        }
-
         continue; // Skip non-product lines
       }
 
@@ -2315,6 +2295,18 @@ async function parseSupplierInvoicePDF(buffer) {
         productName = productName.replace(/\s+\d+(?:ml|g|cl|l|kg|s|pk|cm)\b/i, '').trim();
 
         if (productName.length > 2) {
+          // Find which category this product belongs to:
+          // Find the NEXT category header that appears after this product line
+          let productCategory = 'UNCATEGORIZED';
+
+          for (const categoryHeader of categoryHeaders) {
+            // If this category header comes after the current product line, this product belongs to it
+            if (categoryHeader.lineIndex > i) {
+              productCategory = categoryHeader.name;
+              break; // Use the first (nearest) category header after this product
+            }
+          }
+
           // Add product with category assignment
           products.push({
             sku: sku,
@@ -2324,7 +2316,7 @@ async function parseSupplierInvoicePDF(buffer) {
             packSize: packSize,
             unitCost: unitPrice,
             caseSize: quantity,
-            category: currentCategory, // NEW: Assign product to its category
+            category: productCategory, // Assign product to the category header that follows it
             selected: true // Default to selected
           });
         }
@@ -2335,13 +2327,12 @@ async function parseSupplierInvoicePDF(buffer) {
 
     // Build categories array in PDF order with product counts
     // This metadata is used in Step 2 to organize products by category
-    const categoriesList = categoryOrder.map(categoryName => {
-      const metadata = categoryMap[categoryName];
-      const productsInCategory = products.filter(p => p.category === categoryName);
+    const categoriesList = categoryHeaders.map(categoryHeader => {
+      const productsInCategory = products.filter(p => p.category === categoryHeader.name);
       return {
-        name: categoryName,
+        name: categoryHeader.name,
         itemCount: productsInCategory.length, // Actual count from parsing
-        subtotal: metadata.subtotal // From PDF header
+        subtotal: categoryHeader.subtotal // From PDF header
       };
     });
 
