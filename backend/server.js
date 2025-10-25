@@ -2154,7 +2154,8 @@ async function parseSupplierInvoicePDF(buffer) {
 
       // Pattern 1: LINE WITH SUB-TOTAL KEYWORD
       // Format: "CATEGORY_NAME    SUB-TOTAL : ITEMS X GOODS : YYYYYY.YY [EXC.VAT]"
-      let categoryMatch = line.match(/^([A-Z\s&\-]+?)\s+SUB-TOTAL\s*:\s*ITEMS\s+(\d+)\s+GOODS\s*:\s*([\d.]+)/i);
+      // More robust pattern that captures anything before SUB-TOTAL
+      let categoryMatch = line.match(/^(.+?)\s+SUB-TOTAL\s*:\s*ITEMS\s+(\d+)\s+GOODS\s*:\s*([\d.]+)/i);
 
       // Pattern 2: KNOWN CATEGORY KEYWORD at start of line
       // If line starts with a known category, treat it as a category header
