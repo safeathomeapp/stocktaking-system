@@ -459,6 +459,8 @@ function SupplierInvoiceReview() {
 
         if (response.ok && ignoredItemsData && ignoredItemsData.ignoredItems && Array.isArray(ignoredItemsData.ignoredItems)) {
           console.log(`Found ${ignoredItemsData.ignoredItems.length} ignored items for venue ${venueId}`);
+          console.log('Product SKUs in PDF:', products.map(p => p.sku).join(', '));
+          console.log('Ignored SKUs in DB:', ignoredItemsData.ignoredItems.map(i => i.supplier_sku).join(', '));
 
           // Build a map of category -> count of ignored items
           const ignoredByCategory = {};
@@ -471,9 +473,9 @@ function SupplierInvoiceReview() {
             if (product && product.category) {
               // Increment count for this category
               ignoredByCategory[product.category] = (ignoredByCategory[product.category] || 0) + 1;
-              console.log(`Ignored item ${ignoredItem.supplier_sku} belongs to category: ${product.category}`);
+              console.log(`✓ Ignored item ${ignoredItem.supplier_sku} (${ignoredItem.product_name}) belongs to category: ${product.category}`);
             } else if (ignoredItem.supplier_sku) {
-              console.warn(`Could not find product for ignored SKU: ${ignoredItem.supplier_sku}`);
+              console.log(`✗ Ignored SKU ${ignoredItem.supplier_sku} (${ignoredItem.product_name}) NOT in current PDF`);
             }
           }
 
