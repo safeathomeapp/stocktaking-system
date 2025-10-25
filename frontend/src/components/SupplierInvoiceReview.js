@@ -453,17 +453,18 @@ function SupplierInvoiceReview() {
 
     const queryIgnoredItems = async () => {
       try {
-        // Fetch ignored items for this venue
-        const response = await apiService.get(`/venues/${venueId}/ignored-items`);
+        // Fetch ignored items for this venue using fetch API
+        const response = await fetch(`/api/venues/${venueId}/ignored-items`);
+        const ignoredItemsData = await response.json();
 
-        if (response.success && response.data && Array.isArray(response.data)) {
-          console.log(`Found ${response.data.length} ignored items for venue ${venueId}`);
+        if (response.ok && ignoredItemsData && Array.isArray(ignoredItemsData)) {
+          console.log(`Found ${ignoredItemsData.length} ignored items for venue ${venueId}`);
 
           // Build a map of category -> count of ignored items
           const ignoredByCategory = {};
 
           // For each ignored item, find which category it belongs to
-          for (const ignoredItem of response.data) {
+          for (const ignoredItem of ignoredItemsData) {
             // Find the product in our products array that matches this ignored SKU
             const product = products.find(p => p.sku === ignoredItem.product_sku);
 
