@@ -10,6 +10,7 @@ import SessionHistory from './components/SessionHistory';
 import Analysis from './components/Analysis';
 import VenueManagement from './components/VenueManagement';
 import Settings from './components/Settings';
+import InvoiceWorkflow from './components/InvoiceWorkflow/InvoiceWorkflow';
 import InvoiceInput from './components/InvoiceInput';
 import InvoiceImport from './components/InvoiceImport';
 import ManualInvoiceEntry from './components/ManualInvoiceEntry';
@@ -30,7 +31,7 @@ function App() {
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/venue/new" element={<VenueManagement />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/invoice-input" element={<InvoiceInput />} />
+            <Route path="/invoice-input" element={<InvoiceWorkflow />} />
             <Route path="/invoice-import/:venueId?" element={<InvoiceImport />} />
             <Route path="/invoice-manual/:venueId?" element={<ManualInvoiceEntry />} />
             <Route path="/invoice-review" element={<SupplierInvoiceReview />} />

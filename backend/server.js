@@ -7,6 +7,9 @@ const pool = require('./src/database');
 const { PDFParse } = require('pdf-parse');
 require('dotenv').config();
 
+// Import new invoice routes
+const invoiceRoutes = require('./routes/invoices');
+
 // Updated with county field support
 
 const app = express();
@@ -4080,12 +4083,22 @@ app.get('/api/venues/:venueId/check-ignored-items/:supplierId', async (req, res)
   }
 });
 
+// ============================================================================
+// REGISTER INVOICE ROUTES
+// ============================================================================
+app.use('/api/invoices', invoiceRoutes);
+
+// ============================================================================
+// START SERVER
+// ============================================================================
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Master Products API ready at /api/master-products`);
   console.log(`User Profile API ready at /api/user/profile`);
   console.log(`Supplier Item List API ready at /api/supplier-items`);
   console.log(`EPOS Sales Import API ready at /api/epos-imports`);
+  console.log(`Invoice Parsing API ready at /api/invoices/parse`);
 });
 
 // Force redeploy $(date)// Force redeploy Fri Sep 26 00:02:49 GMTST 2025

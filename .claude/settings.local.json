@@ -12,7 +12,15 @@
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT COUNT(*) FROM master_products WHERE category = ''SOFT DRINK'' AND active = true;\")",
       "Bash(node generate_category_files.js:*)",
       "Bash(cmd /c \"dir C:\\Users\\kevth\\Desktop\\Stocktake\\stocktaking-system\\docs 2>&1\")",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -f \"C:/Users/kevth/Desktop/Stocktake/stocktaking-system/backend/migrations/add_keywords_to_suppliers.sql\")",
+      "Bash(taskkill:*)",
+      "Bash(timeout /t 2)",
+      "Bash(cmd /c \"taskkill /F /IM node.exe\")",
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
