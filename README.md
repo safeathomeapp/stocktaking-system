@@ -1938,9 +1938,15 @@ psql -U postgres stocktaking_local < backup_20251020.sql
 
 # 📄 Invoice PDF Parsing & Supplier Detection System
 
-## Current Status: Step 1 Complete ✅
+## Current Status: Step 1 & Step 2 Complete ✅
 
-The invoice PDF parsing system is fully functional for **uploading and detecting suppliers**. The system has been tested with real Booker invoices and successfully detects unknown suppliers.
+The invoice PDF parsing system is fully functional for **uploading, detecting suppliers, and reviewing parsed items**. The system has been tested with real Booker invoices and successfully:
+- ✅ Parses supplier invoices with category-based item organization
+- ✅ Displays items organized by supplier categories
+- ✅ Allows user selection/deselection of items
+- ✅ Supports quantity editing per item
+- ✅ Calculates dynamic subtotals
+- ✅ Provides clean, efficient UI with consolidated controls
 
 ### What's Working
 
@@ -1951,11 +1957,219 @@ The invoice PDF parsing system is fully functional for **uploading and detecting
 - Booker supplier fully configured and working
 - Error handling for unknown suppliers
 
+✅ **Step 2: Review Items & Select**
+- Parses invoice items from PDF into structured data
+- Groups items by supplier-defined categories
+- Displays category header with: collapse/expand, select-all checkbox, category name, item count, subtotal
+- Checkbox selection for individual items
+- Quantity editor (±/- buttons) with real-time subtotal updates
+- Custom checkbox styling (blue when checked, gray when unchecked)
+- Real-time calculation of:
+  - Items selected per category
+  - Category subtotals
+  - Grand total of selected items
+- Clean, consolidated header bar eliminates redundant UI
+- Navigation: Back button and Next button (disabled if no items selected)
+
 ### Access the Feature
 
 Navigate to: **`http://localhost:3000/invoice-input`**
 
 You can upload any Booker invoice from: `C:/Users/kevth/Desktop/Stocktake/stocktaking-system/invoices/`
+
+---
+
+## Step 2: Review Items & Select - Implementation Details
+
+### Component Architecture
+
+**File**: `frontend/src/components/InvoiceWorkflow/Step2_ReviewItems.js`
+
+**Purpose**: Allows users to review parsed invoice items, select which items to import, and adjust quantities before proceeding to the next step.
+
+### UI Layout
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Review Invoice Items                               │
+│                                                     │
+│  Invoice #3596857 | Date: 2024-10-15 | Booker Ltd. │
+├─────────────────────────────────────────────────────┤
+│  ▼  ☑  RETAIL GROCERY  (15/20 items, £234.50)     │
+│     ├─ [☑] 063724 Coke Zero...  [−] 2 [+]  £8.50 │
+│     ├─ [☑] 064156 Sprite 1.5L...  [−] 5 [+]  £12.00│
+│     └─ [☐] 071234 Apple Juice...  [−] 1 [+]  £3.20 │
+│                                                     │
+│  ▼  ☑  CHILLED  (8/10 items, £156.75)              │
+│     ├─ [☑] 045632 Butter 500g...  [−] 1 [+]  £4.50│
+│     └─ [☑] 058234 Milk Semi...  [−] 2 [+]  £6.00  │
+│                                                     │
+├─────────────────────────────────────────────────────┤
+│  Items Selected: 23 of 30  | Subtotal: £391.25    │
+├─────────────────────────────────────────────────────┤
+│  [← Back]                          [Next: Confirm →]│
+└─────────────────────────────────────────────────────┘
+```
+
+### Key Features
+
+**1. Category-Based Organization**
+- Items grouped by supplier-defined categories (e.g., "RETAIL GROCERY", "CHILLED")
+- Categories collapsible/expandable (chevron icon)
+- Blue highlight when expanded
+- All items visible by default
+
+**2. Consolidated Category Header**
+- Shows: Chevron, Select-All Checkbox, Category Name, Item Count, Subtotal
+- Single select-all checkbox per category
+- Eliminates redundant UI sections
+- Dynamic subtotals update in real-time
+
+**3. Item Selection & Editing**
+```
+[Checkbox]  SKU  Name  Pack Size  [Qty Controls]  Price
+```
+- Individual item checkboxes
+- Quantity editor: decrease (−), input field, increase (+)
+- Quantity disabled if item unchecked
+- Real-time price calculation: `price × qty`
+- Unselected items appear grayed out
+
+**4. Dynamic Calculations**
+- Category subtotal: Sum of selected items in category
+- Grand total: Sum across all categories
+- Item count: X selected / Y total items
+
+### State Management
+
+**Component State** (managed by parent InvoiceWorkflow):
+- `itemCheckboxes`: { [index]: boolean } - Tracks which items are selected
+- `detectedSupplier`: Supplier name and ID
+- `invoiceMetadata`: Invoice number, date, totals
+- `quantities`: { "CATEGORY-SKU": number } - Modified quantities
+
+**Callbacks to Parent**:
+- `onItemCheckboxChange(index, checked)` - Update item selection
+- `onComplete(itemCheckboxes)` - Proceed to next step
+- `onBack()` - Return to previous step
+
+### Props Interface
+
+```javascript
+{
+  parsedItems: [
+    {
+      supplierSku: "063724",
+      supplierName: "Coke Zero",
+      categoryHeader: "RETAIL GROCERY",
+      packSize: "24x330ml",
+      unitSize: "330",
+      quantity: 2,
+      unitPrice: 4.25,
+      rrp: 5.99,
+      vatCode: "B",
+      vatRate: 20
+    },
+    // ... more items
+  ],
+  itemCheckboxes: { 0: true, 1: true, 2: false, ... },
+  detectedSupplier: { id: "UUID", name: "Booker Limited" },
+  invoiceMetadata: { invoiceNumber: "3596857", invoiceDate: "2024-10-15", ... },
+  onItemCheckboxChange: (index, checked) => void,
+  onComplete: (checkboxState) => void,
+  onBack: () => void
+}
+```
+
+### Styling
+
+**Custom Checkbox Style**:
+- Unchecked: Light gray background (#dee2e6), gray border
+- Checked: Blue background (#007bff), white border
+- Checkmark icon displayed when checked
+- Responsive to hover states
+
+**Category Header Styling**:
+- Normal: Light gray background (#f8f9fa)
+- Expanded: Blue background (#007bff), white text
+- Smooth color transitions on state change
+
+**Item Row Styling**:
+- Normal: White background
+- Hover: Light gray background (#f8f9fa)
+- Unselected: 70% opacity
+- Gap spacing for consistent alignment
+
+### Workflow Integration
+
+```
+Step 1: Upload & Parse PDF
+    ↓ (suppliedItems, metadata)
+Step 2: Review Items & Select ← YOU ARE HERE
+    ↓ (itemCheckboxes)
+Step 3: Confirm Ignored Items
+    ↓
+Step 4: Match Master Products
+    ↓
+Step 5: Final Summary & Confirmation
+```
+
+**Transition to Step 3**:
+- Calls `onComplete(itemCheckboxes)`
+- Parent filters out unchecked items
+- Unchecked items passed to Step 3 for ignore reasons
+
+### Data Flow
+
+```javascript
+// When user checks/unchecks item:
+handleToggleItem(key) {
+  const itemIndex = parsedItems.findIndex(item =>
+    `${item.categoryHeader}-${item.supplierSku}` === key
+  );
+  onItemCheckboxChange(itemIndex, !itemCheckboxes[itemIndex]);
+}
+
+// When user clicks "Select All" on category:
+handleToggleAll(category, selectAll) {
+  parsedItems.forEach((item, idx) => {
+    if (item.categoryHeader === category) {
+      onItemCheckboxChange(idx, selectAll);
+    }
+  });
+}
+
+// When user changes quantity:
+handleQuantityChange(key, newQuantity) {
+  setQuantities(prev => ({
+    ...prev,
+    [key]: newQuantity
+  }));
+}
+
+// When user proceeds to next step:
+handleProceed() {
+  onComplete(itemCheckboxes);
+}
+```
+
+### Testing with Booker Invoice
+
+**Test File**: `Booker-Invoice-3596857.pdf`
+
+**Expected Results**:
+- ✅ 22 items parsed across 4 categories
+- ✅ Categories: RETAIL GROCERY, CHILLED, FROZEN, BEVERAGES
+- ✅ All items visible and selectable
+- ✅ Subtotals calculate correctly
+- ✅ Select-all checkbox works per category
+- ✅ Quantities can be edited
+- ✅ Next button disabled when no items selected
+- ✅ Back button navigates to Step 1
+
+### Known Limitations
+
+None currently. Step 2 is fully functional and tested.
 
 Example files:
 - Booker-Invoice-3504502.pdf ✅ (Detected successfully)
