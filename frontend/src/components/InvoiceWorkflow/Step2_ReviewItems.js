@@ -462,22 +462,15 @@ const Button = styled.button`
 // ============================================================================
 
 const Step2_ReviewItems = ({
-  invoiceNumber,
-  invoiceDate,
-  supplierName,
   parsedItems,
-  onProceedToStep3,
+  itemCheckboxes,
+  detectedSupplier,
+  invoiceMetadata,
+  onItemCheckboxChange,
+  onComplete,
+  onBack,
 }) => {
   // ========== STATE ==========
-
-  // Track selected items: { "CATEGORY-SKU": true/false }
-  const [selectedItems, setSelectedItems] = useState(() => {
-    const initial = {};
-    parsedItems.forEach(item => {
-      initial[`${item.categoryHeader}-${item.supplierSku}`] = true;
-    });
-    return initial;
-  });
 
   // Track quantities: { "CATEGORY-SKU": quantity }
   const [quantities, setQuantities] = useState({});
@@ -491,6 +484,17 @@ const Step2_ReviewItems = ({
     });
     return initial;
   });
+
+  // Convert itemCheckboxes from index-based to category-SKU based for internal use
+  // Using useMemo to recalculate whenever itemCheckboxes changes
+  const selectedItems = useMemo(() => {
+    const selected = {};
+    parsedItems.forEach((item, idx) => {
+      const key = `${item.categoryHeader}-${item.supplierSku}`;
+      selected[key] = itemCheckboxes[idx] !== false; // Default to true if not set
+    });
+    return selected;
+  }, [parsedItems, itemCheckboxes]);
 
   // ========== COMPUTED VALUES ==========
 
@@ -526,19 +530,17 @@ const Step2_ReviewItems = ({
   // ========== HANDLERS ==========
 
   const handleToggleItem = (key) => {
-    setSelectedItems(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    const itemIndex = parsedItems.findIndex(item => `${item.categoryHeader}-${item.supplierSku}` === key);
+    if (itemIndex !== -1) {
+      onItemCheckboxChange(itemIndex, !itemCheckboxes[itemIndex]);
+    }
   };
 
   const handleToggleAll = (category, selectAll) => {
-    setSelectedItems(prev => {
-      const updated = { ...prev };
-      categorizedItems[category].forEach(item => {
-        updated[`${category}-${item.supplierSku}`] = selectAll;
-      });
-      return updated;
+    parsedItems.forEach((item, idx) => {
+      if (item.categoryHeader === category) {
+        onItemCheckboxChange(idx, selectAll);
+      }
     });
   };
 
@@ -557,17 +559,8 @@ const Step2_ReviewItems = ({
   };
 
   const handleProceed = () => {
-    // Build list of selected items with their updated quantities
-    const selectedItemsData = parsedItems
-      .filter(item => selectedItems[`${item.categoryHeader}-${item.supplierSku}`])
-      .map(item => ({
-        ...item,
-        quantity: quantities[`${item.categoryHeader}-${item.supplierSku}`] !== undefined
-          ? quantities[`${item.categoryHeader}-${item.supplierSku}`]
-          : item.quantity
-      }));
-
-    onProceedToStep3(selectedItemsData);
+    // Pass current checkbox state to parent
+    onComplete(itemCheckboxes);
   };
 
   // ========== RENDER ==========
@@ -577,7 +570,7 @@ const Step2_ReviewItems = ({
       <Title>Review Invoice Items</Title>
 
       <InvoiceHeader>
-        Invoice #{invoiceNumber} | Date: {invoiceDate} | Supplier: {supplierName}
+        Invoice #{invoiceMetadata.invoiceNumber} | Date: {invoiceMetadata.invoiceDate} | Supplier: {detectedSupplier?.name || 'Unknown'}
       </InvoiceHeader>
 
       <CategoriesContainer>
@@ -695,7 +688,7 @@ const Step2_ReviewItems = ({
         </InvoiceTotals>
 
         <ButtonGroup>
-          <Button className="secondary" onClick={() => window.history.back()}>
+          <Button className="secondary" onClick={onBack}>
             ← Back
           </Button>
           <Button
