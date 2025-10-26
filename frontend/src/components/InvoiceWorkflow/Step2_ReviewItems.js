@@ -97,18 +97,6 @@ const CategoryHeaderButton = styled.button`
   &.expanded {
     background: #007bff;
     color: white;
-
-    .category-title {
-      color: white;
-    }
-
-    .category-stats {
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    .expand-icon {
-      color: white;
-    }
   }
 `;
 
@@ -123,6 +111,10 @@ const CategoryStats = styled.span`
   font-size: 13px;
   font-weight: 400;
   margin-left: auto;
+
+  ${CategoryHeaderButton}.expanded & {
+    color: white;
+  }
 `;
 
 const ExpandIcon = styled.span`
@@ -196,8 +188,6 @@ const CategoryCheckboxLabel = styled.label`
 const ItemsList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  background: #dee2e6;
 
   &.collapsed {
     display: none;
@@ -211,6 +201,11 @@ const ItemRow = styled.div`
   align-items: center;
   gap: 12px;
   transition: background 0.2s;
+  border-bottom: 1px solid #dee2e6;
+
+  &:last-child {
+    border-bottom: none;
+  }
 
   &:hover {
     background: #f8f9fa;
@@ -570,7 +565,7 @@ const Step2_ReviewItems = ({
       <Title>Review Invoice Items</Title>
 
       <InvoiceHeader>
-        Invoice #{invoiceMetadata.invoiceNumber} | Date: {invoiceMetadata.invoiceDate} | Supplier: {detectedSupplier?.name || 'Unknown'}
+        Invoice #{invoiceMetadata.invoiceNumber || 'N/A'} | Date: {invoiceMetadata.invoiceDate ? new Date(invoiceMetadata.invoiceDate).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' }) : 'N/A'} | Supplier: {detectedSupplier?.name || 'Unknown'}
       </InvoiceHeader>
 
       <CategoriesContainer>
