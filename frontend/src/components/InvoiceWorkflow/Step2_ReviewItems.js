@@ -13,10 +13,10 @@
  * User Experience:
  *   - Invoice header with number, date, supplier name
  *   - Categories with collapse/expand capability
- *   - Custom checkbox styling (blue checked, white unchecked, diagonal for partial)
+ *   - Category header includes: chevron, checkbox (select all), name, item count, subtotal
+ *   - Custom checkbox styling (blue checked, white unchecked)
  *   - Item list with: checkbox, code, name, pack size, quantity editor, price
- *   - Dynamic subtotals per category (updated as items selected/modified)
- *   - Select All / Deselect All buttons per category
+ *   - Dynamic subtotals updated in real-time as items selected/modified
  *   - Next button to proceed to Step 3 (Confirm Ignored Items)
  *
  * Data Structure:
@@ -85,8 +85,8 @@ const CategoryHeaderButton = styled.button`
   border: none;
   cursor: pointer;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   user-select: none;
   transition: background 0.2s;
 
@@ -112,29 +112,24 @@ const CategoryHeaderButton = styled.button`
   }
 `;
 
-const CategoryTitle = styled.div`
-  display: flex;
-  gap: 12px;
-  align-items: center;
+const CategoryTitleText = styled.span`
   font-weight: 600;
   font-size: 15px;
-  color: #333;
+  color: inherit;
+`;
 
-  .category-name {
-    color: inherit;
-  }
-
-  .category-stats {
-    color: #666;
-    font-size: 13px;
-    font-weight: 400;
-  }
+const CategoryStats = styled.span`
+  color: #666;
+  font-size: 13px;
+  font-weight: 400;
+  margin-left: auto;
 `;
 
 const ExpandIcon = styled.span`
   font-size: 18px;
   transition: transform 0.2s;
   color: #666;
+  flex-shrink: 0;
 
   ${CategoryHeaderButton}.expanded & {
     transform: rotate(180deg);
@@ -142,32 +137,59 @@ const ExpandIcon = styled.span`
   }
 `;
 
-const CategoryActions = styled.div`
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border-top: 1px solid #dee2e6;
-  justify-content: flex-end;
+const CategoryCheckboxWrapper = styled.div`
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
 `;
 
-const ActionButton = styled.button`
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid #007bff;
-  background: white;
-  color: #007bff;
+const CategoryHiddenCheckbox = styled.input`
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+
+  &:checked ~ label {
+    background: white;
+    border-color: white;
+  }
+`;
+
+const CategoryCheckboxLabel = styled.label`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #dee2e6;
+  border: 2px solid #dee2e6;
   border-radius: 4px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s;
+  user-select: none;
 
-  &:hover {
-    background: #f0f7ff;
+  &::after {
+    content: '✓';
+    color: #007bff;
+    font-size: 14px;
+    font-weight: bold;
+    display: ${props => props.$isChecked ? 'block' : 'none'};
   }
 
-  &:active {
-    transform: translateY(1px);
+  ${CategoryHeaderButton}.expanded & {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: white;
+  }
+
+  ${CategoryHeaderButton}.expanded &::after {
+    color: white;
   }
 `;
 
@@ -354,26 +376,6 @@ const ItemPrice = styled.div`
   white-space: nowrap;
   min-width: 60px;
   text-align: right;
-`;
-
-const CategorySubtotal = styled.div`
-  background: #f8f9fa;
-  padding: 12px 16px;
-  border-top: 1px solid #dee2e6;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
-  color: #333;
-
-  .subtotal-label {
-    font-weight: 500;
-  }
-
-  .subtotal-amount {
-    font-weight: 600;
-    color: #007bff;
-  }
 `;
 
 const BottomSection = styled.div`
@@ -599,13 +601,22 @@ const Step2_ReviewItems = ({
                 onClick={() => handleToggleCategory(category)}
                 className={isExpanded ? 'expanded' : ''}
               >
-                <CategoryTitle>
-                  <ExpandIcon className="expand-icon">▼</ExpandIcon>
-                  <span className="category-name">{category}</span>
-                  <span className="category-stats">
-                    ({selectedCount}/{items.length} items, £{categorySubtotal.toFixed(2)})
-                  </span>
-                </CategoryTitle>
+                <ExpandIcon className="expand-icon">▼</ExpandIcon>
+
+                <CategoryCheckboxWrapper onClick={(e) => e.stopPropagation()}>
+                  <CategoryHiddenCheckbox
+                    type="checkbox"
+                    id={`cat-${category}`}
+                    checked={isAllSelected}
+                    onChange={() => handleToggleAll(category, !isAllSelected)}
+                  />
+                  <CategoryCheckboxLabel htmlFor={`cat-${category}`} $isChecked={isAllSelected} />
+                </CategoryCheckboxWrapper>
+
+                <CategoryTitleText>{category}</CategoryTitleText>
+                <CategoryStats>
+                  ({selectedCount}/{items.length} items, £{categorySubtotal.toFixed(2)})
+                </CategoryStats>
               </CategoryHeaderButton>
 
               <ItemsList className={!isExpanded ? 'collapsed' : ''}>
@@ -666,21 +677,6 @@ const Step2_ReviewItems = ({
                   );
                 })}
               </ItemsList>
-
-              {isExpanded && (
-                <>
-                  <CategoryActions>
-                    <ActionButton onClick={() => handleToggleAll(category, !isAllSelected)}>
-                      {isAllSelected ? 'Deselect All' : 'Select All'}
-                    </ActionButton>
-                  </CategoryActions>
-
-                  <CategorySubtotal>
-                    <span className="subtotal-label">Category Subtotal:</span>
-                    <span className="subtotal-amount">£{categorySubtotal.toFixed(2)}</span>
-                  </CategorySubtotal>
-                </>
-              )}
             </CategorySection>
           );
         })}
