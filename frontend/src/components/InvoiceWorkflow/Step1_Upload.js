@@ -366,7 +366,8 @@ const Step1_Upload = ({ venueId, userId, onUploadComplete }) => {
       // Send to backend
       setLoadingMessage('Parsing PDF and detecting supplier...');
 
-      const response = await fetch('/api/invoices/parse', {
+      // Use backend URL directly (backend runs on port 3005)
+      const response = await fetch('http://localhost:3005/api/invoices/parse', {
         method: 'POST',
         body: formData,
         // Don't set Content-Type header - browser will set it correctly with boundary
