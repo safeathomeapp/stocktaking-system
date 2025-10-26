@@ -164,8 +164,10 @@ class BookerParser extends SupplierParser {
    *
    * Looks for:
    *   - "INVOICE NUMBER [number]" -> invoice number
-   *   - "DATE [date]" -> invoice date (DD/MM/YY format)
+   *   - "DATE [date]" -> invoice date (DD/MM/YY format, may be TAB-separated)
    *   - "INVOICE TOTAL [amount]" -> total amount
+   *
+   * Booker format: "RBL EAST WITTERING 	DATE 	01/05/25 	TIME 07:31"
    *
    * @param {Array<string>} lines - PDF lines
    * @returns {Object} Metadata object with invoiceNumber, invoiceDate, totalAmount
@@ -177,27 +179,52 @@ class BookerParser extends SupplierParser {
       totalAmount: 0,
     };
 
-    // Find invoice number
+    // Find invoice number, date, and total
     for (const line of lines) {
-      if (line.includes('INVOICE NUMBER')) {
+      if (line.includes('INVOICE NUMBER') && !metadata.invoiceNumber) {
         const match = line.match(/INVOICE NUMBER\s+(\d+)/);
         if (match) {
           metadata.invoiceNumber = match[1];
         }
       }
 
-      if (line.includes('DATE') && !line.includes('TIME')) {
-        const dateMatch = line.match(/DATE\s+(\d{2}\/\d{2}\/\d{2})/);
-        if (dateMatch) {
-          // Parse DD/MM/YY format
-          const [day, month, year] = dateMatch[1].split('/');
-          const fullYear = `20${year}`;
-          metadata.invoiceDate = `${fullYear}-${month}-${day}`;
+      // Extract date - may be TAB-separated or space-separated
+      if (line.includes('DATE') && !metadata.invoiceDate) {
+        // Handle TAB-separated format: "... DATE 	01/05/25 	TIME ..."
+        if (line.includes('\t')) {
+          const fields = line.split('\t');
+          const dateIdx = fields.findIndex(f => f.trim() === 'DATE');
+          if (dateIdx !== -1 && dateIdx + 1 < fields.length) {
+            const dateStr = fields[dateIdx + 1].trim();
+            // Extract date pattern DD/MM/YY
+            const dateMatch = dateStr.match(/(\d{2})\/(\d{2})\/(\d{2})/);
+            if (dateMatch) {
+              const [, day, month, year] = dateMatch;
+              const fullYear = `20${year}`;
+              metadata.invoiceDate = `${fullYear}-${month}-${day}`;
+            }
+          }
+        } else {
+          // Try space/colon separated format
+          let dateMatch = line.match(/DATE[:\s]+(\d{2}\/\d{2}\/\d{2})/i);
+          if (dateMatch) {
+            const [day, month, year] = dateMatch[1].split('/');
+            const fullYear = year.length === 2 ? `20${year}` : year;
+            metadata.invoiceDate = `${fullYear}-${month}-${day}`;
+          } else {
+            // Try DD-MM-YY format
+            dateMatch = line.match(/DATE[:\s]+(\d{2})-(\d{2})-(\d{2})/i);
+            if (dateMatch) {
+              const [, day, month, year] = dateMatch;
+              const fullYear = year.length === 2 ? `20${year}` : year;
+              metadata.invoiceDate = `${fullYear}-${month}-${day}`;
+            }
+          }
         }
       }
 
       // INVOICE TOTAL appears at the end
-      if (line.includes('INVOICE TOTAL')) {
+      if (line.includes('INVOICE TOTAL') && !metadata.totalAmount) {
         const match = line.match(/INVOICE TOTAL\s+([\d.]+)/);
         if (match) {
           metadata.totalAmount = parseFloat(match[1]);
@@ -291,33 +318,41 @@ class BookerParser extends SupplierParser {
 
   /**
    * Determine if a line looks like an item line
-   * Item lines: TAB-separated with numeric code at start and 7 fields
+   * Item lines: TAB-separated with numeric code at start
+   *
+   * Booker invoices have items with varying numbers of fields:
+   *   - 7 fields (with RRP): "063724 Coke Zero	24 330ml	1	11.95	11.95	B	1.35 55.7%"
+   *   - 6 fields (no RRP): "287497 CL Buffet Sausage Rolls	1 100pk	1	5.35 M	5.35	A"
+   *   - 5 fields (no RRP): "278664 CE Mature White Cheddar	1 5kg	1	34.46	34.46	A"
+   *
+   * Minimum valid item: numeric code + 4 TABs (5 fields minimum)
    *
    * @param {string} line - Line to check
    * @returns {boolean} True if likely an item line
    */
   looksLikeItemLine(line) {
-    // Item lines: "063724 Coke Zero	24 330ml	1	11.95	11.95	B	1.35 55.7%"
-    // Start with numeric code, contain TAB, have at least 7 fields when split by TAB
+    // Start with numeric code, contain TAB
     const startsWithNumber = /^\d+/.test(line);
-    const hasEnoughFields = (line.match(/\t/g) || []).length >= 6;
+    // Item lines have at least 4 TABs (5 fields minimum: code, pack, qty, price, value)
+    const hasEnoughFields = (line.match(/\t/g) || []).length >= 4;
     return startsWithNumber && hasEnoughFields;
   }
 
   /**
    * Parse a single item line (TAB-separated fields)
    *
-   * Format (7 TAB-separated fields):
+   * Format (5-7 TAB-separated fields, RRP field is optional):
    *   0: CODE DESCRIPTION (e.g., "063724 Coke Zero")
    *   1: PACK SIZE (e.g., "24 330ml")
    *   2: QTY (e.g., "1")
    *   3: PRICE with optional P/M suffix (e.g., "11.95" or "8.49 P")
    *   4: VALUE/TOTAL (e.g., "11.95")
    *   5: VAT CODE (e.g., "B" = 20%, "A" = 0%)
-   *   6: RRP PERCENTAGE (e.g., "1.35 55.7%" where 1.35 is RRP, 55.7% is POR margin)
+   *   6: RRP PERCENTAGE (OPTIONAL) (e.g., "1.35 55.7%" where 1.35 is RRP, 55.7% is POR margin)
    *
-   * Example:
-   *   "063724 Coke Zero	24 330ml	1	11.95	11.95	B	1.35 55.7%"
+   * Examples:
+   *   "063724 Coke Zero	24 330ml	1	11.95	11.95	B	1.35 55.7%" (7 fields with RRP)
+   *   "278664 CE Mature White Cheddar	1 5kg	1	34.46	34.46	A" (6 fields no RRP)
    *
    * @param {string} line - Item line
    * @param {string} category - Category name
@@ -328,7 +363,9 @@ class BookerParser extends SupplierParser {
       // Split by TAB character (actual tabs from PDF)
       const fields = line.split('\t').map(f => f.trim());
 
-      if (fields.length < 7) {
+      // Minimum 5 fields required (code, pack, qty, price, value)
+      // VAT code (field 5) is usually present, RRP (field 6) is optional
+      if (fields.length < 5) {
         this.debug(`Skipping line with only ${fields.length} fields: ${line.substring(0, 60)}`);
         return null;
       }
@@ -356,14 +393,22 @@ class BookerParser extends SupplierParser {
       // Field 4: Value (line total)
       const value = this.extractAmount(fields[4]) || 0;
 
-      // Field 5: VAT code
-      const vatCode = fields[5];
-      const vatRate = vatCode === 'A' ? 0 : vatCode === 'B' ? 20 : null;
+      // Field 5: VAT code (may be missing in some items)
+      // VAT codes are single letters: A (0%), B (20%), or may be absent
+      let vatCode = '';
+      let vatRate = null;
+      if (fields.length > 5 && fields[5] && fields[5].length <= 2) {
+        vatCode = fields[5].toUpperCase();
+        vatRate = vatCode === 'A' ? 0 : vatCode === 'B' ? 20 : null;
+      }
 
-      // Field 6: RRP and POR percentage
+      // Field 6: RRP and POR percentage (OPTIONAL)
       // Format: "1.35 55.7%" where first part is RRP
-      const rrpField = fields[6];
-      const rrpValue = this.extractAmount(rrpField.split(/\s+/)[0]) || 0;
+      // Only present if line has 7+ fields
+      let rrpValue = 0;
+      if (fields.length > 6 && fields[6]) {
+        rrpValue = this.extractAmount(fields[6].split(/\s+/)[0]) || 0;
+      }
 
       // Extract pack and unit size
       const { pack, unit } = this.extractPackAndUnitSize(packSize);
