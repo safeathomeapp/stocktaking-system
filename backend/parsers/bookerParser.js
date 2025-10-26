@@ -116,8 +116,13 @@ class BookerParser extends SupplierParser {
     this.debug('Starting Booker invoice parse');
 
     try {
-      // Step 1: Extract lines from PDF (keep original spacing for better parsing)
-      const lines = pdfText.split(/\r?\n|\r/).map(line => line.trim()).filter(line => line);
+      // Step 1: Extract lines from PDF
+      // IMPORTANT: Preserve TAB characters for field splitting
+      const lines = pdfText.split(/\r?\n|\r/).map(line => {
+        // Trim only regular spaces, not TABs - preserve tabs for field parsing
+        return line.replace(/^ +| +$/g, '');
+      }).filter(line => line.trim().length > 0);
+
       this.debug(`Extracted ${lines.length} lines from PDF`);
 
       // Step 2: Extract invoice metadata
@@ -206,47 +211,64 @@ class BookerParser extends SupplierParser {
   /**
    * Parse items organized by category
    *
-   * Booker invoices have sections like:
-   *   RETAIL GROCERY
-   *   [items]
-   *   SUB-TOTAL : ITEMS 17 GOODS : 150.55 EXC.VAT
+   * Booker invoices have items followed by category headers:
+   *   [items with TAB-separated fields]
+   *   ----- --------
+   *   RETAIL GROCERY	SUB-TOTAL	:	ITEMS	17	GOODS :	150.55	EXC.VAT
+   *   [more items]
+   *   -----	--------
+   *   CHILLED	SUB-TOTAL	:	ITEMS	3	GOODS :	53.44	EXC.VAT
    *
-   *   CHILLED
-   *   [items]
-   *   SUB-TOTAL : ITEMS 3 GOODS : 53.44 EXC.VAT
+   * Strategy: For each item found, look ahead to find which category it belongs to
+   * by finding the next SUB-TOTAL line.
    *
    * @param {Array<string>} lines - PDF lines
    * @returns {Array<ParsedItem>} Parsed items with category info
    */
   parseItemsByCategory(lines) {
     const items = [];
-    let currentCategory = '';
 
+    // First pass: build a map of category start line to category name
+    // Category SUB-TOTAL lines indicate the category for items above them
+    const categoryHeaders = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (this.isCategoryHeaderLine(lines[i])) {
+        const categoryName = lines[i].split('\t')[0].trim();
+        categoryHeaders.push({ lineIdx: i, name: categoryName });
+      }
+    }
+
+    // Second pass: parse items and assign categories
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Detect category headers (all-caps, not just dashes or numbers)
-      if (this.isCategoryHeader(line)) {
-        currentCategory = line.trim();
-        this.debug(`Found category: ${currentCategory}`);
-        continue;
-      }
-
       // Skip separator lines and metadata lines
-      if (line.match(/^-+$/) || line.includes('SUB-TOTAL') || line.includes('TOTAL ITEMS') ||
-          line.includes('RATE GOODS') || line.includes('CODE DESCRIPTION')) {
+      if (line.match(/^-+(\s+-+|-)*$/) || line.includes('SUB-TOTAL') || line.includes('TOTAL ITEMS') ||
+          line.includes('RATE GOODS') || line.includes('CODE DESCRIPTION') || line.includes('INVOICE NUMBER')) {
         continue;
       }
 
-      // Skip special lines (promotions, free items, savings)
+      // Skip special lines
       if (line.includes('BUY') || line.includes('FOR') || line.includes('FREE') ||
-          line.includes('SAVING') || line.includes('INVOICE') || line.includes('AVAILABLE')) {
+          line.includes('SAVING') || line.includes('AVAILABLE') || line.includes('TILL') ||
+          line.includes('BRANCH') || line.includes('CUSTOMER') || line.includes('DATE') ||
+          line.includes('OPERATOR') || line.includes('PAGE')) {
         continue;
       }
 
-      // Parse item line (TAB-separated fields)
-      if (currentCategory && this.looksLikeItemLine(line)) {
-        const item = this.parseItemLine(line, currentCategory);
+      // Parse item line
+      if (line.includes('\t') && this.looksLikeItemLine(line)) {
+        // Find which category this item belongs to
+        // It belongs to the FIRST category header that comes AFTER this line
+        let category = 'UNKNOWN';
+        for (const header of categoryHeaders) {
+          if (header.lineIdx > i) {
+            category = header.name;
+            break;
+          }
+        }
+
+        const item = this.parseItemLine(line, category);
         if (item) {
           items.push(item);
         }
@@ -257,27 +279,45 @@ class BookerParser extends SupplierParser {
   }
 
   /**
+   * Check if a line is a category header with SUB-TOTAL
+   * Format: "RETAIL GROCERY	SUB-TOTAL	:	ITEMS	17	GOODS :	150.55	EXC.VAT"
+   *
+   * @param {string} line - Line to check
+   * @returns {boolean} True if this is a category header line
+   */
+  isCategoryHeaderLine(line) {
+    return line.includes('SUB-TOTAL') && line.includes('ITEMS') && line.includes('GOODS');
+  }
+
+  /**
    * Determine if a line looks like an item line
-   * Item lines start with a code (numbers), not metadata
+   * Item lines: TAB-separated with numeric code at start and 7 fields
    *
    * @param {string} line - Line to check
    * @returns {boolean} True if likely an item line
    */
   looksLikeItemLine(line) {
-    // Item lines start with numeric codes like "063724" or "282673"
-    // Skip lines that are mostly letters or contain header-like text
+    // Item lines: "063724 Coke Zero	24 330ml	1	11.95	11.95	B	1.35 55.7%"
+    // Start with numeric code, contain TAB, have at least 7 fields when split by TAB
     const startsWithNumber = /^\d+/.test(line);
-    const notMetadata = !line.includes(':') && !line.match(/^[A-Z\s&]+$/);
-    return startsWithNumber && notMetadata;
+    const hasEnoughFields = (line.match(/\t/g) || []).length >= 6;
+    return startsWithNumber && hasEnoughFields;
   }
 
   /**
    * Parse a single item line (TAB-separated fields)
    *
-   * Format: CODE [TAB] DESCRIPTION [TAB] PACK SIZE [TAB] QTY [TAB] PRICE [TAB] VALUE [TAB] VAT [TAB] RRP [TAB] POR
+   * Format (7 TAB-separated fields):
+   *   0: CODE DESCRIPTION (e.g., "063724 Coke Zero")
+   *   1: PACK SIZE (e.g., "24 330ml")
+   *   2: QTY (e.g., "1")
+   *   3: PRICE with optional P/M suffix (e.g., "11.95" or "8.49 P")
+   *   4: VALUE/TOTAL (e.g., "11.95")
+   *   5: VAT CODE (e.g., "B" = 20%, "A" = 0%)
+   *   6: RRP PERCENTAGE (e.g., "1.35 55.7%" where 1.35 is RRP, 55.7% is POR margin)
    *
    * Example:
-   *   "063724 Coke Zero 24 330ml 1 11.95 11.95 B 1.35 55.7%"
+   *   "063724 Coke Zero	24 330ml	1	11.95	11.95	B	1.35 55.7%"
    *
    * @param {string} line - Item line
    * @param {string} category - Category name
@@ -285,85 +325,48 @@ class BookerParser extends SupplierParser {
    */
   parseItemLine(line, category) {
     try {
-      // Split by multiple spaces/tabs to get fields
-      const fields = line.split(/\s{2,}/).map(f => f.trim());
+      // Split by TAB character (actual tabs from PDF)
+      const fields = line.split('\t').map(f => f.trim());
 
-      if (fields.length < 5) {
-        // Not enough fields for an item
+      if (fields.length < 7) {
+        this.debug(`Skipping line with only ${fields.length} fields: ${line.substring(0, 60)}`);
         return null;
       }
 
-      // Extract fields - flexible parsing for varying numbers of columns
-      const code = fields[0];
-      let description = '';
-      let packSize = '';
-      let qty = 1;
-      let price = 0;
-      let value = 0;
-      let vatCode = '';
-      let rrp = 0;
-
-      // Reconstruct fields from split array
-      // Format is: CODE DESC PACK QTY PRICE VALUE VAT RRP POR
-      // But description can have spaces, so we need to be careful
-
-      // Code is always first (numeric)
-      if (!code.match(/^\d+$/)) {
+      // Field 0: Code + Description (space-separated)
+      const codeAndDesc = fields[0];
+      const codeMatch = codeAndDesc.match(/^(\d+)\s+(.*)/);
+      if (!codeMatch) {
         return null;
       }
 
-      // Find where numeric fields start
-      let fieldIdx = 1;
+      const code = codeMatch[1];
+      const description = codeMatch[2];
 
-      // Description: everything until we find pack size (contains space and unit)
-      // or until we find quantities/prices
-      let desc = [];
-      while (fieldIdx < fields.length) {
-        const field = fields[fieldIdx];
-        // Check if this looks like pack size (number + space + unit)
-        if (field.match(/^\d+\s+[a-zA-Z]/)) {
-          packSize = field;
-          fieldIdx++;
-          break;
-        }
-        // Check if this looks like a number (qty or price)
-        if (!isNaN(parseFloat(field)) && field.match(/^\d+\.?\d*$/)) {
-          // This is probably qty, not part of description
-          break;
-        }
-        desc.push(field);
-        fieldIdx++;
-      }
-      description = desc.join(' ').trim();
+      // Field 1: Pack size (e.g., "24 330ml")
+      const packSize = fields[1];
 
-      // Rest of fields: qty, price, value, vat, rrp, por
-      if (fieldIdx < fields.length) {
-        qty = this.extractNumber(fields[fieldIdx]) || 1;
-        fieldIdx++;
-      }
-      if (fieldIdx < fields.length) {
-        price = this.extractAmount(fields[fieldIdx]) || 0;
-        fieldIdx++;
-      }
-      if (fieldIdx < fields.length) {
-        value = this.extractAmount(fields[fieldIdx]) || 0;
-        fieldIdx++;
-      }
-      if (fieldIdx < fields.length) {
-        vatCode = fields[fieldIdx] === 'A' || fields[fieldIdx] === 'B' ? fields[fieldIdx] : '';
-        fieldIdx++;
-      }
-      if (fieldIdx < fields.length) {
-        rrp = this.extractAmount(fields[fieldIdx]) || 0;
-        fieldIdx++;
-      }
-      // POR is percentage, we don't need it for database
+      // Field 2: Quantity
+      const qty = this.extractNumber(fields[2]) || 1;
 
-      // Extract pack and unit size from pack size field
-      const { pack, unit } = this.extractPackAndUnitSize(packSize);
+      // Field 3: Price (may have P or M suffix)
+      const priceField = fields[3];
+      const price = this.extractAmount(priceField.replace(/[PM]$/, '')) || 0;
 
-      // Map VAT code to rate
+      // Field 4: Value (line total)
+      const value = this.extractAmount(fields[4]) || 0;
+
+      // Field 5: VAT code
+      const vatCode = fields[5];
       const vatRate = vatCode === 'A' ? 0 : vatCode === 'B' ? 20 : null;
+
+      // Field 6: RRP and POR percentage
+      // Format: "1.35 55.7%" where first part is RRP
+      const rrpField = fields[6];
+      const rrpValue = this.extractAmount(rrpField.split(/\s+/)[0]) || 0;
+
+      // Extract pack and unit size
+      const { pack, unit } = this.extractPackAndUnitSize(packSize);
 
       return {
         supplierSku: this.cleanSku(code),
@@ -376,11 +379,11 @@ class BookerParser extends SupplierParser {
         vatCode: vatCode,
         vatRate: vatRate,
         lineTotal: value,
-        rrp: rrp,
+        rrp: rrpValue,
         categoryHeader: category,
       };
     } catch (error) {
-      this.debug(`Error parsing item line: ${line}`, error.message);
+      this.debug(`Error parsing item line: ${line.substring(0, 60)}... Error: ${error.message}`);
       return null;
     }
   }
@@ -455,69 +458,6 @@ class BookerParser extends SupplierParser {
     return { subtotal, vatTotal };
   }
 
-  /**
-   * Detect category header line
-   *
-   * Category headers are:
-   *   - All or mostly uppercase
-   *   - Contain meaningful words (not dashes or numbers)
-   *   - Examples: "RETAIL GROCERY", "FROZEN FOOD", "WINES SPIRITS BEERS"
-   *
-   * NOT category headers:
-   *   - "-----" (separator)
-   *   - "CODE DESCRIPTION PACK SIZE..."  (column headers)
-   *   - "TOTAL ITEMS: 72" (metadata)
-   *
-   * @param {string} line - Line to check
-   * @returns {boolean} True if this is a category header
-   */
-  isCategoryHeader(line) {
-    // Must be mostly uppercase
-    if (!line.match(/^[A-Z\s&']+$/)) {
-      return false;
-    }
-
-    // Must not be just dashes or separators
-    if (line.match(/^-+$/) || line.length < 4) {
-      return false;
-    }
-
-    // Must not be known metadata lines
-    if (line.includes('CODE') || line.includes('TOTAL') || line.includes('RATE') ||
-        line.includes('INVOICE') || line.includes('CUSTOMER') || line.includes('ITEMS:')) {
-      return false;
-    }
-
-    // Known categories that appear in Booker invoices
-    const knownCategories = [
-      'RETAIL GROCERY',
-      'CHILLED',
-      'CATERING GROCERY',
-      'FROZEN FOOD',
-      'FROZEN',
-      'CONFECTIONERY',
-      'WINES SPIRITS BEERS',
-      'MEAT',
-      'FRUIT & VEG',
-      'FRUIT&VEG',
-      'NON-FOOD',
-      'TOBACCO',
-      'BEERS',
-      'SPIRITS',
-      'WINES',
-    ];
-
-    // Check if line matches known categories or looks like a category
-    for (const cat of knownCategories) {
-      if (line.includes(cat)) {
-        return true;
-      }
-    }
-
-    // If line has multiple words and is all uppercase, likely a category
-    const wordCount = line.split(/\s+/).length;
-    return wordCount >= 2;
-  }
 }
 
 // ============================================================================

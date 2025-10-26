@@ -23,7 +23,14 @@
       "Bash(git commit:*)",
       "Bash(lsof:*)",
       "Bash(awk:*)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(psql:*)",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d invoices\")",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d invoice_line_items\")",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -f \"C:/Users/kevth/Desktop/Stocktake/stocktaking-system/backend/migrations/add_rrp_category_to_invoice_line_items.sql\")",
+      "Bash(node -e:*)",
+      "Bash(node debug-parser.js:*)",
+      "Bash(node debug-parser-full.js:*)"
     ],
     "deny": [],
     "ask": []
