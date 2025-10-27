@@ -532,11 +532,20 @@ const Step2_ReviewItems = ({
   };
 
   const handleToggleAll = (category, selectAll) => {
-    parsedItems.forEach((item, idx) => {
-      if (item.categoryHeader === category) {
-        onItemCheckboxChange(idx, selectAll);
-      }
-    });
+    // Get items for this category from the already-computed categorizedItems
+    const itemsInCategory = categorizedItems[category];
+
+    if (itemsInCategory && itemsInCategory.length > 0) {
+      // Find the indices of all items in this category from parsedItems
+      itemsInCategory.forEach(item => {
+        const itemIndex = parsedItems.findIndex(
+          pItem => pItem.categoryHeader === item.categoryHeader && pItem.supplierSku === item.supplierSku
+        );
+        if (itemIndex !== -1) {
+          onItemCheckboxChange(itemIndex, selectAll);
+        }
+      });
+    }
   };
 
   const handleQuantityChange = (key, newQuantity) => {
