@@ -3556,6 +3556,191 @@ app.post('/api/supplier-items/:id/link-master', async (req, res) => {
   }
 });
 
+// ===== FUZZY MATCHING ENDPOINT FOR STEP 4 =====
+
+/**
+ * POST /api/supplier-items/fuzzy-match
+ *
+ * Purpose:
+ *   Match a supplier item to master products using fuzzy matching logic.
+ *   Used in Step 4 of invoice workflow for product matching.
+ *
+ * Request Body:
+ *   {
+ *     "supplierSku": "12345",
+ *     "supplierName": "Coca Cola 2L Bottle",
+ *     "supplierId": "uuid",
+ *     "unitSize": "2L" or "2000ml",
+ *     "packSize": "6-pack",
+ *     "category": "SOFT DRINK"
+ *   }
+ *
+ * Response:
+ *   {
+ *     "autoMatched": {
+ *       "masterProductId": "uuid",
+ *       "masterProductName": "Coca-Cola 2L Bottle",
+ *       "matchType": "existing_mapping" | "fuzzy",
+ *       "confidence": 95
+ *     } or null,
+ *     "candidates": [
+ *       {
+ *         "id": "uuid",
+ *         "name": "Coca-Cola 2L",
+ *         "brand": "Coca-Cola",
+ *         "category": "SOFT DRINK",
+ *         "unitSize": 2000,
+ *         "caseSize": 6,
+ *         "confidence": 95.5,
+ *         "matchReasons": ["name_match: 98%", "unit_size_match: perfect"]
+ *       }
+ *     ]
+ *   }
+ */
+app.post('/api/supplier-items/fuzzy-match', async (req, res) => {
+  try {
+    const {
+      supplierSku,
+      supplierName,
+      supplierId,
+      unitSize,
+      packSize,
+      category
+    } = req.body;
+
+    if (!supplierSku || !supplierName || !supplierId) {
+      return res.status(400).json({
+        error: 'supplierSku, supplierName, and supplierId are required'
+      });
+    }
+
+    // STEP 1: Check if this supplier item already has an existing mapping
+    const existingMapping = await pool.query(`
+      SELECT
+        sil.id,
+        sil.master_product_id,
+        sil.confidence_score,
+        mp.name as master_product_name
+      FROM supplier_item_list sil
+      LEFT JOIN master_products mp ON sil.master_product_id = mp.id
+      WHERE sil.supplier_id = $1
+        AND sil.supplier_sku = $2
+        AND sil.master_product_id IS NOT NULL
+      LIMIT 1
+    `, [supplierId, supplierSku]);
+
+    if (existingMapping.rows.length > 0) {
+      const mapping = existingMapping.rows[0];
+      return res.json({
+        autoMatched: {
+          masterProductId: mapping.master_product_id,
+          masterProductName: mapping.master_product_name,
+          matchType: 'existing_mapping',
+          confidence: Math.round(mapping.confidence_score || 100)
+        },
+        candidates: []
+      });
+    }
+
+    // STEP 2: Fuzzy match against master_products
+    // Scoring formula: (name * 0.60) + (unitSize * 0.20) + (packSize * 0.15) + (category * 0.05)
+    const fuzzyResults = await pool.query(`
+      SELECT
+        mp.id,
+        mp.name,
+        mp.brand,
+        mp.category,
+        mp.unit_size,
+        mp.case_size,
+        -- Name similarity (0-1 scale from PostgreSQL)
+        similarity(LOWER(mp.name), LOWER($1)) as name_sim,
+        -- Unit size match (1 if exact, 0 otherwise)
+        CASE
+          WHEN $2::TEXT != '' AND LOWER(COALESCE(mp.unit_size::TEXT, '')) LIKE LOWER($2::TEXT) THEN 1
+          WHEN $2::TEXT != '' AND LOWER(COALESCE(mp.unit_size::TEXT, '')) = LOWER($2::TEXT) THEN 1
+          ELSE 0
+        END as unit_match,
+        -- Pack size match (1 if exact, 0 otherwise)
+        CASE
+          WHEN $3::TEXT != '' AND LOWER(COALESCE(mp.case_size::TEXT, '')) LIKE LOWER($3::TEXT) THEN 1
+          WHEN $3::TEXT != '' AND LOWER(COALESCE(mp.case_size::TEXT, '')) = LOWER($3::TEXT) THEN 1
+          ELSE 0
+        END as pack_match,
+        -- Category match (1 if exact, 0 otherwise)
+        CASE
+          WHEN $4::TEXT != '' AND LOWER(COALESCE(mp.category, '')) = LOWER($4::TEXT) THEN 1
+          ELSE 0
+        END as category_match
+      FROM master_products mp
+      WHERE mp.active = true
+        AND (
+          -- Match on name similarity OR category
+          similarity(LOWER(mp.name), LOWER($1)) > 0.3
+          OR (category = $4 AND $4 != '')
+        )
+      ORDER BY
+        -- Final score calculation
+        (similarity(LOWER(mp.name), LOWER($1)) * 0.60
+         + CASE WHEN $2::TEXT != '' THEN similarity(COALESCE(mp.unit_size::TEXT, ''), $2::TEXT) * 0.20 ELSE 0 END
+         + CASE WHEN $3::TEXT != '' THEN similarity(COALESCE(mp.case_size::TEXT, ''), $3::TEXT) * 0.15 ELSE 0 END
+         + CASE WHEN $4::TEXT != '' THEN (CASE WHEN LOWER(mp.category) = LOWER($4) THEN 1 ELSE 0 END) * 0.05 ELSE 0 END
+        ) DESC
+      LIMIT 10
+    `, [supplierName, unitSize || '', packSize || '', category || '']);
+
+    // Transform results to include confidence scores and match reasons
+    const candidates = fuzzyResults.rows.map(row => {
+      const nameSim = row.name_sim * 100; // Scale to 0-100
+      const unitMatch = row.unit_match * 100;
+      const packMatch = row.pack_match * 100;
+      const categoryMatch = row.category_match * 100;
+
+      const confidence =
+        (nameSim * 0.60) +
+        (unitMatch * 0.20) +
+        (packMatch * 0.15) +
+        (categoryMatch * 0.05);
+
+      const matchReasons = [];
+      if (nameSim > 50) matchReasons.push(`name_match: ${Math.round(nameSim)}%`);
+      if (unitMatch > 0) matchReasons.push('unit_size_match: perfect');
+      if (packMatch > 0) matchReasons.push('pack_size_match: perfect');
+      if (categoryMatch > 0) matchReasons.push('category_match: perfect');
+
+      return {
+        id: row.id,
+        name: row.name,
+        brand: row.brand,
+        category: row.category,
+        unitSize: row.unit_size,
+        caseSize: row.case_size,
+        confidence: Math.round(confidence * 10) / 10, // Round to 1 decimal
+        matchReasons
+      };
+    });
+
+    // Determine if top candidate should be auto-matched (based on threshold)
+    const CONFIDENCE_THRESHOLD = 80; // Should match frontend config
+    const autoMatched =
+      candidates.length > 0 && candidates[0].confidence >= CONFIDENCE_THRESHOLD
+        ? {
+            masterProductId: candidates[0].id,
+            masterProductName: candidates[0].name,
+            matchType: 'fuzzy',
+            confidence: candidates[0].confidence
+          }
+        : null;
+
+    res.json({
+      autoMatched,
+      candidates
+    });
+  } catch (error) {
+    console.error('Error in fuzzy match:', error);
+    res.status(500).json({ error: 'Failed to perform fuzzy match' });
+  }
+});
+
 // ===== EPOS SALES IMPORT ENDPOINTS =====
 
 // Upload EPOS CSV data

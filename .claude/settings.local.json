@@ -40,7 +40,9 @@
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT venue_id, supplier_id, supplier_sku, product_name, ignore_reason FROM venue_ignored_items LIMIT 3;\")",
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"ALTER TABLE venue_ignored_items ADD COLUMN IF NOT EXISTS unit_size VARCHAR(50);\")",
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT id, name FROM suppliers LIMIT 5;\")",
-      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d suppliers\")"
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d suppliers\")",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d supplier_item_list\")",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c:*)"
     ],
     "deny": [],
     "ask": []
