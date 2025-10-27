@@ -4089,6 +4089,64 @@ app.get('/api/venues/:venueId/check-ignored-items/:supplierId', async (req, res)
 app.use('/api/invoices', invoiceRoutes);
 
 // ============================================================================
+// DATABASE INSPECTOR API
+// ============================================================================
+
+// Get all tables
+app.get('/api/db-tables', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+    const tables = result.rows.map(row => row.table_name);
+    res.json({ tables });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Inspect a specific table
+app.get('/api/db-inspect/:tableName', async (req, res) => {
+  try {
+    const { tableName } = req.params;
+
+    // Validate table name (prevent SQL injection)
+    if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
+      return res.status(400).json({ error: 'Invalid table name' });
+    }
+
+    // Get columns
+    const columnsResult = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_name = $1
+      ORDER BY ordinal_position
+    `, [tableName]);
+
+    // Get record count
+    const countResult = await pool.query(
+      `SELECT COUNT(*) as count FROM ${tableName}`
+    );
+
+    // Get first 10 records
+    const dataResult = await pool.query(
+      `SELECT * FROM ${tableName} LIMIT 10`
+    );
+
+    res.json({
+      columns: columnsResult.rows,
+      count: parseInt(countResult.rows[0].count),
+      data: dataResult.rows
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
 // START SERVER
 // ============================================================================
 
@@ -4099,6 +4157,7 @@ app.listen(PORT, () => {
   console.log(`Supplier Item List API ready at /api/supplier-items`);
   console.log(`EPOS Sales Import API ready at /api/epos-imports`);
   console.log(`Invoice Parsing API ready at /api/invoices/parse`);
+  console.log(`Database Inspector API ready at /api/db-tables and /api/db-inspect/:tableName`);
 });
 
 // Force redeploy $(date)// Force redeploy Fri Sep 26 00:02:49 GMTST 2025

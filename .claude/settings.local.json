@@ -33,7 +33,9 @@
       "Bash(node debug-parser-full.js:*)",
       "Bash(node debug-parser-detailed.js:*)",
       "Bash(node debug-parser-categories.js:*)",
-      "Bash(node debug-date-extraction.js:*)"
+      "Bash(node debug-date-extraction.js:*)",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d venue_ignore\")",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

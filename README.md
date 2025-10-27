@@ -1938,15 +1938,16 @@ psql -U postgres stocktaking_local < backup_20251020.sql
 
 # 📄 Invoice PDF Parsing & Supplier Detection System
 
-## Current Status: Step 1 & Step 2 Complete ✅
+## Current Status: Steps 1-5 Complete ✅
 
-The invoice PDF parsing system is fully functional for **uploading, detecting suppliers, and reviewing parsed items**. The system has been tested with real Booker invoices and successfully:
-- ✅ Parses supplier invoices with category-based item organization
-- ✅ Displays items organized by supplier categories
-- ✅ Allows user selection/deselection of items
-- ✅ Supports quantity editing per item
-- ✅ Calculates dynamic subtotals
-- ✅ Provides clean, efficient UI with consolidated controls
+The invoice PDF parsing and supplier item matching system is **fully functional** and has been comprehensively documented. The system has been tested with real Booker invoices and successfully handles the complete workflow from PDF upload through final database storage.
+
+**Complete 5-Step Workflow:**
+- ✅ **Step 1**: Upload & Supplier Detection
+- ✅ **Step 2**: Review Items & Select with Progressive Learning
+- ✅ **Step 3**: Confirm Ignored Items + Smart Matching (Tier 1, 2, 3)
+- ✅ **Step 4**: Manual Master Product Matching (with fuzzy search)
+- ✅ **Step 5**: Final Summary & Confirmation (with database save)
 
 ### What's Working
 
@@ -1970,6 +1971,38 @@ The invoice PDF parsing system is fully functional for **uploading, detecting su
   - Grand total of selected items
 - Clean, consolidated header bar eliminates redundant UI
 - Navigation: Back button and Next button (disabled if no items selected)
+- Progressive learning: Auto-unchecks items from venue_ignore on subsequent imports
+
+✅ **Step 3: Confirm Ignored Items & Smart Matching**
+- Three-tier matching system for supplier items:
+  - **Tier 1 (MATCHED)**: Items found in supplier_item_list → Auto-linked
+  - **Tier 2 (CREATED)**: Fuzzy-matched to master_products with ≥60% confidence → Auto-linked
+  - **Tier 2 Failed (NEEDS_MANUAL)**: Items with <60% confidence → Require Step 4
+- Optional reason tracking for ignored items
+- Saves to venue_ignore table for progressive learning
+- Fuzzy matching using PostgreSQL pg_trgm with confidence scoring
+- Comprehensive matching logic and learning system documentation in `docs/INVOICE_MATCHING_LOGIC.md`
+
+✅ **Step 4: Manual Master Product Matching**
+- Search and select master products for unmatched items
+- Fuzzy search with confidence scoring from `/api/master-products/search`
+- Display matching suggestions with confidence scores
+- Create new master product fallback (if no match found)
+- Updates supplier_item_list with verified=true for learning system
+- Item-by-item review with navigation controls
+- See `docs/STEP4_DESIGN.md` for comprehensive specification
+
+✅ **Step 5: Final Summary & Confirmation**
+- Complete summary of invoice with metadata, items, and category breakdown
+- Review all 4 types of data before final save:
+  - invoices (header record)
+  - invoice_line_items (selected items)
+  - supplier_item_list (learning system)
+  - venue_ignored_items (ignored items with reasons)
+- Validation warnings for data quality
+- One-click database save with transaction support
+- Success redirect to dashboard
+- See `docs/STEP5_DESIGN.md` for comprehensive specification
 
 ### Access the Feature
 
@@ -2104,20 +2137,24 @@ You can upload any Booker invoice from: `C:/Users/kevth/Desktop/Stocktake/stockt
 
 ```
 Step 1: Upload & Parse PDF
-    ↓ (suppliedItems, metadata)
-Step 2: Review Items & Select ← YOU ARE HERE
-    ↓ (itemCheckboxes)
-Step 3: Confirm Ignored Items
-    ↓
-Step 4: Match Master Products
-    ↓
+    ↓ (parsedItems, metadata, detectedSupplier)
+Step 2: Review Items & Select
+    ↓ (itemCheckboxes - selected vs ignored items)
+Step 3: Confirm Ignored Items & Smart Matching
+    ↓ (Step 3 matches Tier 1 & 2, extracts items needing manual matching)
+Step 4: Manual Master Product Matching
+    ↓ (matchedItems - user selects master products for unmatched items)
 Step 5: Final Summary & Confirmation
+    ↓ (onSubmit - saves to database)
+✅ INVOICE SAVED TO DATABASE
 ```
 
-**Transition to Step 3**:
-- Calls `onComplete(itemCheckboxes)`
-- Parent filters out unchecked items
-- Unchecked items passed to Step 3 for ignore reasons
+**Data Flow Between Steps:**
+- Step 1 → Step 2: Parsed items, invoice metadata, detected supplier
+- Step 2 → Step 3: Item selection state (checkbox state)
+- Step 3 → Step 4: Unmatched items requiring manual master product selection
+- Step 4 → Step 5: Complete matched items dictionary
+- Step 5 → Database: All invoice data (invoices, line_items, ignored_items, supplier_item_list)
 
 ### Data Flow
 
@@ -2285,12 +2322,38 @@ The Booker parser currently:
   - NON-FOOD
 - Item fields: SKU, description, pack size, unit size, qty, price, line total
 
-### Task 3-5: Steps 2-5 UI Components (PENDING)
-**When**: After Step 1 and Booker parser are solid
-- Step 2: Review Parsed Items (with category grouping)
-- Step 3: Confirm Ignored Items (with reasons)
-- Step 4: Master Product Matching
-- Step 5: Final Summary & Confirmation
+### Steps 2-5 UI Components (COMPLETE ✅)
+
+**Step 2: Review Parsed Items** ✅ COMPLETE
+- See comprehensive documentation in **`docs/STEP3_DESIGN.md`** (Step 3 design that includes Step 2 integration)
+- Category grouping with collapse/expand
+- Select-all checkboxes per category
+- Quantity editing with ±/- controls
+- Real-time subtotal calculations
+
+**Step 3: Confirm Ignored Items** ✅ COMPLETE
+- See comprehensive documentation in **`docs/STEP3_DESIGN.md`**
+- Three-tier smart matching (Tier 1, 2, 3)
+- Optional reason tracking
+- Progressive learning integration
+- Fuzzy matching with confidence scoring
+- Full implementation details and API endpoints
+
+**Step 4: Manual Master Product Matching** ✅ COMPLETE
+- See comprehensive documentation in **`docs/STEP4_DESIGN.md`**
+- Item-by-item matching interface
+- Fuzzy search with confidence scoring
+- Create new master product fallback
+- Learning system integration with verified=true flag
+- Complete API endpoint specifications
+
+**Step 5: Final Summary & Confirmation** ✅ COMPLETE
+- See comprehensive documentation in **`docs/STEP5_DESIGN.md`**
+- Complete invoice summary with all metrics
+- Category breakdown visualization
+- Validation warnings for data quality
+- One-click database save with transaction support
+- Saves to: invoices, invoice_line_items, supplier_item_list, venue_ignored_items
 
 ---
 

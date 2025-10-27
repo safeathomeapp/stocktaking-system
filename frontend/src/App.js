@@ -17,6 +17,7 @@ import ManualInvoiceEntry from './components/ManualInvoiceEntry';
 import SupplierInvoiceReview from './components/SupplierInvoiceReview';
 import EposCsvInput from './components/EposCsvInput';
 import AreaSetup from './components/AreaSetup';
+import DatabaseInspector from './components/DatabaseInspector';
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
             <Route path="/invoice-review" element={<SupplierInvoiceReview />} />
             <Route path="/epos-csv-input/:venueId?" element={<EposCsvInput />} />
             <Route path="/area-setup/:venueId" element={<AreaSetup />} />
+            <Route path="/database" element={<DatabaseInspector />} />
           </Routes>
         </div>
       </Router>
