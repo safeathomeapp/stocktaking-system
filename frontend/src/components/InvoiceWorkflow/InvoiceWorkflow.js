@@ -350,10 +350,10 @@ const InvoiceWorkflow = ({ venueId, userId }) => {
               detectedSupplier={detectedSupplier}
               invoiceMetadata={invoiceMetadata}
               onItemCheckboxChange={(idx, checked) => {
-                setItemCheckboxes({
-                  ...itemCheckboxes,
+                setItemCheckboxes(prevCheckboxes => ({
+                  ...prevCheckboxes,
                   [idx]: checked,
-                });
+                }));
               }}
               onComplete={handleReviewComplete}
               onBack={handleBackClick}
