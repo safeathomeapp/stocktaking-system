@@ -669,9 +669,10 @@ const Dashboard = () => {
         </Button>
 
         <Button
-          onClick={() => navigate('/invoice-input')}
+          onClick={() => navigate('/invoice-input', { state: { venueId: selectedVenue } })}
           variant="outline"
           size="lg"
+          disabled={!selectedVenue}
         >
           Input Invoices
         </Button>

@@ -32,7 +32,7 @@
  * ============================================================================
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import styled from 'styled-components';
 
 // ============================================================================
@@ -308,6 +308,18 @@ const ItemPackSize = styled.div`
   text-overflow: ellipsis;
 `;
 
+const AutoUncheckBadge = styled.span`
+  font-size: 11px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  margin-left: 8px;
+  font-weight: 500;
+`;
+
 const ItemPriceSection = styled.div`
   display: flex;
   gap: 16px;
@@ -461,6 +473,7 @@ const Step2_ReviewItems = ({
   itemCheckboxes,
   detectedSupplier,
   invoiceMetadata,
+  venueId,
   onItemCheckboxChange,
   onComplete,
   onBack,
@@ -479,6 +492,65 @@ const Step2_ReviewItems = ({
     });
     return initial;
   });
+
+  // Track which items were auto-unchecked due to progressive learning
+  const [autoUncheckedItems, setAutoUncheckedItems] = useState(new Set());
+
+  // ========== PROGRESSIVE LEARNING: Load and auto-uncheck ignored items ==========
+
+  useEffect(() => {
+    // Only run if we have venue, supplier, and parsed items
+    if (!venueId || !detectedSupplier?.id || parsedItems.length === 0) {
+      return;
+    }
+
+    const loadIgnoredItems = async () => {
+      try {
+        const response = await fetch(
+          `/api/venue-ignore/list?venueId=${venueId}&supplierId=${detectedSupplier.id}`
+        );
+
+        if (!response.ok) {
+          console.error('Failed to load ignored items:', response.statusText);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.items && data.items.length > 0) {
+          // Create a Set of supplier SKUs that should be auto-unchecked
+          const ignoredSkus = new Set(data.items.map(item => item.supplier_sku));
+
+          // Find items in parsedItems that match ignored SKUs and uncheck them
+          const itemsToUncheck = [];
+          const uncheckedSet = new Set();
+
+          parsedItems.forEach((item, idx) => {
+            if (ignoredSkus.has(item.supplierSku)) {
+              itemsToUncheck.push(idx);
+              uncheckedSet.add(`${item.categoryHeader}-${item.supplierSku}`);
+            }
+          });
+
+          // Apply the unchecking via callback
+          itemsToUncheck.forEach(idx => {
+            onItemCheckboxChange(idx, false);
+          });
+
+          // Track which items were auto-unchecked for visual indication
+          setAutoUncheckedItems(uncheckedSet);
+
+          console.log(
+            `Progressive learning: Auto-unchecked ${itemsToUncheck.length} items from saved ignore list`
+          );
+        }
+      } catch (err) {
+        console.error('Error loading ignored items for progressive learning:', err);
+      }
+    };
+
+    loadIgnoredItems();
+  }, [venueId, detectedSupplier?.id, parsedItems]);
 
   // Convert itemCheckboxes from index-based to category-SKU based for internal use
   // Using useMemo to recalculate whenever itemCheckboxes changes
@@ -638,7 +710,14 @@ const Step2_ReviewItems = ({
                       <ItemDetails>
                         <ItemCode>{item.supplierSku}</ItemCode>
                         <ItemInfo>
-                          <ItemName>{item.supplierName}</ItemName>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <ItemName>{item.supplierName}</ItemName>
+                            {autoUncheckedItems.has(key) && (
+                              <AutoUncheckBadge title="This item was automatically unchecked from your saved ignore list">
+                                Auto-ignored
+                              </AutoUncheckBadge>
+                            )}
+                          </div>
                           <ItemPackSize>{item.packSize} ({item.unitSize})</ItemPackSize>
                         </ItemInfo>
                       </ItemDetails>

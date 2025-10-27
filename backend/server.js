@@ -4147,6 +4147,128 @@ app.get('/api/db-inspect/:tableName', async (req, res) => {
 });
 
 // ============================================================================
+// VENUE IGNORE LIST API - For Invoice Workflow (Step 3 & Step 2)
+// ============================================================================
+
+/**
+ * GET /api/venue-ignore/list
+ * Purpose: Load ignored items for a venue+supplier (used in Step 2 for auto-unchecking)
+ * Query params: venueId, supplierId
+ * Returns: List of items to auto-uncheck in Step 2
+ */
+app.get('/api/venue-ignore/list', async (req, res) => {
+  try {
+    const { venueId, supplierId } = req.query;
+
+    if (!venueId || !supplierId) {
+      return res.status(400).json({
+        success: false,
+        error: 'venueId and supplierId query parameters are required'
+      });
+    }
+
+    const result = await pool.query(
+      `SELECT id, supplier_sku, product_name, unit_size, ignore_reason
+       FROM venue_ignored_items
+       WHERE venue_id = $1 AND supplier_id = $2
+       ORDER BY created_at DESC`,
+      [venueId, supplierId]
+    );
+
+    res.json({
+      success: true,
+      items: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching venue ignored items:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch ignored items'
+    });
+  }
+});
+
+/**
+ * POST /api/venue-ignore/save
+ * Purpose: Save checked items from Step 3 (items to ignore)
+ * Body: { venueId, supplierId, items: [{ supplierSku, productName, unitSize, reason }] }
+ * Returns: Count of items saved
+ */
+app.post('/api/venue-ignore/save', async (req, res) => {
+  try {
+    const { venueId, supplierId, items } = req.body;
+
+    // Validate required fields
+    if (!venueId || !supplierId) {
+      return res.status(400).json({
+        success: false,
+        error: 'venueId and supplierId are required'
+      });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'items array is required and must not be empty'
+      });
+    }
+
+    let savedCount = 0;
+    let skippedCount = 0;
+    const errors = [];
+
+    // Save each item, handling UNIQUE constraint violations gracefully
+    for (const item of items) {
+      try {
+        await pool.query(
+          `INSERT INTO venue_ignored_items
+           (venue_id, supplier_id, supplier_sku, product_name, unit_size, ignore_reason)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (venue_id, supplier_id, supplier_sku)
+           DO UPDATE SET
+             product_name = EXCLUDED.product_name,
+             unit_size = EXCLUDED.unit_size,
+             ignore_reason = EXCLUDED.ignore_reason,
+             updated_at = CURRENT_TIMESTAMP`,
+          [venueId, supplierId, item.supplierSku, item.productName, item.unitSize || null, item.reason || null]
+        );
+        savedCount++;
+      } catch (itemError) {
+        // Handle UNIQUE constraint violations with product_name + unit_size
+        if (itemError.code === '23505') {
+          // Check if it's the secondary unique index
+          if (itemError.constraint === 'idx_venue_ignored_product_name_unit') {
+            skippedCount++;
+            errors.push(`${item.productName} (${item.unitSize}): Already in ignore list`);
+          } else {
+            // Primary unique constraint - update it
+            savedCount++;
+          }
+        } else {
+          console.error(`Error saving item ${item.supplierSku}:`, itemError);
+          errors.push(`${item.supplierSku}: ${itemError.message}`);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      savedCount,
+      skippedCount,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `${savedCount} items saved to ignore list${skippedCount > 0 ? `, ${skippedCount} duplicates skipped` : ''}`
+    });
+  } catch (error) {
+    console.error('Error saving venue ignored items:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save ignored items'
+    });
+  }
+});
+
+// ============================================================================
 // START SERVER
 // ============================================================================
 

@@ -28,6 +28,7 @@
  */
 
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import Step1_Upload from './Step1_Upload';
 import Step2_ReviewItems from './Step2_ReviewItems';
@@ -125,7 +126,14 @@ const ErrorMessage = styled.div`
 // MAIN COMPONENT
 // ============================================================================
 
-const InvoiceWorkflow = ({ venueId, userId }) => {
+const InvoiceWorkflow = ({ venueId: propVenueId, userId: propUserId }) => {
+  // ========== ROUTE & NAVIGATION ==========
+
+  // Extract venueId and userId from location state (passed from Dashboard)
+  const location = useLocation();
+  const venueId = location.state?.venueId || propVenueId;
+  const userId = location.state?.userId || propUserId;
+
   // ========== STATE MANAGEMENT ==========
 
   // Current workflow step (1-5)
@@ -349,6 +357,7 @@ const InvoiceWorkflow = ({ venueId, userId }) => {
               itemCheckboxes={itemCheckboxes}
               detectedSupplier={detectedSupplier}
               invoiceMetadata={invoiceMetadata}
+              venueId={venueId}
               onItemCheckboxChange={(idx, checked) => {
                 setItemCheckboxes(prevCheckboxes => ({
                   ...prevCheckboxes,

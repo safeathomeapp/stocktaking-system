@@ -35,7 +35,12 @@
       "Bash(node debug-parser-categories.js:*)",
       "Bash(node debug-date-extraction.js:*)",
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d venue_ignore\")",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d venue_ignored_items\")",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT venue_id, supplier_id, supplier_sku, product_name, ignore_reason FROM venue_ignored_items LIMIT 3;\")",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"ALTER TABLE venue_ignored_items ADD COLUMN IF NOT EXISTS unit_size VARCHAR(50);\")",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT id, name FROM suppliers LIMIT 5;\")",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d suppliers\")"
     ],
     "deny": [],
     "ask": []
