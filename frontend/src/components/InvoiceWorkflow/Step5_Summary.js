@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import styled from "styled-components";
+import React, { useState } from 'react';
+import styled from 'styled-components';
 
 const SummaryContainer = styled.div`width: 100%;`;
 const SummaryHeader = styled.div`background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px;`;
@@ -27,7 +27,7 @@ const Step5_Summary = ({ invoiceMetadata = {}, parsedItems = [], itemCheckboxes 
   const totalIgnored = ignoredItems.length;
   const autoMatchedCount = importedItems.filter(idx => matchedItems[idx]?.isAutoMatched).length;
   const groupedByCategory = {};
-  parsedItems.forEach((item, idx) => { const category = item.categoryHeader || "Other"; if (!groupedByCategory[category]) groupedByCategory[category] = []; groupedByCategory[category].push({ ...item, index: idx }); });
+  parsedItems.forEach((item, idx) => { const category = item.categoryHeader || 'Other'; if (!groupedByCategory[category]) groupedByCategory[category] = []; groupedByCategory[category].push({ ...item, index: idx }); });
   const toggleCategory = (category) => { setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] })); };
   return (
     <SummaryContainer>
@@ -36,11 +36,11 @@ const Step5_Summary = ({ invoiceMetadata = {}, parsedItems = [], itemCheckboxes 
         <HeaderGrid>
           <HeaderItem>
             <div className="label">Supplier</div>
-            <div className="value">{detectedSupplier?.name || "Unknown"}</div>
+            <div className="value">{detectedSupplier?.name || 'Unknown'}</div>
           </HeaderItem>
           <HeaderItem>
             <div className="label">Invoice Number</div>
-            <div className="value">{invoiceMetadata?.invoiceNumber || "N/A"}</div>
+            <div className="value">{invoiceMetadata?.invoiceNumber || 'N/A'}</div>
           </HeaderItem>
           <HeaderItem>
             <div className="label">Total</div>
@@ -59,7 +59,7 @@ const Step5_Summary = ({ invoiceMetadata = {}, parsedItems = [], itemCheckboxes 
         const importedCategoryItems = items.filter(item => itemCheckboxes[item.index] === true);
         if (!importedCategoryItems.length) return null;
         const isExpanded = expandedCategories[category] !== false;
-        return <CategorySection key={category}><CategoryHeader onClick={() => toggleCategory(category)}><div>{category}</div><div>{isExpanded ? "▼" : "▶"}</div></CategoryHeader>{isExpanded && <CategoryItems>{importedCategoryItems.map((item, idx) => <ItemRow key={idx}><div>{item.supplierName}</div><div>{matchedItems[item.index]?.isAutoMatched ? "Auto" : "Manual"}</div></ItemRow>)}</CategoryItems>}</CategorySection>;
+        return <CategorySection key={category}><CategoryHeader onClick={() => toggleCategory(category)}><div>{category}</div><div>{isExpanded ? '▼' : '▶'}</div></CategoryHeader>{isExpanded && <CategoryItems>{importedCategoryItems.map((item, idx) => <ItemRow key={idx}><div>{item.supplierName}</div><div>{matchedItems[item.index]?.isAutoMatched ? 'Auto' : 'Manual'}</div></ItemRow>)}</CategoryItems>}</CategorySection>;
       })}
       <ActionButtons>
         <BackButton onClick={onBack}>Back</BackButton>
