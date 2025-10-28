@@ -373,6 +373,7 @@ const InvoiceWorkflow = ({ venueId: propVenueId, userId: propUserId }) => {
             <Step3_IgnoreItems
               ignoredItems={ignoredItems}
               ignoreReasons={ignoreReasons}
+              invoiceMetadata={invoiceMetadata}
               venueId={venueId}
               detectedSupplier={detectedSupplier}
               onReasonChange={(idx, reason) => {

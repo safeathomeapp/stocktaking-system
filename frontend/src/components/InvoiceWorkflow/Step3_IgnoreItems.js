@@ -367,6 +367,8 @@ const Step3_IgnoreItems = ({
           body: JSON.stringify({
             venueId,
             supplierId: detectedSupplier.id,
+            invoiceNumber: invoiceMetadata?.invoiceNumber,
+            invoiceDate: invoiceMetadata?.invoiceDate,
             items: itemsToIgnore
           })
         });
