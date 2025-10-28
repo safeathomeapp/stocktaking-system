@@ -584,7 +584,7 @@ const Step3_IgnoreItems = ({
         <BackButton onClick={onBack} disabled={isSubmitting}>
           ← Back
         </BackButton>
-        <SubmitButton onClick={handleSubmit} disabled={isSubmitting || filteredItems.length === 0}>
+        <SubmitButton onClick={handleSubmit} disabled={isSubmitting}>
           {isSubmitting ? 'Saving...' : 'Save & Continue →'}
         </SubmitButton>
       </ButtonSection>
