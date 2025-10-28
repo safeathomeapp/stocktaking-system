@@ -318,9 +318,15 @@ const Step3_IgnoreItems = ({
   onComplete,
   onBack,
 }) => {
+  // Initialize all state variables FIRST before useEffects
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [dbIgnoredSkus, setDbIgnoredSkus] = useState(new Set());
+  const [filteredItems, setFilteredItems] = useState(ignoredItems);
+
   const [checkboxState, setCheckboxState] = useState(() => {
     const state = {};
-    ignoredItems.forEach((_, idx) => {
+    filteredItems.forEach((_, idx) => {
       state[idx] = true; // All items start as checked (will be ignored)
     });
     return state;
@@ -334,11 +340,6 @@ const Step3_IgnoreItems = ({
     });
     setCheckboxState(state);
   }, [filteredItems]);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [dbIgnoredSkus, setDbIgnoredSkus] = useState(new Set());
-  const [filteredItems, setFilteredItems] = useState(ignoredItems);
 
   // Load DB-ignored items and filter them out from display
   useEffect(() => {
