@@ -496,6 +496,12 @@ const Step2_ReviewItems = ({
   // Track which items were auto-unchecked due to progressive learning
   const [autoUncheckedItems, setAutoUncheckedItems] = useState(new Set());
 
+  // Track items that are in the DB ignore list (for filtering later)
+  const [dbIgnoredSkus, setDbIgnoredSkus] = useState(new Set());
+
+  // Track dialog state for handling re-checked items
+  const [recheckDialog, setRecheckDialog] = useState(null);
+
   // ========== PROGRESSIVE LEARNING: Load and auto-uncheck ignored items ==========
 
   useEffect(() => {
@@ -539,6 +545,9 @@ const Step2_ReviewItems = ({
 
           // Track which items were auto-unchecked for visual indication
           setAutoUncheckedItems(uncheckedSet);
+
+          // Also track the SKUs that are in DB (for filtering Step 3 later)
+          setDbIgnoredSkus(ignoredSkus);
 
           console.log(
             `Progressive learning: Auto-unchecked ${itemsToUncheck.length} items from saved ignore list`
@@ -634,9 +643,68 @@ const Step2_ReviewItems = ({
     }));
   };
 
-  const handleProceed = () => {
-    // Pass current checkbox state to parent
+  const handleProceed = async () => {
+    // Find items that are in DB-ignored list but are now CHECKED (re-checked items)
+    const recheckedItems = [];
+
+    parsedItems.forEach((item, idx) => {
+      // If item is in DB ignore list AND is now checked
+      if (dbIgnoredSkus.has(item.supplierSku) && itemCheckboxes[idx] === true) {
+        recheckedItems.push({
+          index: idx,
+          supplierSku: item.supplierSku,
+          name: item.supplierName,
+          category: item.categoryHeader
+        });
+      }
+    });
+
+    // If there are re-checked items, show dialog to ask user
+    if (recheckedItems.length > 0) {
+      setRecheckDialog({
+        items: recheckedItems,
+        decisions: {} // Will track user decisions
+      });
+      return; // Don't proceed yet, wait for dialog response
+    }
+
+    // No re-checked items, proceed normally
     onComplete(itemCheckboxes);
+  };
+
+  const handleRecheckDecision = async (decision) => {
+    // decision: { supplierSku: 'remove' | 'include' }
+    try {
+      // Process deletions for items user chose "Remove permanently"
+      const deletionPromises = [];
+
+      Object.entries(decision).forEach(([supplierSku, action]) => {
+        if (action === 'remove') {
+          // Call delete API
+          deletionPromises.push(
+            fetch('/api/venue-ignore/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                venueId,
+                supplierId: detectedSupplier.id,
+                supplierSku
+              })
+            })
+          );
+        }
+      });
+
+      // Wait for all deletions to complete
+      await Promise.all(deletionPromises);
+
+      // Close dialog and proceed
+      setRecheckDialog(null);
+      onComplete(itemCheckboxes);
+    } catch (error) {
+      console.error('Error processing recheck decisions:', error);
+      alert('Error processing your selections. Please try again.');
+    }
   };
 
   // ========== RENDER ==========
@@ -783,6 +851,128 @@ const Step2_ReviewItems = ({
           </Button>
         </ButtonGroup>
       </BottomSection>
+
+      {/* Dialog for handling re-checked items */}
+      {recheckDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '8px',
+            padding: '30px',
+            maxWidth: '600px',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
+          }}>
+            <h2 style={{ margin: '0 0 20px 0', color: '#333' }}>
+              Previously Ignored Items
+            </h2>
+            <p style={{ color: '#666', marginBottom: '20px' }}>
+              The following items were previously marked as ignored. What would you like to do with them?
+            </p>
+
+            {recheckDialog.items.map((item) => (
+              <div key={item.supplierSku} style={{
+                background: '#f9f9f9',
+                padding: '15px',
+                marginBottom: '15px',
+                borderRadius: '6px',
+                borderLeft: '4px solid #ffc107'
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: '8px' }}>
+                  {item.name}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
+                  {item.category} • SKU: {item.supplierSku}
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => {
+                      const newDecisions = { ...recheckDialog.decisions, [item.supplierSku]: 'remove' };
+                      setRecheckDialog({ ...recheckDialog, decisions: newDecisions });
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      border: '1px solid #e74c3c',
+                      background: '#f8f8f8',
+                      color: '#e74c3c',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    Remove Permanently
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newDecisions = { ...recheckDialog.decisions, [item.supplierSku]: 'include' };
+                      setRecheckDialog({ ...recheckDialog, decisions: newDecisions });
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      border: '1px solid #27ae60',
+                      background: '#f8f8f8',
+                      color: '#27ae60',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 500
+                    }}
+                  >
+                    Include This Invoice
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setRecheckDialog(null)}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  border: '1px solid #ddd',
+                  background: '#f8f8f8',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRecheckDecision(recheckDialog.decisions)}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  border: 'none',
+                  background: '#667eea',
+                  color: 'white',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                Confirm Choices
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Container>
   );
 };

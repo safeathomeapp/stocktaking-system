@@ -18,7 +18,7 @@
  * ============================================================================
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
 // ============================================================================
@@ -326,12 +326,56 @@ const Step3_IgnoreItems = ({
     return state;
   });
 
+  // Re-initialize checkbox state when filtered items change
+  useEffect(() => {
+    const state = {};
+    filteredItems.forEach((_, idx) => {
+      state[idx] = checkboxState[idx] !== undefined ? checkboxState[idx] : true;
+    });
+    setCheckboxState(state);
+  }, [filteredItems]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [dbIgnoredSkus, setDbIgnoredSkus] = useState(new Set());
+  const [filteredItems, setFilteredItems] = useState(ignoredItems);
+
+  // Load DB-ignored items and filter them out from display
+  useEffect(() => {
+    const loadAndFilterItems = async () => {
+      try {
+        // Load items from DB
+        const response = await fetch(
+          `/api/venue-ignore/list?venueId=${venueId}&supplierId=${detectedSupplier?.id}`
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.items) {
+            // Create Set of DB-ignored SKUs
+            const dbSkus = new Set(data.items.map(item => item.supplier_sku));
+            setDbIgnoredSkus(dbSkus);
+
+            // Filter out items that are already in DB
+            const newItems = ignoredItems.filter(item => !dbSkus.has(item.supplierSku));
+            setFilteredItems(newItems);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading DB-ignored items:', err);
+        // If error, just show all items
+        setFilteredItems(ignoredItems);
+      }
+    };
+
+    if (venueId && detectedSupplier?.id && ignoredItems.length > 0) {
+      loadAndFilterItems();
+    }
+  }, [venueId, detectedSupplier?.id, ignoredItems]);
 
   // Count items
   const checkedCount = Object.values(checkboxState).filter(v => v).length;
-  const uncheckedCount = ignoredItems.length - checkedCount;
+  const uncheckedCount = filteredItems.length - checkedCount;
 
   // Handle checkbox toggle
   const handleCheckboxChange = (idx, checked) => {
@@ -347,14 +391,14 @@ const Step3_IgnoreItems = ({
       setIsSubmitting(true);
       setError(null);
 
-      // Get checked items (items to ignore)
-      const itemsToIgnore = ignoredItems
+      // Get checked items (items to ignore) from filteredItems only
+      const itemsToIgnore = filteredItems
         .filter((_, idx) => checkboxState[idx])
-        .map((item, _, filteredArray) => ({
+        .map((item, idx) => ({
           supplierSku: item.supplierSku,
           productName: item.supplierName,
           unitSize: item.unitSize || null,
-          reason: ignoreReasons[ignoredItems.indexOf(item)] || null
+          reason: ignoreReasons[idx] || null
         }));
 
       // If there are items to save, call API
@@ -383,9 +427,10 @@ const Step3_IgnoreItems = ({
       }
 
       // Update parent state with unchecked items (items to import)
-      const uncheckedIndices = ignoredItems
-        .filter((_, idx) => !checkboxState[idx])
-        .map((item) => ignoredItems.indexOf(item));
+      // Note: Only tracking NEW items (filtered items) - DB items are already managed
+      const uncheckedIndices = filteredItems
+        .map((_, idx) => idx)
+        .filter(idx => !checkboxState[idx]);
 
       // Call parent callback to proceed to next step
       onComplete(uncheckedIndices);
@@ -424,7 +469,7 @@ const Step3_IgnoreItems = ({
         </InfoItem>
         <InfoItem>
           <InfoLabel>Items to Review</InfoLabel>
-          <InfoValue>{ignoredItems.length} items</InfoValue>
+          <InfoValue>{filteredItems.length} items</InfoValue>
         </InfoItem>
       </InvoiceInfo>
 
@@ -449,7 +494,7 @@ const Step3_IgnoreItems = ({
           Review each item below. Keep it checked to ignore, or uncheck to import with invoice.
         </ItemsLabel>
 
-        {ignoredItems.length === 0 ? (
+        {filteredItems.length === 0 ? (
           <div
             style={{
               textAlign: 'center',
@@ -462,7 +507,7 @@ const Step3_IgnoreItems = ({
             No items to review. All items from Step 2 have been selected for import.
           </div>
         ) : (
-          ignoredItems.map((item, idx) => (
+          filteredItems.map((item, idx) => (
             <ItemCard key={idx}>
               <ItemHeader>
                 <Checkbox
@@ -538,7 +583,7 @@ const Step3_IgnoreItems = ({
         <BackButton onClick={onBack} disabled={isSubmitting}>
           ← Back
         </BackButton>
-        <SubmitButton onClick={handleSubmit} disabled={isSubmitting || ignoredItems.length === 0}>
+        <SubmitButton onClick={handleSubmit} disabled={isSubmitting || filteredItems.length === 0}>
           {isSubmitting ? 'Saving...' : 'Save & Continue →'}
         </SubmitButton>
       </ButtonSection>

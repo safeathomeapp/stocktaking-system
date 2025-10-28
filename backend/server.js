@@ -4453,6 +4453,45 @@ app.post('/api/venue-ignore/save', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/venue-ignore/delete
+ * Purpose: Remove a specific item from venue_ignored_items
+ * Body: { venueId, supplierId, supplierSku }
+ * Returns: Success status
+ */
+app.post('/api/venue-ignore/delete', async (req, res) => {
+  try {
+    const { venueId, supplierId, supplierSku } = req.body;
+
+    // Validate required fields
+    if (!venueId || !supplierId || !supplierSku) {
+      return res.status(400).json({
+        success: false,
+        error: 'venueId, supplierId, and supplierSku are required'
+      });
+    }
+
+    // Delete the specific item
+    const result = await pool.query(
+      `DELETE FROM venue_ignored_items
+       WHERE venue_id = $1 AND supplier_id = $2 AND supplier_sku = $3`,
+      [venueId, supplierId, supplierSku]
+    );
+
+    res.json({
+      success: true,
+      deleted: result.rowCount > 0,
+      message: result.rowCount > 0 ? 'Item removed from ignore list' : 'Item not found'
+    });
+  } catch (error) {
+    console.error('Error deleting venue ignored item:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete ignored item'
+    });
+  }
+});
+
 // ============================================================================
 // START SERVER
 // ============================================================================
