@@ -907,14 +907,15 @@ const Step2_ReviewItems = ({
                       padding: '8px 12px',
                       fontSize: '13px',
                       border: '1px solid #e74c3c',
-                      background: '#f8f8f8',
-                      color: '#e74c3c',
+                      background: recheckDialog.decisions[item.supplierSku] === 'remove' ? '#e74c3c' : '#f8f8f8',
+                      color: recheckDialog.decisions[item.supplierSku] === 'remove' ? 'white' : '#e74c3c',
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      fontWeight: 500
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease'
                     }}
                   >
-                    Remove Permanently
+                    Remove from Ignore List
                   </button>
                   <button
                     onClick={() => {
@@ -926,14 +927,15 @@ const Step2_ReviewItems = ({
                       padding: '8px 12px',
                       fontSize: '13px',
                       border: '1px solid #27ae60',
-                      background: '#f8f8f8',
-                      color: '#27ae60',
+                      background: recheckDialog.decisions[item.supplierSku] === 'include' ? '#27ae60' : '#f8f8f8',
+                      color: recheckDialog.decisions[item.supplierSku] === 'include' ? 'white' : '#27ae60',
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      fontWeight: 500
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease'
                     }}
                   >
-                    Include This Invoice
+                    Only include in this invoice
                   </button>
                 </div>
               </div>
