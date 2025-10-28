@@ -185,7 +185,16 @@ const InvoiceWorkflow = ({ venueId: propVenueId, userId: propUserId }) => {
     try {
       setUploadedFile(file);
       setRawPdfText(pdfText);
-      setDetectedSupplier(supplier);
+
+      // Normalize supplier object - handle both 'id' and 'sup_id' field names
+      const normalizedSupplier = {
+        ...supplier,
+        id: supplier.id || supplier.sup_id,  // Use 'id' or fall back to 'sup_id'
+        name: supplier.name || supplier.sup_name
+      };
+
+      console.log('Detected supplier:', normalizedSupplier);
+      setDetectedSupplier(normalizedSupplier);
       setParsedItems(items);
       setInvoiceMetadata(metadata);
 

@@ -860,25 +860,41 @@ const Step4_MasterMatch = ({
 
     const { itemIdx, item } = manualModalData;
 
+    // Validate required fields before sending
+    if (!manualFormData.productName || !manualFormData.productName.trim()) {
+      setError('Product Name is required');
+      return;
+    }
+
+    if (!detectedSupplier.id) {
+      console.error('detectedSupplier.id is missing!', { detectedSupplier, manualFormData, item });
+      setError('Supplier ID is missing. Please go back and try again.');
+      return;
+    }
+
     try {
+      const requestBody = {
+        supplierId: detectedSupplier.id,
+        supplierSku: item.supplierSku,
+        supplierName: item.supplierName,
+        productName: manualFormData.productName.trim(),
+        brand: manualFormData.brand || null,
+        category: manualFormData.category || null,
+        subcategory: manualFormData.subcategory || null,
+        unitType: manualFormData.unitType || null,
+        unitSize: manualFormData.unitSize || null,
+        caseSize: manualFormData.caseSize || null,
+        barcode: manualFormData.barcode || null,
+        eaCode: manualFormData.eanCode || null,
+        upcCode: manualFormData.upcCode || null,
+      };
+
+      console.log('Sending create-and-match request:', requestBody);
+
       const response = await fetch('/api/supplier-items/create-and-match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supplierId: detectedSupplier.id,
-          supplierSku: item.supplierSku,
-          supplierName: item.supplierName,
-          productName: manualFormData.productName,
-          brand: manualFormData.brand || null,
-          category: manualFormData.category || null,
-          subcategory: manualFormData.subcategory || null,
-          unitType: manualFormData.unitType || null,
-          unitSize: manualFormData.unitSize || null,
-          caseSize: manualFormData.caseSize || null,
-          barcode: manualFormData.barcode || null,
-          eaCode: manualFormData.eanCode || null,
-          upcCode: manualFormData.upcCode || null,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
