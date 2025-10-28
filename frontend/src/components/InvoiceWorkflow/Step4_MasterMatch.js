@@ -873,6 +873,13 @@ const Step4_MasterMatch = ({
     }
 
     try {
+      // Helper function to extract numeric value from strings like "330ml" → 330
+      const extractNumeric = (value) => {
+        if (!value) return null;
+        const numMatch = String(value).match(/^\d+/);
+        return numMatch ? parseInt(numMatch[0], 10) : null;
+      };
+
       const requestBody = {
         supplierId: detectedSupplier.id,
         supplierSku: item.supplierSku,
@@ -882,8 +889,8 @@ const Step4_MasterMatch = ({
         category: manualFormData.category || null,
         subcategory: manualFormData.subcategory || null,
         unitType: manualFormData.unitType || null,
-        unitSize: manualFormData.unitSize || null,
-        caseSize: manualFormData.caseSize || null,
+        unitSize: extractNumeric(manualFormData.unitSize),  // Extract numeric value (e.g., "330ml" → 330)
+        caseSize: extractNumeric(manualFormData.caseSize),  // Extract numeric value
         barcode: manualFormData.barcode || null,
         eaCode: manualFormData.eanCode || null,
         upcCode: manualFormData.upcCode || null,

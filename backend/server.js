@@ -3389,6 +3389,21 @@ app.post('/api/supplier-items/create-and-match', async (req, res) => {
       await client.query('BEGIN');
 
       // Create master product
+      const masterProductValues = [
+        productName,
+        brand || null,
+        category || null,
+        subcategory || null,
+        unitType || null,
+        unitSize || null,
+        caseSize || null,
+        barcode || null,
+        eaCode || null,
+        upcCode || null
+      ];
+
+      console.log('Creating master product with values:', masterProductValues);
+
       const createProductResult = await client.query(
         `INSERT INTO master_products (
           name, brand, category, subcategory,
@@ -3396,23 +3411,27 @@ app.post('/api/supplier-items/create-and-match', async (req, res) => {
           barcode, ean_code, upc_code, active
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
         RETURNING id`,
-        [
-          productName,
-          brand || null,
-          category || null,
-          subcategory || null,
-          unitType || null,
-          unitSize || null,
-          caseSize || null,
-          barcode || null,
-          eaCode || null,
-          upcCode || null
-        ]
+        masterProductValues
       );
 
+      if (!createProductResult.rows || createProductResult.rows.length === 0) {
+        throw new Error('Failed to create master product - no ID returned');
+      }
+
       const masterProductId = createProductResult.rows[0].id;
+      console.log('Created master product with ID:', masterProductId);
 
       // Update or create supplier_item_list entry
+      const supplierItemValues = [
+        supplierId,
+        supplierSku,
+        supplierName,
+        masterProductId,
+        unitSize || null
+      ];
+
+      console.log('Creating supplier_item_list with values:', supplierItemValues);
+
       await client.query(
         `INSERT INTO supplier_item_list (
           supplier_id, supplier_sku, supplier_name,
@@ -3424,13 +3443,7 @@ app.post('/api/supplier-items/create-and-match', async (req, res) => {
           confidence_score = EXCLUDED.confidence_score,
           verified = EXCLUDED.verified,
           updated_at = CURRENT_TIMESTAMP`,
-        [
-          supplierId,
-          supplierSku,
-          supplierName,
-          masterProductId,
-          unitSize || null
-        ]
+        supplierItemValues
       );
 
       await client.query('COMMIT');
