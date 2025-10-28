@@ -324,16 +324,16 @@ const ActionButton = styled.button`
   margin-top: 10px;
   padding: 6px 12px;
   font-size: 12px;
-  background-color: ${props => props.variant === 'primary' ? '#007bff' : '#f0f0f0'};
-  color: ${props => props.variant === 'primary' ? 'white' : '#333'};
-  border: 1px solid ${props => props.variant === 'primary' ? '#007bff' : '#ddd'};
+  background-color: ${props => props.$variant === 'primary' ? '#007bff' : '#f0f0f0'};
+  color: ${props => props.$variant === 'primary' ? 'white' : '#333'};
+  border: 1px solid ${props => props.$variant === 'primary' ? '#007bff' : '#ddd'};
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
   margin-right: 8px;
 
   &:hover {
-    background-color: ${props => props.variant === 'primary' ? '#0056b3' : '#e0e0e0'};
+    background-color: ${props => props.$variant === 'primary' ? '#0056b3' : '#e0e0e0'};
   }
 `;
 
@@ -1111,7 +1111,7 @@ const Step4_MasterMatch = ({
                                   Change Match
                                 </ActionButton>
                                 <ActionButton
-                                  variant="primary"
+                                  $variant="primary"
                                   onClick={() => handleOpenManualModal(idx)}
                                 >
                                   Create New Product
@@ -1165,7 +1165,7 @@ const Step4_MasterMatch = ({
 
                             <div style={{ marginTop: '12px' }}>
                               <ActionButton
-                                variant="primary"
+                                $variant="primary"
                                 onClick={() => handleOpenManualModal(idx)}
                               >
                                 + Create New Product

@@ -3300,6 +3300,161 @@ app.get('/api/supplier-items', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/supplier-items/get-supplier-items
+ * Purpose: Load all pre-matched items from supplier_item_list for a supplier
+ * Query: supplierId
+ * Returns: Array of supplier items with their master_product_id and confidence
+ */
+app.get('/api/supplier-items/get-supplier-items', async (req, res) => {
+  try {
+    const { supplierId } = req.query;
+
+    if (!supplierId) {
+      return res.status(400).json({
+        success: false,
+        error: 'supplierId is required'
+      });
+    }
+
+    // Load all items from supplier_item_list for this supplier
+    const result = await pool.query(
+      `SELECT
+        id,
+        supplier_sku,
+        supplier_name,
+        master_product_id,
+        confidence_score,
+        unit_size,
+        pack_size
+      FROM supplier_item_list
+      WHERE supplier_id = $1 AND active = true
+      ORDER BY supplier_sku`,
+      [supplierId]
+    );
+
+    res.json({
+      success: true,
+      items: result.rows
+    });
+  } catch (error) {
+    console.error('Error loading supplier items:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load supplier items'
+    });
+  }
+});
+
+/**
+ * POST /api/supplier-items/create-and-match
+ * Purpose: Create new master product and link it via supplier_item_list
+ * Body: {
+ *   supplierId, supplierSku, supplierName,
+ *   productName, brand, category, subcategory,
+ *   unitType, unitSize, caseSize, barcode, eaCode, upcCode
+ * }
+ * Returns: Created master_product_id
+ */
+app.post('/api/supplier-items/create-and-match', async (req, res) => {
+  try {
+    const {
+      supplierId,
+      supplierSku,
+      supplierName,
+      productName,
+      brand,
+      category,
+      subcategory,
+      unitType,
+      unitSize,
+      caseSize,
+      barcode,
+      eaCode,
+      upcCode
+    } = req.body;
+
+    // Validate required fields
+    if (!supplierId || !supplierSku || !productName) {
+      return res.status(400).json({
+        success: false,
+        error: 'supplierId, supplierSku, and productName are required'
+      });
+    }
+
+    // Start transaction
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Create master product
+      const createProductResult = await client.query(
+        `INSERT INTO master_products (
+          name, brand, category, subcategory,
+          unit_type, unit_size, case_size,
+          barcode, ean_code, upc_code, active
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
+        RETURNING id`,
+        [
+          productName,
+          brand || null,
+          category || null,
+          subcategory || null,
+          unitType || null,
+          unitSize || null,
+          caseSize || null,
+          barcode || null,
+          eaCode || null,
+          upcCode || null
+        ]
+      );
+
+      const masterProductId = createProductResult.rows[0].id;
+
+      // Update or create supplier_item_list entry
+      await client.query(
+        `INSERT INTO supplier_item_list (
+          supplier_id, supplier_sku, supplier_name,
+          master_product_id, confidence_score,
+          unit_size, verified, active
+        ) VALUES ($1, $2, $3, $4, 100, $5, true, true)
+        ON CONFLICT (supplier_id, supplier_sku) DO UPDATE SET
+          master_product_id = EXCLUDED.master_product_id,
+          confidence_score = EXCLUDED.confidence_score,
+          verified = EXCLUDED.verified,
+          updated_at = CURRENT_TIMESTAMP`,
+        [
+          supplierId,
+          supplierSku,
+          supplierName,
+          masterProductId,
+          unitSize || null
+        ]
+      );
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        masterProductId,
+        message: 'Product created and linked successfully'
+      });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error creating product and match:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create product and match'
+    });
+  }
+});
+
 // Get supplier item by ID
 app.get('/api/supplier-items/:id', async (req, res) => {
   try {
@@ -4488,161 +4643,6 @@ app.post('/api/venue-ignore/delete', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to delete ignored item'
-    });
-  }
-});
-
-/**
- * GET /api/supplier-items/get-supplier-items
- * Purpose: Load all pre-matched items from supplier_item_list for a supplier
- * Query: supplierId
- * Returns: Array of supplier items with their master_product_id and confidence
- */
-app.get('/api/supplier-items/get-supplier-items', async (req, res) => {
-  try {
-    const { supplierId } = req.query;
-
-    if (!supplierId) {
-      return res.status(400).json({
-        success: false,
-        error: 'supplierId is required'
-      });
-    }
-
-    // Load all items from supplier_item_list for this supplier
-    const result = await pool.query(
-      `SELECT
-        id,
-        supplier_sku,
-        supplier_name,
-        master_product_id,
-        confidence_score,
-        unit_size,
-        pack_size
-      FROM supplier_item_list
-      WHERE supplier_id = $1 AND active = true
-      ORDER BY supplier_sku`,
-      [supplierId]
-    );
-
-    res.json({
-      success: true,
-      items: result.rows
-    });
-  } catch (error) {
-    console.error('Error loading supplier items:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to load supplier items'
-    });
-  }
-});
-
-/**
- * POST /api/supplier-items/create-and-match
- * Purpose: Create new master product and link it via supplier_item_list
- * Body: {
- *   supplierId, supplierSku, supplierName,
- *   productName, brand, category, subcategory,
- *   unitType, unitSize, caseSize, barcode, eaCode, upcCode
- * }
- * Returns: Created master_product_id
- */
-app.post('/api/supplier-items/create-and-match', async (req, res) => {
-  try {
-    const {
-      supplierId,
-      supplierSku,
-      supplierName,
-      productName,
-      brand,
-      category,
-      subcategory,
-      unitType,
-      unitSize,
-      caseSize,
-      barcode,
-      eaCode,
-      upcCode
-    } = req.body;
-
-    // Validate required fields
-    if (!supplierId || !supplierSku || !productName) {
-      return res.status(400).json({
-        success: false,
-        error: 'supplierId, supplierSku, and productName are required'
-      });
-    }
-
-    // Start transaction
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
-
-      // Create master product
-      const createProductResult = await client.query(
-        `INSERT INTO master_products (
-          name, brand, category, subcategory,
-          unit_type, unit_size, case_size,
-          barcode, ean_code, upc_code, active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
-        RETURNING id`,
-        [
-          productName,
-          brand || null,
-          category || null,
-          subcategory || null,
-          unitType || null,
-          unitSize || null,
-          caseSize || null,
-          barcode || null,
-          eaCode || null,
-          upcCode || null
-        ]
-      );
-
-      const masterProductId = createProductResult.rows[0].id;
-
-      // Update or create supplier_item_list entry
-      await client.query(
-        `INSERT INTO supplier_item_list (
-          supplier_id, supplier_sku, supplier_name,
-          master_product_id, confidence_score,
-          unit_size, verified, active
-        ) VALUES ($1, $2, $3, $4, 100, $5, true, true)
-        ON CONFLICT (supplier_id, supplier_sku) DO UPDATE SET
-          master_product_id = EXCLUDED.master_product_id,
-          confidence_score = EXCLUDED.confidence_score,
-          verified = EXCLUDED.verified,
-          updated_at = CURRENT_TIMESTAMP`,
-        [
-          supplierId,
-          supplierSku,
-          supplierName,
-          masterProductId,
-          unitSize || null
-        ]
-      );
-
-      await client.query('COMMIT');
-
-      res.json({
-        success: true,
-        masterProductId,
-        message: 'Product created and linked successfully'
-      });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Error creating product and match:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create product and match'
     });
   }
 });
