@@ -591,36 +591,18 @@ const Step4_MasterMatch = ({
 
           // Check if this item has a pre-match in the database
           if (dbMatch && dbMatch.masterProductId) {
-            // PRE-MATCHED: Get product details from fuzzy-match to have consistent data
-            const response = await fetch('/api/supplier-items/fuzzy-match', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                supplierSku: item.supplierSku,
-                supplierName: item.supplierName,
-                supplierId: detectedSupplier.id,
-                unitSize: item.unitSize || item.packSize || '',
-                packSize: item.packSize || '',
-                category: item.categoryHeader || '',
-              }),
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-
-              // If fuzzy-match returns existing mapping, use it
-              if (data.autoMatched && data.autoMatched.matchType === 'existing_mapping') {
-                newMatches[idx] = {
-                  masterProductId: data.autoMatched.masterProductId,
-                  masterProductName: data.autoMatched.masterProductName,
-                  confidence: data.autoMatched.confidence,
-                  isPreMatched: true,
-                  candidates: data.candidates || [],
-                };
-              }
-            }
+            // PRE-MATCHED: Use database data directly - skip expensive fuzzy-match API call
+            console.log(`[DB Match] Item ${idx}: ${item.supplierName} → ${dbMatch.masterProductId}`);
+            newMatches[idx] = {
+              masterProductId: dbMatch.masterProductId,
+              masterProductName: item.supplierName, // Will be used as fallback name
+              confidence: dbMatch.confidenceScore || 100,
+              isPreMatched: true,
+              candidates: [], // Pre-matched items don't need candidates list
+            };
           } else {
-            // UNMATCHED: Perform fuzzy matching
+            // UNMATCHED: Perform fuzzy matching only for items NOT found in database
+            console.log(`[Fuzzy Match] Item ${idx}: ${item.supplierName}`);
             const response = await fetch('/api/supplier-items/fuzzy-match', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

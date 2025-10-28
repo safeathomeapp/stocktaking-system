@@ -28,7 +28,7 @@
  */
 
 import React, { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import Step1_Upload from './Step1_Upload';
 import Step2_ReviewItems from './Step2_ReviewItems';
@@ -131,6 +131,7 @@ const InvoiceWorkflow = ({ venueId: propVenueId, userId: propUserId }) => {
 
   // Extract venueId and userId from location state (passed from Dashboard)
   const location = useLocation();
+  const navigate = useNavigate();
   const venueId = location.state?.venueId || propVenueId;
   const userId = location.state?.userId || propUserId;
 
@@ -309,9 +310,15 @@ const InvoiceWorkflow = ({ venueId: propVenueId, userId: propUserId }) => {
       // - supplier_item_list (matches)
 
       setError(null);
-      // TODO: Navigate back to dashboard on success
+
+      // Navigate back to dashboard on success
+      // Use a slight delay to allow user to see the loading state
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
     } catch (err) {
       setError(`Failed to submit invoice: ${err.message}`);
+      setFinalConfirm(false);
     }
   };
 
