@@ -3788,6 +3788,7 @@ app.post('/api/supplier-items/fuzzy-match', async (req, res) => {
     }
 
     // STEP 1: Check if this supplier item already has an existing mapping
+    // Note: We still return candidates for users who want to "Change Match"
     const existingMapping = await pool.query(`
       SELECT
         sil.id,
@@ -3802,18 +3803,8 @@ app.post('/api/supplier-items/fuzzy-match', async (req, res) => {
       LIMIT 1
     `, [supplierId, supplierSku]);
 
-    if (existingMapping.rows.length > 0) {
-      const mapping = existingMapping.rows[0];
-      return res.json({
-        autoMatched: {
-          masterProductId: mapping.master_product_id,
-          masterProductName: mapping.master_product_name,
-          matchType: 'existing_mapping',
-          confidence: Math.round(mapping.confidence_score || 100)
-        },
-        candidates: []
-      });
-    }
+    const hasExistingMapping = existingMapping.rows.length > 0;
+    const existingMappingData = hasExistingMapping ? existingMapping.rows[0] : null;
 
     // STEP 2: Fuzzy match against master_products
     // Scoring formula: (name * 0.60) + (unitSize * 0.20) + (packSize * 0.15) + (category * 0.05)
@@ -3893,20 +3884,29 @@ app.post('/api/supplier-items/fuzzy-match', async (req, res) => {
     });
 
     // Determine if top candidate should be auto-matched (based on threshold)
+    // Only auto-match if there's NO existing mapping (first time) and confidence is high
     const CONFIDENCE_THRESHOLD = 80; // Should match frontend config
     const autoMatched =
-      candidates.length > 0 && candidates[0].confidence >= CONFIDENCE_THRESHOLD
+      !hasExistingMapping && candidates.length > 0 && candidates[0].confidence >= CONFIDENCE_THRESHOLD
         ? {
             masterProductId: candidates[0].id,
             masterProductName: candidates[0].name,
             matchType: 'fuzzy',
             confidence: candidates[0].confidence
           }
+        : hasExistingMapping
+        ? {
+            masterProductId: existingMappingData.master_product_id,
+            masterProductName: existingMappingData.master_product_name,
+            matchType: 'existing_mapping',
+            confidence: Math.round(existingMappingData.confidence_score || 100),
+            isExisting: true  // Flag to indicate this is current mapping
+          }
         : null;
 
     res.json({
       autoMatched,
-      candidates
+      candidates  // ← Always return candidates, even for existing mappings (for "Change Match")
     });
   } catch (error) {
     console.error('Error in fuzzy match:', error);
