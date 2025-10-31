@@ -13,7 +13,9 @@ const CategorySection = styled.div`margin-bottom: 25px; background: white; borde
 const CategoryHeader = styled.div`background: #f8f9fa; padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between;`;
 const CategoryItems = styled.div`padding: 0;`;
 const ItemRow = styled.div`padding: 15px 20px; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; &:last-child { border-bottom: none; }`;
-const IgnoredItemsSection = styled.div`background: #fffbea; border: 1px solid #ffc107; padding: 20px; margin-bottom: 30px;`;
+const IgnoredItemsSection = styled.div`background: #fffbea; border: 1px solid #ffc107; margin-bottom: 30px;`;
+const IgnoredItemsHeader = styled.div`background: #fff3cd; border-bottom: 1px solid #ffc107; padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; &:hover { background: #ffe8a8; }`;
+const IgnoredItemsContent = styled.div`padding: 20px;`;
 const IgnoredItem = styled.div`background: white; padding: 15px; border-left: 4px solid #ffc107; margin-bottom: 10px;`;
 const ActionButtons = styled.div`display: flex; gap: 12px; margin-top: 30px; justify-content: center;`;
 const Button = styled.button`padding: 12px 32px; font-size: 16px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer;`;
@@ -22,6 +24,7 @@ const SubmitButton = styled(Button)`background: linear-gradient(135deg, #667eea 
 
 const Step5_Summary = ({ invoiceMetadata = {}, parsedItems = [], itemCheckboxes = {}, matchedItems = {}, ignoredItems = [], ignoreReasons = {}, detectedSupplier = {}, onSubmit = () => {}, onBack = () => {}, isSubmitting = false }) => {
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [isIgnoredExpanded, setIsIgnoredExpanded] = useState(false);
   const importedItems = Object.entries(itemCheckboxes).filter(([_, isChecked]) => isChecked).map(([idx]) => parseInt(idx));
   const totalImported = importedItems.length;
   const totalIgnored = ignoredItems.length;
@@ -29,6 +32,7 @@ const Step5_Summary = ({ invoiceMetadata = {}, parsedItems = [], itemCheckboxes 
   const groupedByCategory = {};
   parsedItems.forEach((item, idx) => { const category = item.categoryHeader || 'Other'; if (!groupedByCategory[category]) groupedByCategory[category] = []; groupedByCategory[category].push({ ...item, index: idx }); });
   const toggleCategory = (category) => { setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] })); };
+  const toggleIgnoredSection = () => { setIsIgnoredExpanded(!isIgnoredExpanded); };
   return (
     <SummaryContainer>
       <SummaryHeader>
@@ -53,7 +57,7 @@ const Step5_Summary = ({ invoiceMetadata = {}, parsedItems = [], itemCheckboxes 
         <StatCard><div className="stat-number">{totalImported}</div><div className="stat-label">Imported</div></StatCard>
         <StatCard><div className="stat-number">{totalIgnored}</div><div className="stat-label">Ignored</div></StatCard>
       </StatsGrid>
-      {totalIgnored > 0 && <IgnoredItemsSection><SectionTitle>Items Ignored ({totalIgnored})</SectionTitle>{ignoredItems.map((item, idx) => <IgnoredItem key={idx}><strong>{item.supplierName}</strong><div>Reason: {ignoreReasons[idx]}</div></IgnoredItem>)}</IgnoredItemsSection>}
+      {totalIgnored > 0 && <IgnoredItemsSection><IgnoredItemsHeader onClick={toggleIgnoredSection}><span>Items Ignored ({totalIgnored})</span><span>{isIgnoredExpanded ? '▼' : '▶'}</span></IgnoredItemsHeader>{isIgnoredExpanded && <IgnoredItemsContent>{ignoredItems.map((item, idx) => <IgnoredItem key={idx}><strong>{item.supplierName}</strong>{ignoreReasons[idx] && <div>Reason: {ignoreReasons[idx]}</div>}</IgnoredItem>)}</IgnoredItemsContent>}</IgnoredItemsSection>}
       <SectionTitle>Items by Category</SectionTitle>
       {Object.entries(groupedByCategory).map(([category, items]) => {
         const importedCategoryItems = items.filter(item => itemCheckboxes[item.index] === true);
