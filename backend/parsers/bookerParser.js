@@ -246,8 +246,17 @@ class BookerParser extends SupplierParser {
    *   -----	--------
    *   CHILLED	SUB-TOTAL	:	ITEMS	3	GOODS :	53.44	EXC.VAT
    *
-   * Strategy: For each item found, look ahead to find which category it belongs to
-   * by finding the next SUB-TOTAL line.
+   * IMPORTANT: Invoices with substitutions may contain a SUBSTITUTIONDETAILS section:
+   *   ------ SUBSTITUTIONDETAILS ------
+   *   [substitution items to ignore]
+   *   ------ INVOICE DETAILS ------
+   *   [actual invoice items]
+   *
+   * Strategy:
+   *   1. Identify substitution section boundaries (SUBSTITUTIONDETAILS to INVOICE DETAILS)
+   *   2. Skip any lines within that section
+   *   3. For remaining items, look ahead to find which category it belongs to
+   *      by finding the next SUB-TOTAL line
    *
    * @param {Array<string>} lines - PDF lines
    * @returns {Array<ParsedItem>} Parsed items with category info
@@ -255,19 +264,33 @@ class BookerParser extends SupplierParser {
   parseItemsByCategory(lines) {
     const items = [];
 
-    // First pass: build a map of category start line to category name
+    // Step 1: Identify substitution section boundaries to skip
+    const { substitutionStart, substitutionEnd } = this.findSubstitutionSectionBounds(lines);
+    this.debug(`Substitution section: lines ${substitutionStart} to ${substitutionEnd}`);
+
+    // Step 2: Build a map of category start line to category name
     // Category SUB-TOTAL lines indicate the category for items above them
     const categoryHeaders = [];
     for (let i = 0; i < lines.length; i++) {
+      // Skip lines within substitution section
+      if (i >= substitutionStart && i <= substitutionEnd) {
+        continue;
+      }
+
       if (this.isCategoryHeaderLine(lines[i])) {
         const categoryName = lines[i].split('\t')[0].trim();
         categoryHeaders.push({ lineIdx: i, name: categoryName });
       }
     }
 
-    // Second pass: parse items and assign categories
+    // Step 3: Parse items and assign categories, skipping substitution section
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+
+      // Skip lines within substitution section
+      if (i >= substitutionStart && i <= substitutionEnd) {
+        continue;
+      }
 
       // Skip separator lines and metadata lines
       if (line.match(/^-+(\s+-+|-)*$/) || line.includes('SUB-TOTAL') || line.includes('TOTAL ITEMS') ||
@@ -303,6 +326,92 @@ class BookerParser extends SupplierParser {
     }
 
     return items;
+  }
+
+  /**
+   * Find the boundaries of the substitution section if present
+   *
+   * When suppliers make substitutions, the invoice includes a SUBSTITUTION DETAILS section:
+   *   SUBSTITUTION DETAILS-Contains Order Number(s):90660709
+   *   The following items are no longer available, please order alternative in future:
+   *   [substitution items to skip]
+   *   [blank line or separator]
+   *   INVOICE DETAILS or category header
+   *
+   * Format variations:
+   *   - Header: "SUBSTITUTION DETAILS", "SUBSTITUTIONDETAILS" (may have space)
+   *   - End: Marked by blank line, "INVOICE DETAILS", or category header like "RETAIL GROCERY"
+   *
+   * Returns line indices where the section starts and ends.
+   * If no substitution section found, returns -1 for both values.
+   *
+   * @param {Array<string>} lines - PDF lines
+   * @returns {Object} {substitutionStart, substitutionEnd} Line indices for section boundaries
+   */
+  findSubstitutionSectionBounds(lines) {
+    let substitutionStart = -1;
+    let substitutionEnd = -1;
+
+    // Find start of substitution section (handle both "SUBSTITUTION DETAILS" and "SUBSTITUTIONDETAILS")
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toUpperCase();
+      if (line.includes('SUBSTITUTION') && (line.includes('DETAILS') || line.includes('DETAILS-'))) {
+        substitutionStart = i;
+        this.debug(`Found substitution header at line ${i}: ${lines[i]}`);
+        break;
+      }
+    }
+
+    // If no substitution section, return -1 for both
+    if (substitutionStart === -1) {
+      return { substitutionStart: -1, substitutionEnd: -1 };
+    }
+
+    // Find end of substitution section
+    // Look for: INVOICE DETAILS, category headers (with SUB-TOTAL), or blank line followed by category
+    for (let i = substitutionStart + 1; i < lines.length; i++) {
+      const line = lines[i];
+      const lineUpper = line.toUpperCase();
+
+      // End markers:
+      // 1. "INVOICE DETAILS" keyword
+      if (lineUpper.includes('INVOICE DETAILS')) {
+        substitutionEnd = i;
+        this.debug(`Found INVOICE DETAILS boundary at line ${i}`);
+        break;
+      }
+
+      // 2. Category header with SUB-TOTAL (indicates start of actual invoice items)
+      if (this.isCategoryHeaderLine(line)) {
+        substitutionEnd = i - 1; // End before the category line
+        this.debug(`Found category header at line ${i}, substitution section ends at ${i - 1}`);
+        break;
+      }
+
+      // 3. Blank line followed by a numeric-starting line (item line)
+      // Skip blank lines and look for the pattern
+      if (line.trim().length === 0) {
+        // Check if next non-blank line is an item line or category
+        for (let j = i + 1; j < lines.length; j++) {
+          if (lines[j].trim().length > 0) {
+            if (this.looksLikeItemLine(lines[j]) || this.isCategoryHeaderLine(lines[j])) {
+              substitutionEnd = i - 1;
+              this.debug(`Found blank line separator at line ${i}, substitution section ends at ${i - 1}`);
+            }
+            break;
+          }
+        }
+        if (substitutionEnd !== -1) break;
+      }
+    }
+
+    // If we found the start but not the end, set end to start to skip only the header line
+    if (substitutionEnd === -1) {
+      substitutionEnd = substitutionStart;
+      this.debug(`No clear substitution end found, skipping only header at line ${substitutionStart}`);
+    }
+
+    return { substitutionStart, substitutionEnd };
   }
 
   /**
