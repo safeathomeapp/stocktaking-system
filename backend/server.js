@@ -3318,18 +3318,23 @@ app.get('/api/supplier-items/get-supplier-items', async (req, res) => {
     }
 
     // Load all items from supplier_item_list for this supplier
+    // Include master product name for correct display in Step 4
     const result = await pool.query(
       `SELECT
-        id,
-        supplier_sku,
-        supplier_name,
-        master_product_id,
-        confidence_score,
-        unit_size,
-        pack_size
-      FROM supplier_item_list
-      WHERE supplier_id = $1 AND active = true
-      ORDER BY supplier_sku`,
+        sil.id,
+        sil.supplier_sku,
+        sil.supplier_name,
+        sil.master_product_id,
+        sil.confidence_score,
+        sil.unit_size,
+        sil.pack_size,
+        mp.name as master_product_name,
+        mp.brand as master_product_brand,
+        mp.category as master_product_category
+      FROM supplier_item_list sil
+      LEFT JOIN master_products mp ON sil.master_product_id = mp.id
+      WHERE sil.supplier_id = $1 AND sil.active = true
+      ORDER BY sil.supplier_sku`,
       [supplierId]
     );
 

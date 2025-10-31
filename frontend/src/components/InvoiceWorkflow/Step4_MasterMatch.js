@@ -548,12 +548,13 @@ const Step4_MasterMatch = ({
 
         const data = await response.json();
 
-        // Create a map: supplierSku -> { master_product_id, confidence_score, etc }
+        // Create a map: supplierSku -> { master_product_id, confidence_score, master_product_name, etc }
         const matchMap = {};
         data.items.forEach(item => {
           if (item.master_product_id) {
             matchMap[item.supplier_sku] = {
               masterProductId: item.master_product_id,
+              masterProductName: item.master_product_name, // ← Now includes the actual master product name
               confidenceScore: item.confidence_score || 100,
               unitSize: item.unit_size,
               packSize: item.pack_size
@@ -592,13 +593,39 @@ const Step4_MasterMatch = ({
           // Check if this item has a pre-match in the database
           if (dbMatch && dbMatch.masterProductId) {
             // PRE-MATCHED: Use database data directly - skip expensive fuzzy-match API call
-            console.log(`[DB Match] Item ${idx}: ${item.supplierName} → ${dbMatch.masterProductId}`);
+            console.log(`[DB Match] Item ${idx}: ${item.supplierName} → ${dbMatch.masterProductName}`);
+
+            // Still fetch candidate alternatives even for pre-matched items
+            // so users can change the match if needed (populated on demand in handleChangeMatch)
+            let preCandidates = [];
+            try {
+              const candResponse = await fetch('/api/supplier-items/fuzzy-match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  supplierSku: item.supplierSku,
+                  supplierName: item.supplierName,
+                  supplierId: detectedSupplier.id,
+                  unitSize: item.unitSize || item.packSize || '',
+                  packSize: item.packSize || '',
+                  category: item.categoryHeader || '',
+                }),
+              });
+
+              if (candResponse.ok) {
+                const candData = await candResponse.json();
+                preCandidates = (candData.candidates || []).sort((a, b) => b.confidence - a.confidence);
+              }
+            } catch (err) {
+              console.warn(`Could not fetch candidates for pre-matched item ${idx}:`, err);
+            }
+
             newMatches[idx] = {
               masterProductId: dbMatch.masterProductId,
-              masterProductName: item.supplierName, // Will be used as fallback name
+              masterProductName: dbMatch.masterProductName || item.supplierName, // ← Use actual master product name from DB
               confidence: dbMatch.confidenceScore || 100,
               isPreMatched: true,
-              candidates: [], // Pre-matched items don't need candidates list
+              candidates: preCandidates, // ← Pre-matched items now have candidates available to change if needed
             };
           } else {
             // UNMATCHED: Perform fuzzy matching only for items NOT found in database
