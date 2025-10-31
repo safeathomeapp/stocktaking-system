@@ -63,7 +63,7 @@ const Step5_Summary = ({ invoiceMetadata = {}, parsedItems = [], itemCheckboxes 
         const importedCategoryItems = items.filter(item => itemCheckboxes[item.index] === true);
         if (!importedCategoryItems.length) return null;
         const isExpanded = expandedCategories[category] !== false;
-        return <CategorySection key={category}><CategoryHeader onClick={() => toggleCategory(category)}><div>{category}</div><div>{isExpanded ? '▼' : '▶'}</div></CategoryHeader>{isExpanded && <CategoryItems>{importedCategoryItems.map((item, idx) => <ItemRow key={idx}><div>{item.supplierName}</div><div>{matchedItems[item.index]?.isAutoMatched ? 'Auto' : 'Manual'}</div></ItemRow>)}</CategoryItems>}</CategorySection>;
+        return <CategorySection key={category}><CategoryHeader onClick={() => toggleCategory(category)}><div>{category}</div><div>{isExpanded ? '▼' : '▶'}</div></CategoryHeader>{isExpanded && <CategoryItems>{importedCategoryItems.map((item, idx) => <ItemRow key={idx}><div>{matchedItems[item.index]?.masterProductName || item.supplierName}</div><div>{matchedItems[item.index]?.isAutoMatched ? 'Auto' : 'Manual'}</div></ItemRow>)}</CategoryItems>}</CategorySection>;
       })}
       <ActionButtons>
         <BackButton onClick={onBack}>Back</BackButton>
