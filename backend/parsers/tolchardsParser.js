@@ -276,11 +276,10 @@ class TolchardsParser extends SupplierParser {
    * "EX0200RB 2.00 6 Rye Mill Shiraz 43.68 87.36 1"
    *
    * Calculations:
-   *   - Unit Size: 70cl (default for wines unless size stated in description)
-   *   - Quantity: Convert to individual units (quantity × case size)
-   *   - Pack Size: Format as "Qx70cl" (e.g., "12x70cl" for 2 cases of 6)
+   *   - Quantity: Interpret as cases.units format (0.01 = 0 cases + 1 unit; 2.03 = 2 cases + 3 units)
+   *   - Unit Size: Detect from description or default (Wine: 75cl, Spirit: 70cl)
+   *   - Pack Size: Format as "Qx{unitSize}" (e.g., "12x75cl")
    *   - Unit Price: Price per case ÷ case size (price per individual unit)
-   *   - Fractional quantities (0.01, etc.) represent partial cases, round to minimum 1 unit
    *
    * @param {string} line - Item line to parse
    * @returns {ParsedItem|null} Parsed item or null if invalid
@@ -347,17 +346,19 @@ class TolchardsParser extends SupplierParser {
       // Calculate unit price: price per case ÷ units per case
       const unitPrice = price / caseSize;
 
-      // Convert quantity to individual units
-      // quantity × caseSize = total units
-      // For fractional quantities (< 1), round to minimum 1 unit
-      let actualQuantity = quantity * caseSize;
-      actualQuantity = Math.max(1, Math.round(actualQuantity));
+      // Convert quantity from cases.units format to actual individual units
+      // 0.01 = 0 cases + 1 unit
+      // 2.03 = 2 cases + 3 units = (2 × caseSize) + 3
+      const integerPart = Math.floor(quantity);
+      const decimalPart = quantity - integerPart;
+      const individualUnits = Math.round(decimalPart * 100); // 0.01 → 1, 0.03 → 3
+      const actualQuantity = (integerPart * caseSize) + individualUnits;
 
-      // Unit size: 70cl for wines (default)
-      // TODO: Could enhance to detect sizes from description (e.g., "1L", "750ml", "37.5cl")
-      const unitSize = '70cl';
+      // Extract unit size from description or use defaults
+      // Wine: 75cl, Spirit: 70cl (unless size is explicitly stated in description)
+      const unitSize = this.extractUnitSize(description);
 
-      // Pack size format: "{quantity}x{unitSize}" (e.g., "12x70cl")
+      // Pack size format: "{quantity}x{unitSize}" (e.g., "12x75cl")
       const packSize = `${actualQuantity}x${unitSize}`;
 
       return {
@@ -377,6 +378,67 @@ class TolchardsParser extends SupplierParser {
       this.debug(`Error parsing item line: ${line.substring(0, 60)}... Error: ${error.message}`);
       return null;
     }
+  }
+
+  /**
+   * Extract unit size from product description or use sensible default
+   *
+   * Strategy:
+   *   1. Look for explicit size indicators in description (ml, cl, l, g, oz, gallon)
+   *   2. If found, use that size (e.g., "9g" → "9g")
+   *   3. If not found, determine based on product type:
+   *      - Wine keywords: Shiraz, Pinot, Chardonnay, Sauvignon, etc. → 75cl
+   *      - Spirit keywords: Whiskey, Bushmills, Gin, Vodka, etc. → 70cl
+   *      - Default: 75cl (wines are more common at Tolchards)
+   *
+   * Examples:
+   *   "Rye Mill Shiraz" → 75cl (matches "Shiraz" wine keyword)
+   *   "Bushmills Black Bush" → 70cl (matches "Bushmills" spirit keyword)
+   *   "Fullers London Pride 9g" → 9g (explicit size)
+   *
+   * @param {string} description - Product description
+   * @returns {string} Unit size (e.g., "75cl", "70cl", "9g")
+   */
+  extractUnitSize(description) {
+    // First, try to find explicit size in description (e.g., "75cl", "9g", "750ml")
+    const sizeMatch = description.match(/(\d+(?:\.\d+)?)\s*(ml|cl|l|g|oz|gallon|gal|gb)/i);
+    if (sizeMatch) {
+      const number = sizeMatch[1];
+      const unit = sizeMatch[2].toLowerCase();
+      return `${number}${unit}`;
+    }
+
+    // No explicit size found - determine based on product type
+    const lowerDesc = description.toLowerCase();
+
+    // Check for wine keywords first (grape varieties, wine types, regions)
+    const wineKeywords = [
+      'shiraz', 'pinot', 'chardonnay', 'sauvignon', 'merlot', 'cabernet',
+      'riesling', 'prosecco', 'champagne', 'rioja', 'bordeaux', 'burgundy',
+      'chablis', 'chianti', 'barolo', 'barbaresco', 'albariño', 'gewürztraminer',
+      'tempranillo', 'nebbiolo', 'grüner', 'vouv', 'muscadet',
+    ];
+
+    const isWine = wineKeywords.some(keyword => lowerDesc.includes(keyword));
+    if (isWine) {
+      return '75cl';
+    }
+
+    // Check for spirit keywords (whiskey, gin, vodka, rum, brandy, and brand names)
+    const spiritKeywords = [
+      'whiskey', 'whisky', 'gin', 'vodka', 'rum', 'brandy', 'tequila',
+      'liqueur', 'spirit', 'schnapps', 'cognac', 'armagnac',
+      'bourbon', 'scotch', 'sake', 'malt', 'single malt',
+      'bushmills', 'jameson', 'maker', 'jack daniel', 'johnnie',
+    ];
+
+    const isSpirit = spiritKeywords.some(keyword => lowerDesc.includes(keyword));
+    if (isSpirit) {
+      return '70cl';
+    }
+
+    // Default: wines are 75cl (Tolchards is primarily wines)
+    return '75cl';
   }
 
   /**
