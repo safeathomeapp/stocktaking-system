@@ -47,7 +47,8 @@
       "Bash(node test-substitution-parser.js:*)",
       "Read(//c/Users/kevth/Downloads/**)",
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT id, sup_name, sup_website FROM suppliers LIMIT 5;\")",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT sup_id, sup_name FROM suppliers WHERE sup_name ILIKE ''%tolchards%'';\")"
     ],
     "deny": [],
     "ask": []

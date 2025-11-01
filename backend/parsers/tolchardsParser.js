@@ -275,6 +275,13 @@ class TolchardsParser extends SupplierParser {
    * Example line might look like:
    * "EX0200RB 2.00 6 Rye Mill Shiraz 43.68 87.36 1"
    *
+   * Calculations:
+   *   - Unit Size: 70cl (default for wines unless size stated in description)
+   *   - Quantity: Convert to individual units (quantity × case size)
+   *   - Pack Size: Format as "Qx70cl" (e.g., "12x70cl" for 2 cases of 6)
+   *   - Unit Price: Price per case ÷ case size (price per individual unit)
+   *   - Fractional quantities (0.01, etc.) represent partial cases, round to minimum 1 unit
+   *
    * @param {string} line - Item line to parse
    * @returns {ParsedItem|null} Parsed item or null if invalid
    */
@@ -335,18 +342,30 @@ class TolchardsParser extends SupplierParser {
       const vatCode = parts[parts.length - 1];
       const vatRate = vatCode === '1' ? 20 : vatCode === '0' ? 0 : null;
 
+      // ===== TOLCHARDS FORMAT CONVERSION =====
+
       // Calculate unit price: price per case ÷ units per case
       const unitPrice = price / caseSize;
 
-      // Pack size: quantity × case size
-      const packSize = `${quantity}x${caseSize}`;
+      // Convert quantity to individual units
+      // quantity × caseSize = total units
+      // For fractional quantities (< 1), round to minimum 1 unit
+      let actualQuantity = quantity * caseSize;
+      actualQuantity = Math.max(1, Math.round(actualQuantity));
+
+      // Unit size: 70cl for wines (default)
+      // TODO: Could enhance to detect sizes from description (e.g., "1L", "750ml", "37.5cl")
+      const unitSize = '70cl';
+
+      // Pack size format: "{quantity}x{unitSize}" (e.g., "12x70cl")
+      const packSize = `${actualQuantity}x${unitSize}`;
 
       return {
         supplierSku: this.cleanSku(productCode),
         supplierName: this.cleanProductName(description),
         packSize: packSize,
-        unitSize: caseSize.toString(), // Unit size is the case size (e.g., "6" bottles)
-        quantity: quantity,
+        unitSize: unitSize,
+        quantity: actualQuantity,
         unitPrice: Math.round(unitPrice * 100) / 100, // Round to 2 decimals
         nettPrice: value,
         vatCode: vatCode,
