@@ -413,6 +413,35 @@ POST /api/sessions/:id/entries
 
 ---
 
+## PDF Invoice Parsers
+
+The system can automatically extract invoice data from supplier PDFs. Each supplier has a dedicated parser that understands their specific invoice format.
+
+### Implemented Parsers
+
+| Supplier | Format | Status | Details |
+|---|---|---|---|
+| **Booker Limited** | Table-based (TAB-separated) | ✅ Production | Handles SUBSTITUTION DETAILS sections |
+| **Tolchards Ltd** | Wine & spirits (space-separated) | ✅ Production | Proper quantity format (cases.units), wine/spirit unit sizes |
+
+### Quick Parser Facts
+
+- **Two-Layer Detection**: Fast keyword scanning → Detailed parser validation
+- **Automatic**: PDF uploaded → Supplier detected → Data extracted
+- **Extensible**: Add new suppliers easily (5 methods to implement)
+- **Scalable**: Constant performance with 1 or 100+ suppliers
+
+### For Detailed Parser Information
+
+See **[docs/PARSERS.md](docs/PARSERS.md)** for:
+- Complete parser architecture documentation
+- Detailed field mappings for each supplier
+- Step-by-step guide for adding new suppliers
+- Output format specification
+- Testing checklist and troubleshooting guide
+
+---
+
 ## Database Schema
 
 **Database**: PostgreSQL on Railway
