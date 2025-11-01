@@ -33,6 +33,7 @@
  */
 
 const BookerParser = require('./bookerParser');
+const TolchardsParser = require('./tolchardsParser');
 const MainSupplierMatcher = require('./mainSupplierMatcher');
 // TODO: Import additional parsers as they're created
 // const SupplierNameParser = require('./supplierNameParser');
@@ -55,6 +56,7 @@ class ParserRegistry {
 
     // Initialize with built-in parsers
     this.register('booker', BookerParser);
+    this.register('tolchards', TolchardsParser);
     // TODO: Register additional suppliers as parsers are created
   }
 
@@ -371,6 +373,8 @@ class ParserRegistry {
     const nameToParserKey = {
       'Booker Limited': 'booker',
       'Booker Wholesale': 'booker', // Also accept this name
+      'Tolchards Ltd': 'tolchards',
+      'Tolchards': 'tolchards', // Also accept shorter name
       // Add more as suppliers are added
       // 'Supplier 2': 'supplier2',
       // 'Supplier 3': 'supplier3',

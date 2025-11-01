@@ -44,7 +44,10 @@
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"\\d supplier_item_list\")",
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c:*)",
       "Bash(node -c:*)",
-      "Bash(node test-substitution-parser.js:*)"
+      "Bash(node test-substitution-parser.js:*)",
+      "Read(//c/Users/kevth/Downloads/**)",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" -U postgres -d stocktaking_local -c \"SELECT id, sup_name, sup_website FROM suppliers LIMIT 5;\")",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []
