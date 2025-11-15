@@ -915,7 +915,6 @@ const StockTaking = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedMasterProduct, setSelectedMasterProduct] = useState(null);
 
-
   // Area photo display
   const [showAreaPhoto, setShowAreaPhoto] = useState(false);
 
@@ -1468,12 +1467,15 @@ const StockTaking = () => {
     }
   };
 
-  // Remove product from counting session
+  // Remove product from venue and current session
   const handleRemoveProduct = async (productId) => {
-    if (window.confirm('Remove this product from the current counting session?\n\nThis will not delete it from your venue products.')) {
+    if (window.confirm('Remove this product from the area?\n\nThis will permanently delete it from your venue.')) {
       try {
-        // Delete stock entry from database
+        // Delete stock entry from this session
         await apiService.deleteStockEntry(sessionId, productId);
+
+        // Delete the product from venue_products permanently
+        await apiService.deleteVenueProduct(productId);
 
         // Update local state
         setStockItems(prev => prev.filter(item => item.id !== productId));
@@ -1493,8 +1495,8 @@ const StockTaking = () => {
           return newUnits;
         });
       } catch (error) {
-        console.error('Error deleting stock entry:', error);
-        setError('Failed to remove product from session');
+        console.error('Error deleting product:', error);
+        setError('Failed to remove product');
       }
     }
   };

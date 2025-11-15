@@ -1401,7 +1401,43 @@ app.delete('/api/entries/:id', async (req, res) => {
   }
 });
 
-// Add this endpoint after the DELETE /api/entries/:id endpoint in your server.js
+// Delete a venue product (permanently remove from venue)
+app.delete('/api/venue-products/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    // First, delete all stock_entries for this product (cascade)
+    await pool.query(
+      `DELETE FROM stock_entries WHERE product_id = $1`,
+      [productId]
+    );
+
+    // Then delete all wastage_records for this product (cascade)
+    await pool.query(
+      `DELETE FROM wastage_records WHERE product_id = $1`,
+      [productId]
+    );
+
+    // Finally, delete the product from venue_products
+    const result = await pool.query(
+      `DELETE FROM venue_products WHERE id = $1 RETURNING id, name`,
+      [productId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Product permanently removed from venue (all records deleted)',
+      deleted_product: result.rows[0].name
+    });
+  } catch (error) {
+    console.error('Error deleting venue product:', error);
+    res.status(500).json({ error: 'Failed to delete product' });
+  }
+});
 
 // Get session progress summary
 app.get('/api/sessions/:id/progress', async (req, res) => {
