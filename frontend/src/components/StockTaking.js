@@ -915,6 +915,7 @@ const StockTaking = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedMasterProduct, setSelectedMasterProduct] = useState(null);
 
+
   // Area photo display
   const [showAreaPhoto, setShowAreaPhoto] = useState(false);
 
@@ -1467,35 +1468,19 @@ const StockTaking = () => {
     }
   };
 
-  // Remove product from venue and current session
+  // Remove product from current session only
   const handleRemoveProduct = async (productId) => {
-    if (window.confirm('Remove this product from the area?\n\nThis will permanently delete it from your venue.')) {
+    if (window.confirm('Remove this product?\n\nThis will mark it as stock 0 in this session.\nIt will be hidden from future sessions.')) {
       try {
-        // Delete stock entry from this session
-        await apiService.deleteStockEntry(sessionId, productId);
+        // Save stock as 0 for this product (marks it for removal)
+        await apiService.updateStockEntry(sessionId, productId, 0, 0);
 
-        // Delete the product from venue_products permanently
-        await apiService.deleteVenueProduct(productId);
-
-        // Update local state
-        setStockItems(prev => prev.filter(item => item.id !== productId));
-        setStockCounts(prev => {
-          const newCounts = { ...prev };
-          delete newCounts[productId];
-          return newCounts;
-        });
-        setStockCases(prev => {
-          const newCases = { ...prev };
-          delete newCases[productId];
-          return newCases;
-        });
-        setStockUnits(prev => {
-          const newUnits = { ...prev };
-          delete newUnits[productId];
-          return newUnits;
-        });
+        // Update local state to show 0
+        setStockCounts(prev => ({ ...prev, [productId]: 0 }));
+        setStockCases(prev => ({ ...prev, [productId]: 0 }));
+        setStockUnits(prev => ({ ...prev, [productId]: 0 }));
       } catch (error) {
-        console.error('Error deleting product:', error);
+        console.error('Error updating stock entry:', error);
         setError('Failed to remove product');
       }
     }
@@ -1831,6 +1816,11 @@ const StockTaking = () => {
   };
 
   const filteredItems = stockItems.filter(item => {
+    // Filter out hidden items (marked for removal in previous sessions)
+    if (item.hidden) {
+      return false;
+    }
+
     const productName = item.venue_name || item.name || '';
     const productCategory = item.category || '';
     return productName.toLowerCase().includes(searchTerm.toLowerCase()) ||

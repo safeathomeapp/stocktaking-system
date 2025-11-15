@@ -104,15 +104,6 @@ export const apiService = {
     }
   },
 
-  deleteVenueProduct: async (productId) => {
-    try {
-      const response = await api.delete(`/api/venue-products/${productId}`);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { success: false, error: error.response?.data?.error || error.message };
-    }
-  },
-
   // Sessions
   getSessions: async (status = 'in_progress') => {
     try {

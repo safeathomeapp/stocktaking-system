@@ -447,6 +447,7 @@ app.get('/api/venues/:id/products', async (req, res) => {
          vp.area_id,
          vp.created_at,
          vp.updated_at,
+         vp.hidden,
          mp.brand,
          mp.unit_type,
          mp.unit_size,
@@ -456,7 +457,7 @@ app.get('/api/venues/:id/products', async (req, res) => {
          mp.case_size
        FROM venue_products vp
        LEFT JOIN master_products mp ON vp.master_product_id = mp.id
-       WHERE vp.venue_id = $1
+       WHERE vp.venue_id = $1 AND vp.hidden = false
        ORDER BY mp.category, mp.name`,
       [id]
     );
@@ -921,6 +922,26 @@ app.put('/api/sessions/:id', async (req, res) => {
     `;
 
     const result = await pool.query(query, values);
+
+    // If session is being marked as completed, hide items with 0 stock
+    if (status === 'completed') {
+      try {
+        await pool.query(`
+          UPDATE venue_products
+          SET hidden = true
+          WHERE id IN (
+            SELECT DISTINCT product_id
+            FROM stock_entries
+            WHERE session_id = $1
+            GROUP BY product_id
+            HAVING COALESCE(SUM(quantity), 0) = 0
+          )
+        `, [id]);
+      } catch (hideError) {
+        console.error('Error hiding zero-stock items:', hideError);
+        // Don't fail the request, just log the error
+      }
+    }
 
     res.json({
       message: 'Session updated successfully',
@@ -1401,41 +1422,18 @@ app.delete('/api/entries/:id', async (req, res) => {
   }
 });
 
-// Delete a venue product (permanently remove from venue)
+// Delete stock entry for a product from current session only
+// NOTE: This is a no-op endpoint - the actual deletion happens via
+// DELETE /api/sessions/:sessionId/entries/product/:productId
 app.delete('/api/venue-products/:productId', async (req, res) => {
   try {
-    const { productId } = req.params;
-
-    // First, delete all stock_entries for this product (cascade)
-    await pool.query(
-      `DELETE FROM stock_entries WHERE product_id = $1`,
-      [productId]
-    );
-
-    // Then delete all wastage_records for this product (cascade)
-    await pool.query(
-      `DELETE FROM wastage_records WHERE product_id = $1`,
-      [productId]
-    );
-
-    // Finally, delete the product from venue_products
-    const result = await pool.query(
-      `DELETE FROM venue_products WHERE id = $1 RETURNING id, name`,
-      [productId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
     res.json({
       success: true,
-      message: 'Product permanently removed from venue (all records deleted)',
-      deleted_product: result.rows[0].name
+      message: 'Product removed from current session only'
     });
   } catch (error) {
-    console.error('Error deleting venue product:', error);
-    res.status(500).json({ error: 'Failed to delete product' });
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Failed to process request' });
   }
 });
 
